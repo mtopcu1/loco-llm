@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# LocalLLM runtime state (machine-local, not committed)
+state/running.json
+state/history.jsonl
+state/logs/
+.llm-env
+
+# Per-spec gitignore: large benchmark artifacts opt-out
+benchmarks/*/results/**/raw/_large/
+
+# Build artifacts
+build/
+dist/
+*.egg
