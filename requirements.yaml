@@ -1,0 +1,66 @@
+# Cross-cutting external prerequisites for the LocalLLM repo.
+# Source of truth — `requirements.md` is auto-generated from this file.
+# Add a new entry with: id, name, why, verify (cmd + version_regex + min), install_hint.
+
+- id: cuda-driver
+  name: NVIDIA CUDA Driver (Windows host)
+  why: GPU passthrough into WSL2
+  verify:
+    cmd: nvidia-smi
+    version_regex: 'Driver Version:\s*([\d.]+)'
+    min: "535.0"
+  install_hint: "https://www.nvidia.com/Download/index.aspx"
+
+- id: python
+  name: Python
+  why: Base interpreter for runtime venvs and the CLI
+  verify:
+    cmd: python3 --version
+    version_regex: 'Python\s+([\d.]+)'
+    min: "3.11"
+  install_hint: "apt install python3.11 python3.11-venv"
+
+- id: hf-cli
+  name: huggingface-hub CLI
+  why: Used by models/*/pull.sh to fetch weights
+  verify:
+    cmd: huggingface-cli --version
+    version_regex: '([\d.]+)'
+    min: "0.20.0"
+  install_hint: "pip install -U huggingface_hub[cli]"
+
+- id: build-essential
+  name: build-essential + cmake
+  why: Building llama.cpp and similar native runtimes
+  verify:
+    cmd: gcc --version
+    version_regex: 'gcc.*?([\d.]+)'
+    min: "11.0"
+  install_hint: "apt install build-essential cmake"
+
+- id: git
+  name: Git
+  why: Cloning runtime forks in runtimes/*/build.sh
+  verify:
+    cmd: git --version
+    version_regex: 'git version\s+([\d.]+)'
+    min: "2.30"
+  install_hint: "apt install git"
+
+- id: curl
+  name: curl
+  why: healthcheck.sh and ad-hoc endpoint probing
+  verify:
+    cmd: curl --version
+    version_regex: 'curl\s+([\d.]+)'
+    min: "7.80"
+  install_hint: "apt install curl"
+
+- id: jq
+  name: jq
+  why: JSON parsing in shell scripts
+  verify:
+    cmd: jq --version
+    version_regex: 'jq-([\d.]+)'
+    min: "1.6"
+  install_hint: "apt install jq"
