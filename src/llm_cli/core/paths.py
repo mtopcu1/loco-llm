@@ -4,7 +4,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import yaml
 
@@ -46,11 +45,20 @@ def load_paths(path: Path) -> Paths:
     This is deliberately simple — paths.yaml is short and has no need for
     arbitrary nesting.
     """
-    raw: dict[str, Any] = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if loaded is None:
+        raw = {}
+    elif not isinstance(loaded, dict):
+        raise ValueError("paths.yaml must be a mapping at the top level")
+    else:
+        raw = loaded
 
     for key in REQUIRED_KEYS:
         if key not in raw:
             raise ValueError(f"paths.yaml missing required key: {key!r}")
+        val = raw[key]
+        if not isinstance(val, str) or not val.strip():
+            raise ValueError(f"paths.yaml key {key!r} must be a non-empty string")
 
     data_root_raw = str(raw["data_root"])
     data_root = Path(data_root_raw).expanduser()

@@ -62,6 +62,28 @@ def test_load_paths_unresolved_variable_raises(tmp_path: Path) -> None:
         load_paths(yaml_file)
 
 
+def test_load_paths_rejects_non_mapping_yaml(tmp_path: Path) -> None:
+    yaml_file = tmp_path / "paths.yaml"
+    yaml_file.write_text("[not, a, mapping]\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="must be a mapping"):
+        load_paths(yaml_file)
+
+
+def test_load_paths_rejects_empty_string_value(tmp_path: Path) -> None:
+    yaml_file = tmp_path / "paths.yaml"
+    yaml_file.write_text(
+        "data_root: ~/llm\n"
+        "runtimes: ${data_root}/runtimes\n"
+        "models:\n"
+        "cache: ${data_root}/cache\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="must be a non-empty string"):
+        load_paths(yaml_file)
+
+
 def test_paths_to_env_dict_returns_uppercased_strings(tmp_path: Path) -> None:
     yaml_file = tmp_path / "paths.yaml"
     yaml_file.write_text(
