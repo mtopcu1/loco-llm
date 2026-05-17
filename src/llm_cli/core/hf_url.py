@@ -39,11 +39,17 @@ def parse_hf_url(url: str) -> ParsedHFUrl:
     if not rest:
         return ParsedHFUrl(repo=repo_id, revision="main", file=None)
     kind = rest[0]
-    if kind == "tree":
+    if kind in ("tree", "blob", "resolve"):
         if len(rest) < 2:
-            raise HFUrlError(f"`tree/` URL missing revision: {url!r}")
+            raise HFUrlError(f"`{kind}/` URL missing revision: {url!r}")
         revision = rest[1]
-        if len(rest) > 2:
-            raise HFUrlError(f"`tree/` URL must not include a file path: {url!r}")
-        return ParsedHFUrl(repo=repo_id, revision=revision, file=None)
+        file_parts = rest[2:]
+        if kind == "tree":
+            if file_parts:
+                raise HFUrlError(f"`tree/` URL must not include a file path: {url!r}")
+            return ParsedHFUrl(repo=repo_id, revision=revision, file=None)
+        if not file_parts:
+            raise HFUrlError(f"`{kind}/` URL missing file path: {url!r}")
+        file_str = "/".join(file_parts)
+        return ParsedHFUrl(repo=repo_id, revision=revision, file=file_str)
     raise HFUrlError(f"unsupported HF URL shape: {url!r}")
