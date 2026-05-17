@@ -89,3 +89,44 @@ def test_coerce_enum_rejects_unlisted():
     spec = _spec("x", "enum", values=["a", "b"])
     with pytest.raises(ParamValidationError, match="must be one of"):
         coerce_value(spec, "c")
+
+
+from pathlib import Path
+
+from llm_cli.core.params import expand_path
+from llm_cli.core.settings import Settings
+
+
+def _settings(tmp_path: Path) -> Settings:
+    return Settings(
+        data_root=tmp_path / "data",
+        repo_root=tmp_path / "repo",
+        runtimes_dir=tmp_path / "data" / "runtimes",
+        models_dir=tmp_path / "data" / "models",
+        cache_dir=tmp_path / "data" / "cache",
+    )
+
+
+def test_expand_path_tokens(tmp_path):
+    s = _settings(tmp_path)
+    assert expand_path("${data_root}/x", s) == str((tmp_path / "data" / "x").as_posix())
+    assert expand_path("${models_dir}/m.gguf", s) == str(
+        (tmp_path / "data" / "models" / "m.gguf").as_posix()
+    )
+
+
+def test_expand_path_home(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    s = _settings(tmp_path)
+    assert expand_path("~/foo", s).endswith("/foo")
+
+
+def test_expand_path_unknown_token_raises(tmp_path):
+    s = _settings(tmp_path)
+    with pytest.raises(ParamValidationError, match="unknown template token"):
+        expand_path("${nope}/x", s)
+
+
+def test_expand_path_passthrough_when_no_token(tmp_path):
+    s = _settings(tmp_path)
+    assert expand_path("/abs/path", s) == "/abs/path"

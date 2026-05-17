@@ -1,9 +1,14 @@
 """Typed parameter system used by runtime build/serve schemas and configs."""
 from __future__ import annotations
 
+import os
+import re
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import Any
+
+from llm_cli.core.settings import Settings
 
 
 class ParamType(str, Enum):
@@ -75,6 +80,57 @@ def parse_schema(raw: dict[str, Any]) -> list[ParamSpec]:
 
 class ParamValidationError(ValueError):
     """Raised when a value cannot be coerced/validated against its ParamSpec."""
+
+
+_TOKEN_RE = re.compile(r"\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
+
+
+def _settings_tokens(s: Settings) -> dict[str, str]:
+    return {
+        "data_root": s.data_root.as_posix(),
+        "repo_root": s.repo_root.as_posix(),
+        "runtimes_dir": s.runtimes_dir.as_posix(),
+        "models_dir": s.models_dir.as_posix(),
+        "cache_dir": s.cache_dir.as_posix(),
+    }
+
+
+def expand_path(raw: str, settings: Settings) -> str:
+    """Expand ${data_root}/${runtimes_dir}/... and leading ~ in a path string.
+
+    Unknown ${...} tokens raise ParamValidationError. No shell is involved.
+    """
+    tokens = _settings_tokens(settings)
+    if raw.startswith("~"):
+        home = os.environ.get("HOME")
+        if (
+            home is not None
+            and (raw == "~" or (len(raw) > 1 and raw[1] in "/\\"))
+        ):
+            suffix = (
+                raw[2:].replace("\\", "/").lstrip("/")
+                if len(raw) > 2
+                else ""
+            )
+            base = Path(home)
+            expanded = (
+                str((base / suffix).as_posix()) if suffix else str(base.as_posix())
+            )
+        else:
+            expanded = str(Path(raw).expanduser())
+    else:
+        expanded = raw
+
+    def _sub(match: re.Match[str]) -> str:
+        name = match.group(1)
+        if name not in tokens:
+            raise ParamValidationError(
+                f"unknown template token ${{{name}}}; "
+                f"valid: {', '.join(sorted(tokens))}"
+            )
+        return tokens[name]
+
+    return _TOKEN_RE.sub(_sub, expanded)
 
 
 _BOOL_TRUE = {"true", "1", "yes", "y", "on"}
