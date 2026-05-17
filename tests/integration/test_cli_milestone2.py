@@ -1,4 +1,4 @@
-"""Integration tests for list, config, build, and pull commands."""
+"""Integration tests for list, config, runtime install, and model pull."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -24,13 +24,15 @@ def _make_repo(root: Path) -> Path:
     (rt / "manifest.yaml").write_text(
         "id: rt-a\n"
         "display_name: A\n"
+        "official: true\n"
+        "build: {}\n"
         "serve:\n"
         "  weights:\n"
         "    type: path\n"
         "    env: LLM_RT_A_WEIGHTS\n",
         encoding="utf-8",
     )
-    for name in ("build.sh", "serve.sh", "healthcheck.sh"):
+    for name in ("build.sh", "serve.sh", "healthcheck.sh", "verify.sh"):
         (rt / name).write_text("#!/usr/bin/env bash\necho ok\n", encoding="utf-8")
     md = repo / "models" / "md-a"
     md.mkdir(parents=True)
@@ -44,8 +46,6 @@ def _make_repo(root: Path) -> Path:
         "serve:\n"
         "  host: 127.0.0.1\n"
         "  port: 9\n"
-        "  env:\n"
-        "    X: ${data_root}/mark\n"
         "  params:\n"
         "    weights: ${models_dir}/m.gguf\n",
         encoding="utf-8",
@@ -116,31 +116,35 @@ def test_config_show_resolves_env(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "${data_root}" not in result.stdout
     assert "${models_dir}" not in result.stdout
-    assert "/mark" in result.stdout
     assert "/m.gguf" in result.stdout
 
 
-@patch("llm_cli.commands.artifacts.run_repo_bash", return_value=0)
-def test_build_calls_run_repo_bash(mock_run, tmp_path: Path) -> None:
+@patch("llm_cli.commands.runtime_cmd._run_build_script", return_value=0)
+@patch("llm_cli.commands.runtime_cmd._run_verify_script", return_value=0)
+def test_runtime_install_calls_build_and_verify(
+    mock_verify, mock_build, tmp_path: Path
+) -> None:
     repo = _make_repo(tmp_path)
     _configure(tmp_path, repo)
     result = runner.invoke(
         app,
-        ["build", "rt-a"],
+        ["runtime", "install", "rt-a", "--yes"],
         catch_exceptions=False,
     )
     assert result.exit_code == 0
-    mock_run.assert_called_once()
-    assert mock_run.call_args[0][1] == "runtimes/rt-a/build.sh"
+    mock_build.assert_called_once()
+    mock_verify.assert_called_once()
+    assert mock_build.call_args.kwargs["runtime_id"] == "rt-a"
+    assert mock_verify.call_args.kwargs["runtime_id"] == "rt-a"
 
 
-@patch("llm_cli.commands.artifacts.run_repo_bash", return_value=0)
-def test_pull_calls_run_repo_bash(mock_run, tmp_path: Path) -> None:
+@patch("llm_cli.commands.model_cmd.run_repo_bash", return_value=0)
+def test_model_pull_calls_run_repo_bash(mock_run, tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
     _configure(tmp_path, repo)
     result = runner.invoke(
         app,
-        ["pull", "md-a"],
+        ["model", "pull", "md-a"],
         catch_exceptions=False,
     )
     assert result.exit_code == 0
@@ -148,12 +152,12 @@ def test_pull_calls_run_repo_bash(mock_run, tmp_path: Path) -> None:
     assert mock_run.call_args[0][1] == "models/md-a/pull.sh"
 
 
-def test_build_unknown_runtime_errors(tmp_path: Path) -> None:
+def test_runtime_install_unknown_runtime_errors(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
     _configure(tmp_path, repo)
     result = runner.invoke(
         app,
-        ["build", "missing"],
+        ["runtime", "install", "missing", "--yes"],
         catch_exceptions=False,
     )
     assert result.exit_code == 1

@@ -4,7 +4,7 @@ from typing import Optional
 import typer
 
 from llm_cli import __version__
-from llm_cli.commands import artifacts, config_cmd, list_cmd
+from llm_cli.commands import config_cmd, list_cmd
 from llm_cli.commands import setup as setup_cmd
 from llm_cli.commands import specs as specs_cmd
 from llm_cli.commands import lifecycle_cmds
@@ -51,12 +51,6 @@ app.command(
     help="List discovered runtimes, models, configs, and benchmarks.",
 )(list_cmd.list_entities)
 app.add_typer(config_cmd.config_app, name="config")
-app.command("build", help="Run runtimes/<id>/build.sh in WSL with LLM_* env.")(
-    artifacts.build_runtime
-)
-app.command("pull", help="Run models/<id>/pull.sh in WSL with LLM_* env.")(
-    artifacts.pull_model
-)
 
 # Lifecycle: serve, switch, stop, status, logs.
 app.command("serve", help="Start a config in fg/bg/systemd mode.")(serve_cmd.serve)
