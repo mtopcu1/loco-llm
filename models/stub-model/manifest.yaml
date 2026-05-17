@@ -1,5 +1,0 @@
-id: stub-model
-display_name: Stub Model (smoke)
-description: >
-  Minimal model package for `llm pull` and config validation.
-  Replace with a real weights recipe (HF id, local GGUF path, …).
