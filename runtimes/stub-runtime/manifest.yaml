@@ -4,5 +4,6 @@ official: true
 description: >
   Minimal runtime package for exercising discovery, `llm runtime install`, and
   layout validation. Replace with a real inference server (vLLM, llama.cpp, ...).
+accepts_formats: []
 build: {}
 serve: {}

@@ -5,6 +5,8 @@ description: >
   Builds upstream llama.cpp and serves GGUF weights via the OpenAI-compatible
   HTTP API (`llama-server`).
 
+accepts_formats: [gguf]
+
 requires:
   - id: cmake
     verify:
