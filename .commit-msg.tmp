@@ -1,0 +1,11 @@
+feat(validate,model-cmd): registry-backed model rules + drop legacy model dir code
+
+- validate_config_v2: enforce model presence/absence via accepts_formats,
+  look up models in the registry (errors), warn when primary path missing
+- registry.py: drop ModelRecord / discover_models / get_model /
+  validate_model_layout (replaced by model_registry.* + accepts_formats)
+- list_cmd: enumerate models from registry.json instead of repo dirs
+- model_cmd: list and info backed by registry.json (pull/add/uninstall
+  arrive in later tasks)
+- Fixture updates so existing serve + milestone2 + registry tests model
+  the new world (accepts_formats on runtimes, seeded model registry)

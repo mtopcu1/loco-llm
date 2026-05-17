@@ -39,13 +39,6 @@ class RuntimeManifest:
 
 
 @dataclass(frozen=True)
-class ModelRecord:
-    id: str
-    path: Path
-    manifest: dict[str, Any]
-
-
-@dataclass(frozen=True)
 class BenchmarkRecord:
     id: str
     path: Path
@@ -82,23 +75,6 @@ def discover_runtimes(repo: Path) -> list[RuntimeRecord]:
         data = _safe_load(mf)
         rid = str(data.get("id", child.name))
         out.append(RuntimeRecord(id=rid, path=child, manifest=data))
-    return out
-
-
-def discover_models(repo: Path) -> list[ModelRecord]:
-    root = repo / "models"
-    if not root.is_dir():
-        return []
-    out: list[ModelRecord] = []
-    for child in sorted(root.iterdir(), key=lambda p: p.name):
-        if not child.is_dir():
-            continue
-        mf = child / "manifest.yaml"
-        if not mf.is_file():
-            continue
-        data = _safe_load(mf)
-        mid = str(data.get("id", child.name))
-        out.append(ModelRecord(id=mid, path=child, manifest=data))
     return out
 
 
@@ -170,13 +146,6 @@ def get_runtime_manifest(repo: Path, runtime_id: str) -> RuntimeManifest | None:
     return _to_manifest(rec) if rec is not None else None
 
 
-def get_model(repo: Path, model_id: str) -> ModelRecord | None:
-    for m in discover_models(repo):
-        if m.id == model_id:
-            return m
-    return None
-
-
 def get_config(repo: Path, config_id: str) -> ConfigRecord | None:
     for c in discover_configs(repo):
         if c.id == config_id:
@@ -192,36 +161,37 @@ def validate_runtime_layout(r: RuntimeRecord) -> list[str]:
     return errs
 
 
-def validate_model_layout(m: ModelRecord) -> list[str]:
-    errs: list[str] = []
-    if not (m.path / "pull.sh").is_file():
-        errs.append(f"{m.id}: missing pull.sh")
-    return errs
-
-
 def validate_config_v2(repo: Path, cfg: ConfigRecord) -> tuple[list[str], list[str]]:
     """Return (errors, warnings). Errors fail validation; warnings are advisory."""
     errs: list[str] = []
     warnings: list[str] = []
+
     rt_id = cfg.data.get("runtime")
-    md_id = cfg.data.get("model")
     if not isinstance(rt_id, str):
         errs.append(f"{cfg.id}: runtime must be a string")
         return errs, warnings
-    if not isinstance(md_id, str):
-        errs.append(f"{cfg.id}: model must be a string")
-        return errs, warnings
+
     rt = get_runtime(repo, rt_id)
     rt_manifest = _to_manifest(rt) if rt is not None else None
     if rt is None:
         errs.append(f"{cfg.id}: unknown runtime {rt_id!r}")
     else:
         errs.extend(validate_runtime_layout(rt))
-    md = get_model(repo, md_id)
-    if md is None:
-        errs.append(f"{cfg.id}: unknown model {md_id!r}")
-    else:
-        errs.extend(validate_model_layout(md))
+
+    md_id_raw = cfg.data.get("model")
+    md_id: str | None = md_id_raw if isinstance(md_id_raw, str) else None
+    if rt_manifest is not None:
+        if rt_manifest.accepts_formats and md_id is None:
+            errs.append(
+                f"{cfg.id}: model: is required when runtime {rt_id!r} declares "
+                f"accepts_formats={list(rt_manifest.accepts_formats)}"
+            )
+        if not rt_manifest.accepts_formats and md_id is not None:
+            errs.append(
+                f"{cfg.id}: runtime {rt_id!r} has empty accepts_formats; "
+                f"config must not set `model:`"
+            )
+
     serve = cfg.data.get("serve")
     if not isinstance(serve, dict):
         errs.append(f"{cfg.id}: serve must be a mapping")
@@ -236,22 +206,47 @@ def validate_config_v2(repo: Path, cfg: ConfigRecord) -> tuple[list[str], list[s
             else:
                 _, param_errs = validate_params(rt_manifest.serve_schema, params)
                 errs.extend(f"{cfg.id}: {e}" for e in param_errs)
+
     ready = cfg.data.get("readiness")
     if ready is not None and not isinstance(ready, dict):
         errs.append(f"{cfg.id}: readiness must be a mapping when present")
+
     yaml_id = cfg.data.get("id")
     if yaml_id is not None and yaml_id != cfg.id:
         errs.append(f"{cfg.id}: file id {yaml_id!r} does not match filename/config id")
+
     try:
         settings = resolve(load_settings())
     except (MissingSettingError, UnknownSettingError, ValueError) as exc:
         errs.append(f"settings: {exc}")
         return errs, warnings
+
+    if rt_manifest is not None and md_id is not None and rt_manifest.accepts_formats:
+        from llm_cli.core.model_registry import get_entry as _get_model
+
+        model_entry = _get_model(settings.models_dir, md_id)
+        if model_entry is None:
+            errs.append(f"{cfg.id}: unknown model {md_id!r}")
+        else:
+            if model_entry.format not in rt_manifest.accepts_formats:
+                errs.append(
+                    f"{cfg.id}: model {md_id!r} has format "
+                    f"{model_entry.format!r}; runtime {rt_id!r} accepts "
+                    f"{list(rt_manifest.accepts_formats)}"
+                )
+            primary_path = settings.models_dir / md_id / model_entry.artifact.primary
+            if not primary_path.exists():
+                warnings.append(
+                    f"{cfg.id}: model {md_id!r} primary path missing on disk "
+                    f"({primary_path}); run `llm model pull {md_id}`."
+                )
+
     if rt_manifest is not None and not is_installed(settings.runtimes_dir, rt_id):
         warnings.append(
             f"{cfg.id}: runtime {rt_id!r} is not installed; "
             f"run `llm runtime install {rt_id}` before `llm serve`."
         )
+
     return errs, warnings
 
 

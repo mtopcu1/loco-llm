@@ -1,53 +1,71 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
 
 from typer.testing import CliRunner
 
+from llm_cli.core.model_registry import (
+    Artifact,
+    HFSource,
+    Metadata,
+    RegistryEntry,
+    upsert_entry,
+)
 from llm_cli.core.settings import save_settings
 from llm_cli.main import app
 
 runner = CliRunner()
 
 
-def _scaffold(repo: Path) -> None:
-    md = repo / "models" / "md-a"
-    md.mkdir(parents=True)
-    (md / "manifest.yaml").write_text(
-        "id: md-a\ndisplay_name: M\nsource: { kind: huggingface, repo: foo/bar }\n",
-        encoding="utf-8",
+def _seed_entry(models_dir: Path, mid: str = "qwen-qwen2.5-7b-instruct") -> RegistryEntry:
+    e = RegistryEntry(
+        id=mid,
+        format="safetensors-dir",
+        source=HFSource(repo="Qwen/Qwen2.5-7B-Instruct"),
+        artifact=Artifact(primary=".", files=("config.json",), total_size_bytes=42),
+        metadata=Metadata(display_name="Qwen 2.5", license="apache-2.0"),
+        installed_at="2026-05-17T00:00:00Z",
     )
-    (md / "pull.sh").write_text("#!/usr/bin/env bash\necho ok\n", encoding="utf-8")
+    upsert_entry(models_dir, e)
+    return e
 
 
-def test_model_list(tmp_path: Path) -> None:
+def _configure(tmp_path: Path) -> Path:
     repo = tmp_path / "repo"
     repo.mkdir()
-    _scaffold(repo)
     save_settings({"data_root": str(tmp_path / "data"), "repo_root": str(repo)})
+    return tmp_path / "data" / "models"
+
+
+def test_model_list_empty(tmp_path: Path) -> None:
+    _configure(tmp_path)
     result = runner.invoke(app, ["model", "list"], catch_exceptions=False)
     assert result.exit_code == 0
-    assert "md-a" in result.stdout
+    assert "no models registered" in result.stdout.lower() or "Models" in result.stdout
+
+
+def test_model_list_shows_registered_entry(tmp_path: Path) -> None:
+    models_dir = _configure(tmp_path)
+    _seed_entry(models_dir)
+    result = runner.invoke(app, ["model", "list"], catch_exceptions=False)
+    assert result.exit_code == 0
+    assert "qwen-qwen2.5-7b-instruct" in result.stdout
+    assert "safetensors-dir" in result.stdout
 
 
 def test_model_info(tmp_path: Path) -> None:
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    _scaffold(repo)
-    save_settings({"data_root": str(tmp_path / "data"), "repo_root": str(repo)})
-    result = runner.invoke(app, ["model", "info", "md-a"], catch_exceptions=False)
+    models_dir = _configure(tmp_path)
+    _seed_entry(models_dir)
+    result = runner.invoke(
+        app, ["model", "info", "qwen-qwen2.5-7b-instruct"], catch_exceptions=False
+    )
     assert result.exit_code == 0
-    assert "md-a" in result.stdout
-    assert "huggingface" in result.stdout
+    assert "Qwen/Qwen2.5-7B-Instruct" in result.stdout
+    assert "apache-2.0" in result.stdout
 
 
-@patch("llm_cli.commands.model_cmd.run_repo_bash", return_value=0)
-def test_model_pull_calls_run_repo_bash(mock_run, tmp_path: Path) -> None:
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    _scaffold(repo)
-    save_settings({"data_root": str(tmp_path / "data"), "repo_root": str(repo)})
-    result = runner.invoke(app, ["model", "pull", "md-a"], catch_exceptions=False)
-    assert result.exit_code == 0
-    assert mock_run.call_args[0][1] == "models/md-a/pull.sh"
+def test_model_info_missing(tmp_path: Path) -> None:
+    _configure(tmp_path)
+    result = runner.invoke(app, ["model", "info", "ghost"], catch_exceptions=False)
+    assert result.exit_code == 1
+    assert "unknown model" in result.stdout

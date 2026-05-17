@@ -9,7 +9,9 @@ from rich.console import Console
 from rich.table import Table
 
 from llm_cli.core import registry
+from llm_cli.core.model_registry import RegistryEntry, load_registry
 from llm_cli.core.repo import repo_root
+from llm_cli.core.settings import load_settings, resolve
 
 console = Console()
 
@@ -17,8 +19,8 @@ console = Console()
 def _summarize(item: Any) -> dict[str, Any]:
     if isinstance(item, registry.RuntimeRecord):
         return {"id": item.id, "kind": "runtime", "path": str(item.path)}
-    if isinstance(item, registry.ModelRecord):
-        return {"id": item.id, "kind": "model", "path": str(item.path)}
+    if isinstance(item, RegistryEntry):
+        return {"id": item.id, "kind": "model", "format": item.format, "source": item.source.kind}
     if isinstance(item, registry.ConfigRecord):
         return {
             "id": item.id,
@@ -54,7 +56,8 @@ def list_entities(
         raise typer.Exit(code=1)
 
     runtimes = registry.discover_runtimes(repo)
-    models = registry.discover_models(repo)
+    settings = resolve(load_settings())
+    models = sorted(load_registry(settings.models_dir).values(), key=lambda e: e.id)
     configs = registry.discover_configs(repo)
     benches = registry.discover_benchmarks(repo)
 
@@ -90,11 +93,12 @@ def list_entities(
                 table.add_row(r.id, dn)
         elif title == "models":
             table.add_column("ID")
+            table.add_column("Format")
+            table.add_column("Source")
             table.add_column("Display name")
             for m in rows:
-                assert isinstance(m, registry.ModelRecord)
-                dn = str(m.manifest.get("display_name", ""))
-                table.add_row(m.id, dn)
+                assert isinstance(m, RegistryEntry)
+                table.add_row(m.id, m.format, m.source.kind, m.metadata.display_name)
         elif title == "configs":
             table.add_column("ID")
             table.add_column("Runtime")

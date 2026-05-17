@@ -19,10 +19,17 @@ def _write_runtime(
     *,
     with_scripts: bool = True,
     serve_schema: dict | None = None,
+    accepts_formats: list[str] | None = None,
 ) -> None:
     root = repo / "runtimes" / rid
     root.mkdir(parents=True)
     body = f"id: {rid}\ndisplay_name: {rid}\n"
+    if accepts_formats is not None:
+        body += yaml.safe_dump({"accepts_formats": accepts_formats}, sort_keys=False)
+    else:
+        # default for these legacy fixtures: a single stub format so configs with
+        # `model:` still validate.
+        body += yaml.safe_dump({"accepts_formats": ["stub"]}, sort_keys=False)
     if serve_schema is not None:
         body += yaml.safe_dump({"serve": serve_schema}, sort_keys=False)
     (root / "manifest.yaml").write_text(
@@ -35,14 +42,27 @@ def _write_runtime(
 
 
 def _write_model(repo: Path, mid: str, *, with_pull: bool = True) -> None:
-    root = repo / "models" / mid
-    root.mkdir(parents=True)
-    (root / "manifest.yaml").write_text(
-        f"id: {mid}\ndisplay_name: {mid}\n",
-        encoding="utf-8",
+    """Seed a model entry in the per-test registry (under data_root/models)."""
+    from llm_cli.core.model_registry import (
+        Artifact, HFSource, Metadata, RegistryEntry, upsert_entry,
     )
-    if with_pull:
-        (root / "pull.sh").write_text("#!/usr/bin/env bash\necho ok\n", encoding="utf-8")
+    from llm_cli.core.settings import load_settings, resolve
+
+    settings = resolve(load_settings())
+    settings.models_dir.mkdir(parents=True, exist_ok=True)
+    upsert_entry(
+        settings.models_dir,
+        RegistryEntry(
+            id=mid,
+            format="stub",
+            source=HFSource(repo="o/r"),
+            artifact=Artifact(
+                primary="weights.bin", files=("weights.bin",), total_size_bytes=1
+            ),
+            metadata=Metadata(display_name=mid),
+            installed_at="2026-05-17T00:00:00Z",
+        ),
+    )
 
 
 def _write_config(
@@ -115,9 +135,13 @@ def test_validate_runtime_missing_script(tmp_path: Path) -> None:
 def test_validate_includes_settings_errors(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
-    _write_runtime(repo, "rt-a")
-    _write_model(repo, "md-a")
-    _write_config(repo, "cfg1", "rt-a", "md-a")
+    # Runtime with empty accepts_formats so the config doesn't need `model:`.
+    _write_runtime(repo, "rt-a", accepts_formats=[])
+    (repo / "configs").mkdir()
+    (repo / "configs" / "cfg1.yaml").write_text(
+        "id: cfg1\nruntime: rt-a\nserve:\n  host: 127.0.0.1\n  port: 1\n",
+        encoding="utf-8",
+    )
     cfg = registry.discover_configs(repo)[0]
     errs = registry.validate_config(repo, cfg)
     assert any("settings:" in e for e in errs)
@@ -245,3 +269,80 @@ def test_runtime_manifest_accepts_formats_invalid_type(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="accepts_formats must be a list"):
         registry.get_runtime_manifest(repo, "rt")
+
+
+def _write_v2_config(repo: Path, cid: str, body: dict) -> None:
+    p = repo / "configs" / f"{cid}.yaml"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(yaml.safe_dump(body, sort_keys=False), encoding="utf-8")
+
+
+def test_validate_requires_model_when_accepts_formats_non_empty(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"; repo.mkdir()
+    _settings(tmp_path, repo)
+    _write_runtime_manifest(repo, "rt", {"id": "rt", "official": True, "accepts_formats": ["gguf"]})
+    _write_v2_config(repo, "c", {
+        "id": "c", "runtime": "rt",
+        "serve": {"host": "127.0.0.1", "port": 8080, "params": {}},
+    })
+    cfg = next(c for c in registry.discover_configs(repo) if c.id == "c")
+    errs, _ = registry.validate_config_v2(repo, cfg)
+    assert any("model: is required" in e for e in errs)
+
+
+def test_validate_rejects_model_when_accepts_formats_empty(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"; repo.mkdir()
+    _settings(tmp_path, repo)
+    _write_runtime_manifest(repo, "rt", {"id": "rt", "official": True, "accepts_formats": []})
+    _write_v2_config(repo, "c", {
+        "id": "c", "runtime": "rt", "model": "x",
+        "serve": {"host": "127.0.0.1", "port": 8080, "params": {}},
+    })
+    cfg = next(c for c in registry.discover_configs(repo) if c.id == "c")
+    errs, _ = registry.validate_config_v2(repo, cfg)
+    assert any("must not set `model:`" in e for e in errs)
+
+
+def test_validate_errors_on_unknown_model(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"; repo.mkdir()
+    _settings(tmp_path, repo)
+    _write_runtime_manifest(
+        repo, "rt", {"id": "rt", "official": True, "accepts_formats": ["gguf"]}
+    )
+    _write_v2_config(repo, "c", {
+        "id": "c", "runtime": "rt", "model": "ghost",
+        "serve": {"host": "127.0.0.1", "port": 8080, "params": {}},
+    })
+    cfg = next(c for c in registry.discover_configs(repo) if c.id == "c")
+    errs, _ = registry.validate_config_v2(repo, cfg)
+    assert any("unknown model 'ghost'" in e for e in errs)
+
+
+def test_validate_errors_on_format_mismatch(tmp_path: Path) -> None:
+    from llm_cli.core.model_registry import (
+        Artifact, HFSource, Metadata, RegistryEntry, upsert_entry,
+    )
+
+    repo = tmp_path / "repo"; repo.mkdir()
+    _settings(tmp_path, repo)
+    _write_runtime_manifest(
+        repo, "rt", {"id": "rt", "official": True, "accepts_formats": ["safetensors-dir"]}
+    )
+    _write_v2_config(repo, "c", {
+        "id": "c", "runtime": "rt", "model": "g",
+        "serve": {"host": "127.0.0.1", "port": 8080, "params": {}},
+    })
+    upsert_entry(
+        tmp_path / "data" / "models",
+        RegistryEntry(
+            id="g",
+            format="gguf",
+            source=HFSource(repo="o/r"),
+            artifact=Artifact(primary="x.gguf", files=("x.gguf",), total_size_bytes=1),
+            metadata=Metadata(),
+            installed_at="2026-05-17T00:00:00Z",
+        ),
+    )
+    cfg = next(c for c in registry.discover_configs(repo) if c.id == "c")
+    errs, _ = registry.validate_config_v2(repo, cfg)
+    assert any("format" in e and "gguf" in e for e in errs)

@@ -25,6 +25,7 @@ def _make_repo(root: Path) -> Path:
         "id: rt-a\n"
         "display_name: A\n"
         "official: true\n"
+        "accepts_formats: [stub]\n"
         "build: {}\n"
         "serve:\n"
         "  weights:\n"
@@ -34,10 +35,27 @@ def _make_repo(root: Path) -> Path:
     )
     for name in ("build.sh", "serve.sh", "healthcheck.sh", "verify.sh"):
         (rt / name).write_text("#!/usr/bin/env bash\necho ok\n", encoding="utf-8")
-    md = repo / "models" / "md-a"
-    md.mkdir(parents=True)
-    (md / "manifest.yaml").write_text("id: md-a\ndisplay_name: M\n", encoding="utf-8")
-    (md / "pull.sh").write_text("#!/usr/bin/env bash\necho ok\n", encoding="utf-8")
+
+    # Seed model registry: same scaffolding tests expect a 'md-a' model present.
+    from llm_cli.core.model_registry import (
+        Artifact, HFSource, Metadata, RegistryEntry, upsert_entry,
+    )
+    models_dir = root / "data" / "models"
+    models_dir.mkdir(parents=True, exist_ok=True)
+    (models_dir / "md-a").mkdir(parents=True, exist_ok=True)
+    (models_dir / "md-a" / "weights.bin").write_bytes(b"x")
+    upsert_entry(
+        models_dir,
+        RegistryEntry(
+            id="md-a",
+            format="stub",
+            source=HFSource(repo="o/r"),
+            artifact=Artifact(primary="weights.bin", files=("weights.bin",), total_size_bytes=1),
+            metadata=Metadata(display_name="M"),
+            installed_at="2026-05-17T00:00:00Z",
+        ),
+    )
+
     (repo / "configs").mkdir()
     (repo / "configs" / "cfg-one.yaml").write_text(
         "id: cfg-one\n"
@@ -136,20 +154,6 @@ def test_runtime_install_calls_build_and_verify(
     mock_verify.assert_called_once()
     assert mock_build.call_args.kwargs["runtime_id"] == "rt-a"
     assert mock_verify.call_args.kwargs["runtime_id"] == "rt-a"
-
-
-@patch("llm_cli.commands.model_cmd.run_repo_bash", return_value=0)
-def test_model_pull_calls_run_repo_bash(mock_run, tmp_path: Path) -> None:
-    repo = _make_repo(tmp_path)
-    _configure(tmp_path, repo)
-    result = runner.invoke(
-        app,
-        ["model", "pull", "md-a"],
-        catch_exceptions=False,
-    )
-    assert result.exit_code == 0
-    mock_run.assert_called_once()
-    assert mock_run.call_args[0][1] == "models/md-a/pull.sh"
 
 
 def test_runtime_install_unknown_runtime_errors(tmp_path: Path) -> None:

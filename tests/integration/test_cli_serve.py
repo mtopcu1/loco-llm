@@ -26,6 +26,7 @@ def _make_repo(root: Path, port: int = 18080, *, installed: bool = True) -> Path
     rt.mkdir(parents=True)
     (rt / "manifest.yaml").write_text(
         "id: rt-a\n"
+        "accepts_formats: [stub]\n"
         "serve:\n"
         "  token:\n"
         "    type: string\n"
@@ -35,10 +36,25 @@ def _make_repo(root: Path, port: int = 18080, *, installed: bool = True) -> Path
     )
     for name in ("build.sh", "serve.sh", "healthcheck.sh"):
         (rt / name).write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
-    md = repo / "models" / "md-a"
-    md.mkdir(parents=True)
-    (md / "manifest.yaml").write_text("id: md-a\n", encoding="utf-8")
-    (md / "pull.sh").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    # Seed model registry under data_root/models with a matching stub entry.
+    from llm_cli.core.model_registry import (
+        Artifact, HFSource, Metadata, RegistryEntry, upsert_entry,
+    )
+    models_dir = root / "data" / "models"
+    models_dir.mkdir(parents=True, exist_ok=True)
+    (models_dir / "md-a").mkdir(parents=True, exist_ok=True)
+    (models_dir / "md-a" / "weights.bin").write_bytes(b"x")
+    upsert_entry(
+        models_dir,
+        RegistryEntry(
+            id="md-a",
+            format="stub",
+            source=HFSource(repo="o/r"),
+            artifact=Artifact(primary="weights.bin", files=("weights.bin",), total_size_bytes=1),
+            metadata=Metadata(display_name="md-a"),
+            installed_at="2026-05-17T00:00:00Z",
+        ),
+    )
     (repo / "configs").mkdir()
     (repo / "configs" / "cfg-a.yaml").write_text(
         f"id: cfg-a\nruntime: rt-a\nmodel: md-a\nserve:\n  host: 127.0.0.1\n  port: {port}\n  params:\n    token: test-token\n",
