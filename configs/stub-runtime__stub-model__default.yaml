@@ -4,7 +4,6 @@ model: stub-model
 serve:
   host: 127.0.0.1
   port: 18080
-  env:
-    STUB_MARK: "${data_root}/stub-mark"
+  params: {}
 readiness:
   timeout_seconds: 120
