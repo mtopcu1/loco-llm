@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from llm_cli.core.settings import KEY_REGISTRY, Settings, default_settings
+from llm_cli.core.settings import KEY_REGISTRY, Settings, default_settings, settings_path
 
 
 def test_settings_dataclass_has_expected_fields() -> None:
@@ -36,3 +36,16 @@ def test_key_registry_has_required_keys() -> None:
     for k in ("runtimes_dir", "models_dir", "cache_dir"):
         assert KEY_REGISTRY[k]["required"] is False
         assert KEY_REGISTRY[k]["derived_from"] == "data_root"
+
+
+def test_settings_path_defaults_to_home_config(monkeypatch, tmp_path) -> None:
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    assert settings_path() == tmp_path / ".config" / "llm" / "config.yaml"
+
+
+def test_settings_path_honors_xdg_config_home(monkeypatch, tmp_path) -> None:
+    xdg = tmp_path / "xdg"
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
+    assert settings_path() == xdg / "llm" / "config.yaml"

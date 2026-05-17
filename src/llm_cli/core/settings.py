@@ -1,6 +1,7 @@
 """User-level settings stored at ~/.config/llm/config.yaml."""
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -58,3 +59,10 @@ KEY_REGISTRY: dict[str, dict[str, Any]] = {
 def default_settings() -> dict[str, str]:
     """The minimum stored dict; repo_root is filled in by `llm setup`."""
     return {"data_root": KEY_REGISTRY["data_root"]["default"]}
+
+
+def settings_path() -> Path:
+    """Resolve the settings file path honoring $XDG_CONFIG_HOME."""
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    base = Path(xdg) if xdg else Path.home() / ".config"
+    return base / "llm" / "config.yaml"
