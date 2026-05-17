@@ -29,14 +29,14 @@ llm specs
 # 5. Install a runtime and model, validate config, serve
 llm setup --default
 llm runtime install llamacpp --yes
-llm model pull unsloth-qwen3.6-35b-a3b
+llm model pull https://huggingface.co/Qwen/Qwen2.5-7B-Instruct
 llm config validate
-llm serve llamacpp__unsloth-qwen3.6-35b-a3b__default
+llm serve llamacpp__qwen-qwen2.5-7b-instruct__default
 llm status
 llm stop
 ```
 
-For a minimal smoke without llamacpp weights, use `llm runtime install stub-runtime --yes` and `llm serve stub-runtime__stub-model__default` instead.
+For a minimal smoke without llamacpp weights, use `llm runtime install stub-runtime --yes` and `llm serve stub-runtime__default` instead.
 
 See [`docs/lifecycle.md`](docs/lifecycle.md) for modes, switching, and logs. See [`docs/runtime-lifecycle.md`](docs/runtime-lifecycle.md) for `llm runtime install` / `.installed`.
 
@@ -45,12 +45,13 @@ See [`docs/lifecycle.md`](docs/lifecycle.md) for modes, switching, and logs. See
 | Path | What it holds |
 |---|---|
 | `runtimes/{id}/` | Manifest + build/serve/healthcheck scripts for one runtime |
-| `models/{id}/` | Manifest + pull script for one model (no weights — those live in `~/llm/models/`) |
-| `configs/{id}.yaml` | One launch unit (runtime + model + flags) |
+| `configs/{id}.yaml` | One launch unit (runtime + optional model + flags) |
 | `benchmarks/{id}/` | Wrapper around an existing benchmark tool, plus committed results |
 | `state/` | Runtime state: `running.json`, `history.jsonl`, `logs/` (gitignored; see `docs/lifecycle.md`) |
 | `docs/` | HOWTOs and reference notes |
 | `src/llm_cli/` | The Python CLI implementation |
+
+Models are not in the repo — they live per-machine in `$LLM_MODELS/registry.json` plus `$LLM_MODELS/<id>/`. See [`docs/add-a-model.md`](docs/add-a-model.md).
 
 See [`docs/superpowers/specs/2026-05-15-localllm-scaffolding-design.md`](docs/superpowers/specs/2026-05-15-localllm-scaffolding-design.md)
 for the full design.
@@ -78,9 +79,11 @@ for the full design.
 | `llm runtime install <id>` | Build/install runtime; writes `$LLM_RUNTIMES/<id>/.installed` |
 | `llm runtime uninstall <id>` | Remove install marker (optional `--purge` deletes artifacts) |
 | `llm runtime rebuild <id>` | Re-run install; `--reset` drops stored build params |
-| `llm model list` | List discovered models |
-| `llm model info <id>` | Show model manifest summary |
-| `llm model pull <id>` | Run `models/<id>/pull.sh` via WSL bash with `LLM_*` env injected |
+| `llm model list` | List models in `$LLM_MODELS/registry.json` |
+| `llm model info <id>` | Show the full registry entry |
+| `llm model pull <url-or-id>` | Pull from HF (URL) or refresh an existing id (`--format`, `--include`, `--exclude`, `--id`, `--force`) |
+| `llm model add <id> <path> --format <fmt>` | Register local weights via symlink (or copy fallback) |
+| `llm model uninstall <id> [--purge]` | Remove a registry entry (and optionally its files) |
 | `llm serve <config>` | Start a config (background by default; `--foreground`, `--systemd`) |
 | `llm switch <config>` | Stop current + start new config in the same mode |
 | `llm stop` | Stop the running service |
