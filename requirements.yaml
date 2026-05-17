@@ -24,10 +24,10 @@
   name: huggingface-hub CLI
   why: Used by models/*/pull.sh to fetch weights
   verify:
-    cmd: huggingface-cli --version
+    cmd: hf --version
     version_regex: '([\d.]+)'
     min: "0.20.0"
-  install_hint: "pip install -U huggingface_hub[cli]"
+  install_hint: "curl -LsSf https://hf.co/cli/install.sh | bash"
 
 - id: build-essential
   name: build-essential + cmake
@@ -55,12 +55,3 @@
     version_regex: 'curl\s+([\d.]+)'
     min: "7.80"
   install_hint: "apt install curl"
-
-- id: jq
-  name: jq
-  why: JSON parsing in shell scripts
-  verify:
-    cmd: jq --version
-    version_regex: 'jq-([\d.]+)'
-    min: "1.6"
-  install_hint: "apt install jq"

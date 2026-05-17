@@ -186,6 +186,65 @@ def test_doctor_runtime_flag_scopes_to_one_runtime(tmp_path: Path, monkeypatch) 
     assert seen_ids == ["git"]
 
 
+def test_doctor_runtime_flag_rejects_unknown_runtime(tmp_path: Path, monkeypatch) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "requirements.yaml").write_text("[]\n", encoding="utf-8")
+    _configure(tmp_path, repo)
+
+    def fake_check_all(requirements, **kw):  # pragma: no cover - should not be reached
+        raise AssertionError("doctor should reject unknown runtime before checks")
+
+    monkeypatch.setattr("llm_cli.commands.doctor.check_all", fake_check_all)
+
+    result = runner.invoke(app, ["doctor", "--runtime", "ollamacpp"])
+
+    assert result.exit_code == 1
+    assert "unknown runtime 'ollamacpp'" in result.stdout
+
+
+def test_doctor_runtime_flag_uses_manifest_defaults_when_uninstalled(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "requirements.yaml").write_text("[]\n", encoding="utf-8")
+    _write_runtime(
+        repo,
+        "rt-a",
+        "  - id: cmake\n"
+        "    verify: { cmd: cmake --version, version_regex: '([0-9.]+)' }\n"
+        "    install_hint: install cmake\n"
+        "  - id: nvcc\n"
+        "    when: { build.flavor: cuda }\n"
+        "    verify: { cmd: nvcc --version, version_regex: '([0-9.]+)' }\n"
+        "    install_hint: install cuda\n",
+        build_yaml=(
+            "build:\n"
+            "  flavor:\n"
+            "    type: enum\n"
+            "    values: [cuda, cpu]\n"
+            "    default: cuda\n"
+        ),
+    )
+    _configure(tmp_path, repo)
+    seen_ids: list[str] = []
+
+    def fake_check_all(requirements, **kw):
+        seen_ids.extend(r.id for r in requirements)
+        return [
+            RequirementResult(requirement=r, status=CheckStatus.OK, detected_version="x.y")
+            for r in requirements
+        ]
+
+    monkeypatch.setattr("llm_cli.commands.doctor.check_all", fake_check_all)
+
+    result = runner.invoke(app, ["doctor", "--runtime", "rt-a"])
+
+    assert result.exit_code == 0, result.stdout
+    assert sorted(seen_ids) == ["cmake", "nvcc"]
+
+
 def test_doctor_all_flag_includes_uninstalled_runtime_defaults(
     tmp_path: Path, monkeypatch
 ) -> None:

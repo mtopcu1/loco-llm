@@ -83,8 +83,8 @@ Inside WSL:
 
 ```bash
 sudo apt update
-sudo apt install -y python3.11 python3.11-venv build-essential cmake git curl jq
-pip install -U huggingface_hub[cli]
+sudo apt install -y python3.11 python3.11-venv build-essential cmake git curl
+curl -LsSf https://hf.co/cli/install.sh | bash
 ```
 
 ### 6. Bootstrap the LocalLLM CLI

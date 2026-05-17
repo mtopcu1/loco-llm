@@ -72,10 +72,24 @@ def doctor(
 
     extras: list = []
     if runtime is not None:
+        from llm_cli.core import registry as _registry
         from llm_cli.core.install_record import read_record
 
+        mf = _registry.get_runtime_manifest(repo, runtime)
+        if mf is None:
+            console.print(f"[red]error:[/red] unknown runtime {runtime!r}")
+            raise typer.Exit(code=1)
+
         rec = read_record(settings.runtimes_dir, runtime)
-        build_params = dict(rec.build_params) if rec is not None else {}
+        build_params = (
+            dict(rec.build_params)
+            if rec is not None
+            else {
+                spec.key: spec.default
+                for spec in mf.build_schema
+                if spec.default is not None
+            }
+        )
         extras = requirements_for_runtime(repo, runtime, build_params=build_params)
     elif all_runtimes:
         extras = requirements_for_all_runtimes(repo, settings.runtimes_dir, installed_only=False)
