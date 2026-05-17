@@ -1,7 +1,6 @@
 """`llm doctor` — verify external requirements; `llm doctor render-requirements` regenerates the markdown."""
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import typer
@@ -14,6 +13,7 @@ from llm_cli.core.doctor import (
     load_requirements,
     render_requirements_md,
 )
+from llm_cli.core.repo import repo_root
 
 console = Console()
 doctor_app = typer.Typer(
@@ -22,11 +22,6 @@ doctor_app = typer.Typer(
     invoke_without_command=True,
     no_args_is_help=False,
 )
-
-
-def _repo_root() -> Path:
-    explicit = os.environ.get("LLM_REPO_ROOT")
-    return Path(explicit) if explicit else Path.cwd()
 
 
 def _requirements_yaml(repo: Path) -> Path:
@@ -52,7 +47,7 @@ def doctor(ctx: typer.Context) -> None:
     if ctx.invoked_subcommand is not None:
         return
 
-    repo = _repo_root()
+    repo = repo_root()
     reqs = load_requirements(_requirements_yaml(repo))
     results = check_all(reqs)
 
@@ -89,7 +84,7 @@ def doctor(ctx: typer.Context) -> None:
     "render-requirements", help="Regenerate requirements.md from requirements.yaml."
 )
 def render_requirements() -> None:
-    repo = _repo_root()
+    repo = repo_root()
     reqs = load_requirements(_requirements_yaml(repo))
     md = render_requirements_md(reqs)
     out = repo / "requirements.md"
