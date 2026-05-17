@@ -139,6 +139,7 @@ def test_resolve_honors_explicit_dir_overrides() -> None:
 
 def test_resolve_expands_tilde(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     out = resolve({"data_root": "~/llm", "repo_root": "~/r"})
     assert out.data_root == tmp_path / "llm"
