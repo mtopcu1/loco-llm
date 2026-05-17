@@ -92,3 +92,42 @@ def test_validate_includes_settings_errors(tmp_path: Path) -> None:
     cfg = registry.discover_configs(repo)[0]
     errs = registry.validate_config(repo, cfg)
     assert any("settings:" in e for e in errs)
+
+
+def test_runtime_manifest_typed(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "runtimes" / "rt-a").mkdir(parents=True)
+    (repo / "runtimes" / "rt-a" / "manifest.yaml").write_text(
+        "id: rt-a\n"
+        "display_name: A\n"
+        "official: true\n"
+        "build:\n"
+        "  flavor:\n"
+        "    type: enum\n"
+        "    values: [cuda, cpu]\n"
+        "    default: cuda\n"
+        "serve:\n"
+        "  ctx:\n"
+        "    type: int\n"
+        "    default: 8192\n"
+        "requires:\n"
+        "  - id: cmake\n"
+        "    verify: { cmd: cmake --version, version_regex: 'v ([\\d.]+)', min: '3.16' }\n"
+        "    install_hint: apt install cmake\n",
+        encoding="utf-8",
+    )
+    for s in ("build.sh", "serve.sh", "healthcheck.sh"):
+        (repo / "runtimes" / "rt-a" / s).write_text(
+            "#!/usr/bin/env bash\n", encoding="utf-8"
+        )
+    mfs = registry.load_runtime_manifests(repo)
+    assert len(mfs) == 1
+    rt = mfs[0]
+    assert rt.id == "rt-a"
+    assert rt.official is True
+    assert [s.key for s in rt.build_schema] == ["flavor"]
+    assert rt.build_schema[0].values == ("cuda", "cpu")
+    assert [s.key for s in rt.serve_schema] == ["ctx"]
+    assert len(rt.requires) == 1
+    assert rt.requires[0]["id"] == "cmake"

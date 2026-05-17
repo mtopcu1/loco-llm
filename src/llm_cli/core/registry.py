@@ -7,6 +7,7 @@ from typing import Any
 
 import yaml
 
+from llm_cli.core.params import ParamSpec, parse_schema
 from llm_cli.core.settings import (
     MissingSettingError,
     UnknownSettingError,
@@ -20,6 +21,19 @@ class RuntimeRecord:
     id: str
     path: Path
     manifest: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class RuntimeManifest:
+    id: str
+    display_name: str
+    description: str
+    official: bool
+    build_schema: list[ParamSpec]
+    serve_schema: list[ParamSpec]
+    requires: list[dict[str, Any]]
+    path: Path
+    raw: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -120,6 +134,33 @@ def get_runtime(repo: Path, runtime_id: str) -> RuntimeRecord | None:
         if r.id == runtime_id:
             return r
     return None
+
+
+def _to_manifest(rec: RuntimeRecord) -> RuntimeManifest:
+    data = rec.manifest
+    requires = data.get("requires") or []
+    if not isinstance(requires, list):
+        raise ValueError(f"{rec.id}: requires must be a list")
+    return RuntimeManifest(
+        id=rec.id,
+        display_name=str(data.get("display_name", rec.id)),
+        description=str(data.get("description", "")),
+        official=bool(data.get("official", False)),
+        build_schema=parse_schema(data.get("build") or {}),
+        serve_schema=parse_schema(data.get("serve") or {}),
+        requires=[r for r in requires if isinstance(r, dict)],
+        path=rec.path,
+        raw=data,
+    )
+
+
+def load_runtime_manifests(repo: Path) -> list[RuntimeManifest]:
+    return [_to_manifest(r) for r in discover_runtimes(repo)]
+
+
+def get_runtime_manifest(repo: Path, runtime_id: str) -> RuntimeManifest | None:
+    rec = get_runtime(repo, runtime_id)
+    return _to_manifest(rec) if rec is not None else None
 
 
 def get_model(repo: Path, model_id: str) -> ModelRecord | None:
