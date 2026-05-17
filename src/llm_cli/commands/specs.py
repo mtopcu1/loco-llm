@@ -1,14 +1,14 @@
 """`llm specs` — regenerate the auto block in specs.md."""
 from __future__ import annotations
 
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
 from rich.console import Console
 
-from llm_cli.core.paths import load_paths
+from llm_cli.core.repo import repo_root
+from llm_cli.core.settings import MissingSettingError, load_settings, resolve
 from llm_cli.core.specs import (
     MarkersMissingError,
     detect_all,
@@ -19,23 +19,16 @@ from llm_cli.core.specs import (
 console = Console()
 
 
-def _repo_root() -> Path:
-    explicit = os.environ.get("LLM_REPO_ROOT")
-    return Path(explicit) if explicit else Path.cwd()
-
-
 def _utcnow_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _gather_block(repo: Path) -> str:
-    paths_yaml = repo / "paths.yaml"
     data_root = "not detected"
-    if paths_yaml.is_file():
-        try:
-            data_root = load_paths(paths_yaml).data_root.as_posix()
-        except Exception:
-            pass
+    try:
+        data_root = resolve(load_settings()).data_root.as_posix()
+    except (MissingSettingError, ValueError):
+        pass
     specs = detect_all(repo_root=repo.resolve().as_posix(), data_root=data_root)
     return render_specs_block(specs, generated_at=_utcnow_iso())
 
@@ -52,7 +45,7 @@ def specs_command(
     ),
 ) -> None:
     """Regenerate the auto block in specs.md."""
-    repo = _repo_root()
+    repo = repo_root()
     new_block = _gather_block(repo)
 
     if print_only:
