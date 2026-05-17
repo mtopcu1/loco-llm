@@ -8,6 +8,7 @@ from llm_cli.commands import artifacts, config_cmd, list_cmd
 from llm_cli.commands import setup as setup_cmd
 from llm_cli.commands import specs as specs_cmd
 from llm_cli.commands import lifecycle_cmds
+from llm_cli.commands.model_cmd import model_app
 from llm_cli.commands.runtime_cmd import runtime_app
 from llm_cli.commands import serve as serve_cmd
 from llm_cli.commands.doctor import doctor_app
@@ -44,6 +45,7 @@ app.command("specs", help="Regenerate the auto block in specs.md.")(specs_cmd.sp
 app.add_typer(doctor_app, name="doctor")
 app.add_typer(settings_app, name="settings")
 app.add_typer(runtime_app, name="runtime")
+app.add_typer(model_app, name="model")
 app.command(
     "list",
     help="List discovered runtimes, models, configs, and benchmarks.",
