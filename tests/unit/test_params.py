@@ -9,6 +9,7 @@ from llm_cli.core.params import (
     ParamValidationError,
     coerce_value,
     derive_env_name,
+    evaluate_when,
     parse_schema,
     validate_params,
 )
@@ -152,6 +153,32 @@ def test_derive_env_name_fallback_build():
 def test_derive_env_name_normalizes_dashes():
     spec = _spec("n-gpu-layers", "int")
     assert derive_env_name(spec, runtime_id="llamacpp") == "LLM_LLAMACPP_N_GPU_LAYERS"
+
+
+def test_evaluate_when_none_passes():
+    assert evaluate_when(None, build_params={"flavor": "cuda"}) is True
+    assert evaluate_when({}, build_params={"flavor": "cuda"}) is True
+
+
+def test_evaluate_when_matches():
+    assert evaluate_when(
+        {"build.flavor": "cuda"}, build_params={"flavor": "cuda"}
+    ) is True
+
+
+def test_evaluate_when_mismatches():
+    assert evaluate_when(
+        {"build.flavor": "cuda"}, build_params={"flavor": "cpu"}
+    ) is False
+
+
+def test_evaluate_when_param_absent_means_unknown():
+    assert evaluate_when({"build.flavor": "cuda"}, build_params={}) is False
+
+
+def test_evaluate_when_rejects_non_build_prefix():
+    with pytest.raises(ValueError, match="only supports build"):
+        evaluate_when({"serve.host": "x"}, build_params={})
 
 
 def test_validate_params_fills_defaults():

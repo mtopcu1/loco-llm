@@ -205,6 +205,29 @@ def coerce_value(spec: ParamSpec, raw: Any) -> Any:
     raise ParamValidationError(f"param {spec.key!r}: unhandled type {spec.type!r}")
 
 
+def evaluate_when(
+    when: dict[str, Any] | None, *, build_params: dict[str, Any]
+) -> bool:
+    """Return True if a `requires:` entry's `when:` clause matches.
+
+    v1 supports only `build.<param>: <scalar>` equality. Missing/None clause -> True.
+    A reference to a param the user didn't supply returns False (skip the dep).
+    """
+    if not when:
+        return True
+    for key, expected in when.items():
+        if not key.startswith("build."):
+            raise ValueError(
+                f"`when:` only supports build.<param> keys in v1; got {key!r}"
+            )
+        param = key[len("build.") :]
+        if param not in build_params:
+            return False
+        if build_params[param] != expected:
+            return False
+    return True
+
+
 def validate_params(
     specs: list[ParamSpec], raw: dict[str, Any] | None
 ) -> tuple[dict[str, Any], list[str]]:
