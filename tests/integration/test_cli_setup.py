@@ -52,3 +52,32 @@ def test_setup_interactive_default_layout(tmp_path, monkeypatch) -> None:
     assert stored == {"data_root": str(data), "repo_root": str(repo)}
     assert (data / "runtimes").is_dir()
 
+
+def test_setup_interactive_granular_layout(tmp_path, monkeypatch) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    data = tmp_path / "dr"
+    rt_override = tmp_path / "rtcustom"
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+    user_input = (
+        f"{data}\n"
+        "n\n"
+        f"{rt_override}\n"
+        "\n"
+        "\n"
+    )
+    result = runner.invoke(app, ["setup"], input=user_input, catch_exceptions=False)
+    assert result.exit_code == 0, result.stdout
+
+    cfg = settings_path()
+    stored = yaml.safe_load(cfg.read_text(encoding="utf-8"))
+    assert stored["repo_root"] == str(repo)
+    assert stored["data_root"] == str(data)
+    assert stored["runtimes_dir"] == str(rt_override)
+    assert "models_dir" not in stored
+    assert "cache_dir" not in stored
+    assert rt_override.is_dir()
+    assert (data / "models").is_dir()

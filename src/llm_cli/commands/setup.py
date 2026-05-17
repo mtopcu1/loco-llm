@@ -59,5 +59,14 @@ def setup(
 
 
 def _prompt_dir_overrides(data_root: str) -> dict[str, str]:
-    """Placeholder; granular prompts are added in Task 10."""
-    return {}
+    """Prompt for each dir key; empty answer omits the key so it stays derived."""
+    overrides: dict[str, str] = {}
+    data_root_path = Path(data_root).expanduser()
+    for key in ("runtimes_dir", "models_dir", "cache_dir"):
+        meta = KEY_REGISTRY[key]
+        derived = data_root_path / meta["derived_suffix"]
+        answer = typer.prompt(meta["prompt"], default="", show_default=False)
+        answer = answer.strip()
+        if answer and answer != str(derived):
+            overrides[key] = answer
+    return overrides
