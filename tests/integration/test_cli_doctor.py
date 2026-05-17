@@ -30,6 +30,21 @@ def _write_requirements(repo: Path) -> None:
     )
 
 
+def _write_runtime(repo: Path, runtime_id: str, requires_yaml: str, build_yaml: str = "") -> None:
+    rt = repo / "runtimes" / runtime_id
+    rt.mkdir(parents=True)
+    (rt / "manifest.yaml").write_text(
+        f"id: {runtime_id}\n"
+        "official: true\n"
+        f"{build_yaml}"
+        "requires:\n"
+        f"{requires_yaml}",
+        encoding="utf-8",
+    )
+    for script in ("build.sh", "serve.sh", "healthcheck.sh"):
+        (rt / script).write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+
+
 def test_doctor_render_requirements_writes_md(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -91,3 +106,114 @@ def test_doctor_missing_requirements_yaml_errors(tmp_path: Path) -> None:
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code != 0
     assert "requirements.yaml" in (result.stdout or "") + (result.stderr or "")
+
+
+def test_doctor_default_scopes_to_installed_runtime_deps(tmp_path: Path) -> None:
+    from llm_cli.core.install_record import InstallRecord, write_record
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "requirements.yaml").write_text("[]\n", encoding="utf-8")
+    _write_runtime(
+        repo,
+        "rt-a",
+        "  - id: definitely-not-on-path-zzz\n"
+        "    verify: { cmd: definitely-not-on-path-zzz, version_regex: '([0-9.]+)' }\n"
+        "    install_hint: nope\n",
+    )
+    runtimes_dir = tmp_path / "data" / "runtimes"
+    write_record(
+        runtimes_dir,
+        InstallRecord(
+            runtime_id="rt-a",
+            installed_at="2026-05-17T00:00:00Z",
+            build_params={},
+            build_sh_sha256="x",
+            verify_passed=True,
+            schema_hash="y",
+        ),
+    )
+    _configure(tmp_path, repo)
+
+    result = runner.invoke(app, ["doctor"], catch_exceptions=False)
+
+    assert "definitely-not-on-path-zzz" in result.stdout
+    assert result.exit_code == 1
+
+
+def test_doctor_runtime_flag_scopes_to_one_runtime(tmp_path: Path, monkeypatch) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "requirements.yaml").write_text("[]\n", encoding="utf-8")
+    _write_runtime(
+        repo,
+        "rt-a",
+        "  - id: cmake\n"
+        "    verify: { cmd: cmake --version, version_regex: '([0-9.]+)' }\n"
+        "    install_hint: install cmake\n",
+    )
+    _write_runtime(
+        repo,
+        "rt-b",
+        "  - id: git\n"
+        "    verify: { cmd: git --version, version_regex: '([0-9.]+)' }\n"
+        "    install_hint: install git\n",
+    )
+    _configure(tmp_path, repo)
+    seen_ids: list[str] = []
+
+    def fake_check_all(requirements, **kw):
+        seen_ids.extend(r.id for r in requirements)
+        return [
+            RequirementResult(requirement=r, status=CheckStatus.OK, detected_version="x.y")
+            for r in requirements
+        ]
+
+    monkeypatch.setattr("llm_cli.commands.doctor.check_all", fake_check_all)
+
+    result = runner.invoke(app, ["doctor", "--runtime", "rt-b"])
+
+    assert result.exit_code == 0, result.stdout
+    assert seen_ids == ["git"]
+
+
+def test_doctor_all_flag_includes_uninstalled_runtime_defaults(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "requirements.yaml").write_text("[]\n", encoding="utf-8")
+    _write_runtime(
+        repo,
+        "rt-a",
+        "  - id: cmake\n"
+        "    verify: { cmd: cmake --version, version_regex: '([0-9.]+)' }\n"
+        "    install_hint: install cmake\n"
+        "  - id: nvcc\n"
+        "    when: { build.flavor: cuda }\n"
+        "    verify: { cmd: nvcc --version, version_regex: '([0-9.]+)' }\n"
+        "    install_hint: install cuda\n",
+        build_yaml=(
+            "build:\n"
+            "  flavor:\n"
+            "    type: enum\n"
+            "    values: [cuda, cpu]\n"
+            "    default: cuda\n"
+        ),
+    )
+    _configure(tmp_path, repo)
+    seen_ids: list[str] = []
+
+    def fake_check_all(requirements, **kw):
+        seen_ids.extend(r.id for r in requirements)
+        return [
+            RequirementResult(requirement=r, status=CheckStatus.OK, detected_version="x.y")
+            for r in requirements
+        ]
+
+    monkeypatch.setattr("llm_cli.commands.doctor.check_all", fake_check_all)
+
+    result = runner.invoke(app, ["doctor", "--all"])
+
+    assert result.exit_code == 0, result.stdout
+    assert sorted(seen_ids) == ["cmake", "nvcc"]

@@ -43,17 +43,58 @@ _STATUS_STYLES = {
 
 
 @doctor_app.callback()
-def doctor(ctx: typer.Context) -> None:
-    """Run all requirement checks and print a status table."""
+def doctor(
+    ctx: typer.Context,
+    runtime: str | None = typer.Option(
+        None, "--runtime", help="Scope to a single runtime's requirements."
+    ),
+    all_runtimes: bool = typer.Option(
+        False, "--all", help="Include every runtime's deps (installed or not)."
+    ),
+) -> None:
+    """Run requirement checks: universal + runtime-scoped extras."""
     if ctx.invoked_subcommand is not None:
         return
 
     repo = repo_root()
-    reqs = load_requirements(_requirements_yaml(repo))
-    results = check_all(reqs)
+    universal = load_requirements(_requirements_yaml(repo))
+
+    from llm_cli.core.doctor import (
+        requirements_for_all_runtimes,
+        requirements_for_runtime,
+    )
+    from llm_cli.core.settings import load_settings, resolve as _resolve
+
+    try:
+        settings = _resolve(load_settings())
+    except Exception as exc:  # noqa: BLE001 - surface settings issues as doctor failures.
+        console.print(f"[red]error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    extras: list = []
+    if runtime is not None:
+        from llm_cli.core.install_record import read_record
+
+        rec = read_record(settings.runtimes_dir, runtime)
+        build_params = dict(rec.build_params) if rec is not None else {}
+        extras = requirements_for_runtime(repo, runtime, build_params=build_params)
+    elif all_runtimes:
+        extras = requirements_for_all_runtimes(repo, settings.runtimes_dir, installed_only=False)
+    else:
+        extras = requirements_for_all_runtimes(repo, settings.runtimes_dir, installed_only=True)
+
+    seen = {req.id for req in universal}
+    merged = list(universal)
+    for req in extras:
+        if req.id in seen:
+            continue
+        seen.add(req.id)
+        merged.append(req)
+
+    results = check_all(merged)
 
     table = Table(title="External Requirements")
-    table.add_column("ID")
+    table.add_column("ID", no_wrap=True)
     table.add_column("Name")
     table.add_column("Status")
     table.add_column("Detected")
