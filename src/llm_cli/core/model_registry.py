@@ -175,3 +175,22 @@ def write_registry(models_dir: Path, entries: dict[str, RegistryEntry]) -> Path:
             os.remove(tmp_name)
         raise
     return p
+
+
+def get_entry(models_dir: Path, entry_id: str) -> RegistryEntry | None:
+    return load_registry(models_dir).get(entry_id)
+
+
+def upsert_entry(models_dir: Path, entry: RegistryEntry) -> Path:
+    entries = load_registry(models_dir)
+    entries[entry.id] = entry
+    return write_registry(models_dir, entries)
+
+
+def remove_entry(models_dir: Path, entry_id: str) -> bool:
+    entries = load_registry(models_dir)
+    if entry_id not in entries:
+        return False
+    entries.pop(entry_id)
+    write_registry(models_dir, entries)
+    return True

@@ -102,3 +102,25 @@ def test_load_wrong_version_raises(tmp_path: Path):
     )
     with pytest.raises(ValueError, match="unsupported registry version"):
         load_registry(tmp_path)
+
+
+from llm_cli.core.model_registry import get_entry, upsert_entry, remove_entry
+
+
+def test_upsert_and_get(tmp_path: Path):
+    entry = _hf_entry()
+    upsert_entry(tmp_path, entry)
+    fetched = get_entry(tmp_path, entry.id)
+    assert fetched == entry
+
+
+def test_get_missing_returns_none(tmp_path: Path):
+    assert get_entry(tmp_path, "nope") is None
+
+
+def test_remove_entry(tmp_path: Path):
+    entry = _hf_entry()
+    upsert_entry(tmp_path, entry)
+    assert remove_entry(tmp_path, entry.id) is True
+    assert get_entry(tmp_path, entry.id) is None
+    assert remove_entry(tmp_path, entry.id) is False
