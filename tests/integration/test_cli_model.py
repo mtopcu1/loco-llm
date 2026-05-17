@@ -109,6 +109,66 @@ def _fake_download(repo, revision, include, exclude, target_dir):
     return 0
 
 
+def test_model_pull_existing_id_refreshes(tmp_path: Path) -> None:
+    models_dir = _configure(tmp_path)
+    (models_dir / "qwen-q__q4").mkdir(parents=True)
+    (models_dir / "qwen-q__q4" / "x.gguf").write_bytes(b"x" * 50)
+    from llm_cli.core.model_registry import (
+        Artifact,
+        HFSource,
+        Metadata,
+        RegistryEntry,
+        get_entry,
+        upsert_entry,
+    )
+    upsert_entry(
+        models_dir,
+        RegistryEntry(
+            id="qwen-q__q4",
+            format="gguf",
+            source=HFSource(repo="qwen/Q", revision="main", include=("*Q4*",)),
+            artifact=Artifact(primary="x.gguf", files=("x.gguf",), total_size_bytes=50),
+            metadata=Metadata(display_name="qwen/Q"),
+            installed_at="2026-01-01T00:00:00Z",
+        ),
+    )
+
+    def fake_dl(repo, revision, include, exclude, target_dir):
+        return 0
+
+    with patch("llm_cli.commands.model_cmd.hf_download", side_effect=fake_dl):
+        result = runner.invoke(app, ["model", "pull", "qwen-q__q4"], catch_exceptions=False)
+    assert result.exit_code == 0
+    e = get_entry(models_dir, "qwen-q__q4")
+    assert e.installed_at != "2026-01-01T00:00:00Z"
+
+
+def test_model_pull_ambiguous_url_errors(tmp_path: Path) -> None:
+    models_dir = _configure(tmp_path)
+    url = "https://huggingface.co/unsloth/Qwen3.6-235B-A22B-GGUF"
+    multi_quant = HFRepoInfo(
+        repo="unsloth/Qwen3.6-235B-A22B-GGUF",
+        revision="main",
+        sha="x",
+        license=None,
+        siblings=[
+            HFSibling(rfilename="model-Q4_K_M.gguf", size=10, lfs_sha256=None),
+            HFSibling(rfilename="model-Q5_K_M.gguf", size=10, lfs_sha256=None),
+        ],
+    )
+    with patch(
+        "llm_cli.commands.model_cmd.fetch_repo_revision", return_value=multi_quant
+    ), patch(
+        "llm_cli.commands.model_cmd.hf_download"
+    ) as mock_dl:
+        result = runner.invoke(app, ["model", "pull", url], catch_exceptions=False)
+    assert result.exit_code == 1
+    assert "--include" in result.stdout
+    assert not mock_dl.called
+    from llm_cli.core.model_registry import load_registry
+    assert load_registry(models_dir) == {}
+
+
 def test_model_pull_url_happy_path(tmp_path: Path) -> None:
     models_dir = _configure(tmp_path)
     url = (
