@@ -91,3 +91,21 @@ def load_settings() -> dict[str, str]:
             f"Valid keys: {', '.join(sorted(KEY_REGISTRY))}"
         )
     return {str(k): str(v) for k, v in raw.items()}
+
+
+def save_settings(values: dict[str, str]) -> Path:
+    """Write the settings dict to disk; returns the path written."""
+    unknown = sorted(k for k in values if k not in KEY_REGISTRY)
+    if unknown:
+        raise UnknownSettingError(
+            f"unknown setting(s): {', '.join(unknown)}. "
+            f"Valid keys: {', '.join(sorted(KEY_REGISTRY))}"
+        )
+    path = settings_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    ordered = {k: values[k] for k in KEY_REGISTRY if k in values}
+    path.write_text(
+        yaml.safe_dump(ordered, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    return path

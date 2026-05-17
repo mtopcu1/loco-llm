@@ -11,6 +11,7 @@ from llm_cli.core.settings import (
     UnknownSettingError,
     default_settings,
     load_settings,
+    save_settings,
     settings_path,
 )
 
@@ -92,3 +93,21 @@ def test_load_settings_rejects_non_mapping(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
     with pytest.raises(ValueError):
         load_settings()
+
+
+def test_save_settings_round_trip(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    save_settings({"data_root": "~/llm", "repo_root": "/some/repo"})
+    assert load_settings() == {"data_root": "~/llm", "repo_root": "/some/repo"}
+
+
+def test_save_settings_creates_parent_dirs(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "deep" / "xdg"))
+    save_settings({"data_root": "~/llm", "repo_root": "/r"})
+    assert (tmp_path / "deep" / "xdg" / "llm" / "config.yaml").is_file()
+
+
+def test_save_settings_rejects_unknown_keys(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    with pytest.raises(UnknownSettingError):
+        save_settings({"oops": "yes"})
