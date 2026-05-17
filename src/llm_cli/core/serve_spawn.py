@@ -99,3 +99,26 @@ def spawn_background(
         return int(out[-1])
     except ValueError as exc:
         raise RuntimeError(f"background spawn stdout not a PID: {out!r}") from exc
+
+
+def _default_popen(cmd: list[str], *, env: dict[str, str]) -> subprocess.Popen[str]:
+    return subprocess.Popen(cmd, env=env, text=True)
+
+
+def spawn_foreground(
+    *,
+    inner: str,
+    env: Mapping[str, str],
+    on_started: Callable[[int], None],
+    runner: Callable[..., subprocess.Popen[str]] = _default_popen,
+) -> tuple[int, int]:
+    """Run `inner` attached to the current terminal. Block until it exits.
+
+    Calls `on_started(pid)` once the child is spawned (caller uses this to
+    write state/running.json). Returns (pid, exit_code).
+    """
+    proc = runner(["bash", "-lc", inner], env=dict(env))
+    if proc.pid is None:
+        raise RuntimeError("subprocess failed to get a PID")
+    on_started(proc.pid)
+    return proc.pid, int(proc.wait())

@@ -10,6 +10,7 @@ from llm_cli.core.serve_spawn import (
     build_serve_inner,
     port_in_use,
     spawn_background,
+    spawn_foreground,
     wait_for_ready,
 )
 
@@ -129,3 +130,52 @@ def test_spawn_background_raises_on_nonzero_exit() -> None:
             env={},
             runner=runner,
         )
+
+
+def test_spawn_foreground_invokes_runner_and_returns_pid_and_exit_code() -> None:
+    """Foreground returns (pid, exit_code) — on_started fires once PID is known."""
+    started = {"pid": None}
+
+    def on_started(pid: int) -> None:
+        started["pid"] = pid
+
+    class FakePopen:
+        def __init__(self, cmd: list, *, env: dict) -> None:
+            self.cmd = cmd
+            self.env = env
+            self.pid = 4242
+
+        def wait(self) -> int:
+            return 0
+
+    def runner(cmd: list, *, env: dict) -> FakePopen:
+        return FakePopen(cmd, env=env)
+
+    pid, code = spawn_foreground(
+        inner="x",
+        env={"LLM_DATA_ROOT": "/r"},
+        on_started=on_started,
+        runner=runner,
+    )
+    assert pid == 4242
+    assert code == 0
+    assert started["pid"] == 4242
+
+
+def test_spawn_foreground_propagates_nonzero_exit() -> None:
+    class FakePopen:
+        pid = 99
+
+        def __init__(self, cmd: list, *, env: dict) -> None:
+            pass
+
+        def wait(self) -> int:
+            return 7
+
+    _pid, code = spawn_foreground(
+        inner="x",
+        env={},
+        on_started=lambda _pid: None,
+        runner=lambda cmd, *, env: FakePopen(cmd, env=env),
+    )
+    assert code == 7
