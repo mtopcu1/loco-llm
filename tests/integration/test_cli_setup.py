@@ -81,3 +81,17 @@ def test_setup_interactive_granular_layout(tmp_path, monkeypatch) -> None:
     assert "cache_dir" not in stored
     assert rt_override.is_dir()
     assert (data / "models").is_dir()
+
+
+def test_setup_prints_next_steps_panel(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+    result = runner.invoke(app, ["setup", "--default"], catch_exceptions=False)
+
+    assert result.exit_code == 0
+    assert "Recommended next steps" in result.stdout
+    assert "llm runtime install" in result.stdout
+    assert "llm model pull" in result.stdout
+    assert "llm serve" in result.stdout
