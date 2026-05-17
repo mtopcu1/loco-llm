@@ -101,3 +101,48 @@ def test_infer_format_split_gguf_one_family_ok():
     r = infer_format(p, files)
     assert r.format == "gguf"
     assert sorted(r.include) == sorted(files)
+
+
+from pathlib import Path
+
+from llm_cli.core.model_resolve import build_artifact
+
+
+def test_build_artifact_single_gguf(tmp_path: Path):
+    f = tmp_path / "weights.gguf"
+    f.write_bytes(b"x" * 1024)
+    art = build_artifact(tmp_path, "gguf")
+    assert art.primary == "weights.gguf"
+    assert art.files == ("weights.gguf",)
+    assert art.total_size_bytes == 1024
+
+
+def test_build_artifact_split_gguf(tmp_path: Path):
+    for i in (1, 2, 3):
+        (tmp_path / f"model-Q4-{i:05d}-of-00003.gguf").write_bytes(b"x" * 10)
+    art = build_artifact(tmp_path, "gguf")
+    assert art.primary == "model-Q4-00001-of-00003.gguf"
+    assert art.files[0] == "model-Q4-00001-of-00003.gguf"
+    assert len(art.files) == 3
+
+
+def test_build_artifact_safetensors_dir(tmp_path: Path):
+    (tmp_path / "config.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "tokenizer.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "model-00001-of-00002.safetensors").write_bytes(b"x" * 50)
+    (tmp_path / "model-00002-of-00002.safetensors").write_bytes(b"x" * 50)
+    art = build_artifact(tmp_path, "safetensors-dir")
+    assert art.primary == "."
+    assert "config.json" in art.files
+    assert art.total_size_bytes == 100
+
+
+def test_build_artifact_empty_dir_errors(tmp_path: Path):
+    with pytest.raises(ValueError, match="no files"):
+        build_artifact(tmp_path, "gguf")
+
+
+def test_build_artifact_safetensors_dir_missing_config_errors(tmp_path: Path):
+    (tmp_path / "model.safetensors").write_bytes(b"x")
+    with pytest.raises(ValueError, match="config.json"):
+        build_artifact(tmp_path, "safetensors-dir")

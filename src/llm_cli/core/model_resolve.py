@@ -113,3 +113,40 @@ def infer_format(parsed: ParsedHFUrl, repo_files: list[str]) -> InferResult:
         "could not infer format from repo contents; "
         "re-run with --format and/or --include"
     )
+
+
+def _walk_relative(root: Path) -> list[Path]:
+    out: list[Path] = []
+    for p in sorted(root.rglob("*")):
+        if p.is_file():
+            out.append(p.relative_to(root))
+    return out
+
+
+def build_artifact(download_dir: Path, format_: str) -> Artifact:
+    files = _walk_relative(download_dir)
+    if not files:
+        raise ValueError(f"no files under {download_dir}")
+    rel_strs = [p.as_posix() for p in files]
+    total = sum((download_dir / p).stat().st_size for p in files)
+    if format_ == "gguf":
+        gguf = sorted(p for p in rel_strs if _GGUF_SUFFIX.search(p))
+        if not gguf:
+            raise ValueError(f"no .gguf files under {download_dir}")
+        primary = gguf[0]
+        return Artifact(
+            primary=primary,
+            files=tuple(gguf),
+            total_size_bytes=total,
+            sha256={},
+        )
+    if format_ == "safetensors-dir":
+        if "config.json" not in rel_strs:
+            raise ValueError(f"safetensors-dir missing config.json under {download_dir}")
+        return Artifact(
+            primary=".",
+            files=tuple(sorted(rel_strs)),
+            total_size_bytes=total,
+            sha256={},
+        )
+    raise ValueError(f"unsupported format {format_!r}")
