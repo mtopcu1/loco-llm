@@ -1,6 +1,7 @@
 """Persistence of a runtime's `.installed` marker file."""
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -62,3 +63,25 @@ def clear_record(runtimes_dir: Path, runtime_id: str) -> bool:
         return False
     p.unlink()
     return True
+
+
+def file_sha256(path: Path) -> str:
+    """Return hex sha256 of a file's contents; '' if the file is missing."""
+    if not path.is_file():
+        return ""
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(64 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def schema_hash(schema: dict[str, Any] | None) -> str:
+    """Stable hex sha256 of a canonicalized schema mapping.
+
+    Keys are sorted recursively so semantically-equal schemas produce the same
+    hash regardless of YAML key order. Used by InstallRecord.schema_hash to
+    flag drift between install time and the current manifest.
+    """
+    payload = json.dumps(schema or {}, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()

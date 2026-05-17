@@ -6,9 +6,11 @@ import pytest
 
 from llm_cli.core.install_record import (
     InstallRecord,
+    file_sha256,
     is_installed,
     read_record,
     record_path,
+    schema_hash,
     write_record,
 )
 
@@ -59,3 +61,28 @@ def test_read_record_corrupt_raises(tmp_path: Path):
     p.write_text("not json", encoding="utf-8")
     with pytest.raises(ValueError, match="corrupt"):
         read_record(tmp_path / "runtimes", "llamacpp")
+
+
+def test_file_sha256(tmp_path: Path):
+    p = tmp_path / "a.sh"
+    p.write_bytes(b"hello\n")
+    # sha256("hello\n")
+    assert file_sha256(p) == (
+        "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03"
+    )
+
+
+def test_file_sha256_missing_returns_empty(tmp_path: Path):
+    assert file_sha256(tmp_path / "nope") == ""
+
+
+def test_schema_hash_stable_across_key_order():
+    a = {"flavor": {"type": "enum", "values": ["cuda", "cpu"], "default": "cuda"}}
+    b = {"flavor": {"default": "cuda", "type": "enum", "values": ["cuda", "cpu"]}}
+    assert schema_hash(a) == schema_hash(b)
+
+
+def test_schema_hash_changes_on_value_change():
+    a = {"jobs": {"type": "int", "default": 0}}
+    b = {"jobs": {"type": "int", "default": 1}}
+    assert schema_hash(a) != schema_hash(b)
