@@ -35,10 +35,11 @@ Replace the current `paths.yaml` + `llm init` flow with a clean separation betwe
 
 **Location:** `${XDG_CONFIG_HOME:-$HOME/.config}/llm/config.yaml`.
 
-**Schema (all dir keys optional):**
+**Schema (dir keys optional, `data_root` and `repo_root` required):**
 
 ```yaml
 data_root: ~/llm
+repo_root: /mnt/c/Private/Projects/LocalLLM
 # Optional explicit overrides. If a key is absent, the CLI derives it as
 # ${data_root}/<name> at runtime.
 # runtimes_dir: /mnt/d/runtimes
@@ -49,19 +50,18 @@ data_root: ~/llm
 **Resolution rules:**
 
 - `data_root` is required; the built-in default is `~/llm`.
+- `repo_root` is required; no built-in default — `llm setup` records it from `cwd` (which is the repo root when `install.sh` invokes it).
 - `runtimes_dir` / `models_dir` / `cache_dir` are stored only when the user has explicitly overridden them. Otherwise they're computed at read time from `data_root` (joining `runtimes`, `models`, and `cache` respectively).
 - `~` is expanded to the user's home at resolution time, not at write time (so a settings file moved between machines still works).
-- The CLI exposes a resolved, fully-populated view internally (`Settings` dataclass) — `data_root`, `runtimes_dir`, `models_dir`, `cache_dir`, all as absolute `Path` objects.
+- The CLI exposes a resolved, fully-populated view internally (`Settings` dataclass) — `data_root`, `repo_root`, `runtimes_dir`, `models_dir`, `cache_dir`, all as absolute `Path` objects.
 
 ### 5.2 Repo location
 
 `paths.yaml` is **removed from the repo**. The repo no longer carries any per-machine state.
 
-Repo discovery (`core/repo.py`):
+Repo discovery is trivial: `repo_root` is read from `~/.config/llm/config.yaml`. There is **no env-var override and no walk-up heuristic**. `llm setup` records `repo_root = cwd` automatically (which is the repo when `install.sh` invokes it). `llm settings edit repo_root` is the escape hatch if the clone is ever moved.
 
-1. `LLM_REPO_ROOT` env var if set.
-2. Walk up from cwd looking for **`requirements.yaml`** (the most distinctive committed file in this project's layout).
-3. Fall back to cwd if nothing is found (commands that need the repo will error clearly).
+If `repo_root` is missing or points at a directory that doesn't exist, repo-aware commands (`list`, `build`, `pull`, `config validate`, `doctor`, `specs`) error with: `repo_root is not configured; run \`llm setup\` from inside the repo`.
 
 ### 5.3 Env injection for bash scripts
 
@@ -70,6 +70,7 @@ The CLI is the only thing that runs `runtimes/{id}/build.sh`, `models/{id}/pull.
 | Env var | Source |
 |---|---|
 | `LLM_DATA_ROOT` | `Settings.data_root` |
+| `LLM_REPO_ROOT` | `Settings.repo_root` |
 | `LLM_RUNTIMES` | `Settings.runtimes_dir` |
 | `LLM_MODELS` | `Settings.models_dir` |
 | `LLM_CACHE` | `Settings.cache_dir` |
@@ -89,12 +90,12 @@ This is the same idiom as `direnv hook`, `starship init`, etc. — stateless, al
 
 | Command | Behavior |
 |---|---|
-| `llm setup` | Two-phase interactive walkthrough. (1) Prompt for `data_root` (default `~/llm`). (2) Prompt: "Use default subdirectory layout under data_root? [Y/n]". If **Y**, store only `data_root`. If **n**, prompt for each of `runtimes_dir`, `models_dir`, `cache_dir` with the derived default shown in brackets; an empty answer keeps the key derived (not stored). Then write the settings file (creating `~/.config/llm/` as needed), `mkdir -p` each resolved dir, and print a summary. |
-| `llm setup --default` | Non-interactive. Writes a settings file containing only `data_root: ~/llm`, creates the dirs, prints the resolved view. Used by automation and tests. |
+| `llm setup` | Records `repo_root = cwd` silently (no prompt). Then two-phase interactive walkthrough: (1) prompt for `data_root` (default `~/llm`); (2) prompt "Use default subdirectory layout under data_root? [Y/n]" — if **Y**, store only `data_root` + `repo_root`; if **n**, prompt for each of `runtimes_dir`, `models_dir`, `cache_dir` with the derived default shown in brackets, empty answer keeps the key derived. Write the settings file (creating `~/.config/llm/` as needed), `mkdir -p` each resolved data dir, print a summary. |
+| `llm setup --default` | Non-interactive. Records `repo_root = cwd` and `data_root = ~/llm`, creates dirs, prints the resolved view. Used by automation and tests. |
 | `llm settings show` | Print the stored file path, the raw stored contents, and the resolved effective view (with derived keys filled in). |
 | `llm settings env` | Print `export LLM_*=...` lines for the resolved view. No newline-quoting surprises; values are shell-escaped. Designed for `eval "$(llm settings env)"`. |
 | `llm settings edit <key>` | Interactive: prompt for one key with the current stored (or derived) value as the default. Validate, write the file, `mkdir -p` the new target if it's a dir key. |
-| `llm settings edit <key> --default` | Reset that key to its built-in default. For `data_root`, that's `~/llm`. For the three dir keys, "default" means **removed from the file** so it goes back to being derived from `data_root`. |
+| `llm settings edit <key> --default` | Reset that key to its built-in default. For `data_root`, that's `~/llm`. For the three dir keys, "default" means **removed from the file** so it goes back to being derived from `data_root`. `repo_root` has no built-in default and rejects `--default` with a clear error (use plain `llm settings edit repo_root` to set a new path). |
 
 ### 6.2 Commands kept verbatim
 
@@ -108,29 +109,29 @@ These all switch from reading `paths.yaml` to reading the resolved `Settings`, b
 
 ### 6.4 Valid keys today
 
-`data_root`, `runtimes_dir`, `models_dir`, `cache_dir`. Unknown keys passed to `llm settings edit` produce a clear error listing the known keys. (This list is the registry that drives `setup` too.)
+`data_root`, `repo_root`, `runtimes_dir`, `models_dir`, `cache_dir`. Unknown keys passed to `llm settings edit` produce a clear error listing the known keys. (This list is the registry that drives `setup` too.)
 
 ## 7. install.sh changes
 
-End of `install.sh` (in WSL):
+End of `install.sh` (in WSL) — note the explicit `cd` so `setup` records `repo_root` correctly:
 
 ```bash
 if [ -z "${LLM_SKIP_SETUP:-}" ] && [ ! -f "${XDG_CONFIG_HOME:-$HOME/.config}/llm/config.yaml" ]; then
-  "$venv_dir/bin/llm" setup
+  ( cd "$REPO_ROOT" && "$venv_dir/bin/llm" setup )
 fi
 ```
 
 - Auto-runs `llm setup` interactively on first install.
 - Skippable with `LLM_SKIP_SETUP=1` (for CI / scripted setups).
-- A re-install with an existing settings file is a no-op (does not overwrite).
+- A re-install with an existing settings file is a no-op (does not overwrite). To rewrite, the user runs `llm setup` (or `llm settings edit <key>`) manually.
 
 ## 8. File / module layout (concrete)
 
 | Path | Role |
 |---|---|
 | `src/llm_cli/core/settings.py` | `Settings` dataclass, `load_settings()`, `save_settings()`, `resolve(settings)` → fully-populated `Settings`, `default_settings()`, `settings_path()` (XDG-aware), `KEY_REGISTRY` describing each key (default, prompt text, validator). |
-| `src/llm_cli/core/repo.py` | Updated: walk up for `requirements.yaml` instead of `paths.yaml`. |
-| `src/llm_cli/core/wsl.py` | `run_repo_bash()` accepts a `Settings` (or built-in env-dict) and injects `LLM_DATA_ROOT` / `LLM_RUNTIMES` / `LLM_MODELS` / `LLM_CACHE` into the subprocess env. The `source .llm-env` shell prelude is removed. |
+| `src/llm_cli/core/repo.py` | Shrinks to `repo_root() -> Path` that reads resolved `Settings.repo_root`. Raises a clear error if missing. No env-var override, no walk-up. |
+| `src/llm_cli/core/wsl.py` | `run_repo_bash()` accepts a resolved `Settings` and injects `LLM_DATA_ROOT` / `LLM_REPO_ROOT` / `LLM_RUNTIMES` / `LLM_MODELS` / `LLM_CACHE` into the subprocess env. The `source .llm-env` shell prelude is removed. |
 | `src/llm_cli/commands/setup.py` | `llm setup` command (interactive + `--default`). |
 | `src/llm_cli/commands/settings_cmd.py` | `llm settings show / env / edit` Typer sub-app. |
 | `src/llm_cli/commands/init.py` | **Deleted.** |
@@ -153,12 +154,12 @@ User is the sole consumer; no compat shim is needed. The migration is:
 
 New / updated:
 
-- **`tests/unit/test_settings.py`** — defaults, derivation rules, `~` expansion, save/load round-trip, XDG honored, unknown keys error.
-- **`tests/unit/test_repo.py`** — walk-up marker changed to `requirements.yaml`; existing env-var override case still passes.
-- **`tests/unit/test_wsl.py`** — `run_repo_bash` injects the four `LLM_*` env vars from a `Settings` and no longer sources `.llm-env`.
-- **`tests/integration/test_cli_setup.py`** — `llm setup --default` is non-interactive and writes the expected file + creates dirs; `llm settings show` reflects both stored and resolved; `llm settings env` round-trips through bash `eval`; `llm settings edit data_root --default` resets; `llm settings edit runtimes_dir --default` removes the override.
-- **`tests/integration/test_cli_milestone2.py`** — updated to pass settings via the new mechanism rather than `LLM_REPO_ROOT` + a `paths.yaml` file. (Tests that need a settings file pass `XDG_CONFIG_HOME=tmp_path/cfg`.)
-- **Removed:** any test that asserted `paths.yaml` / `.llm-env` behavior. The Milestone-1 `llm init` tests are deleted with the command.
+- **`tests/unit/test_settings.py`** — defaults, derivation rules, `~` expansion, save/load round-trip, XDG honored, unknown keys error, `repo_root` required (missing → clear error).
+- **`tests/unit/test_repo.py`** — `repo_root()` reads from settings; raises a clear error if `repo_root` is missing. No env-var override is tested (it doesn't exist anymore).
+- **`tests/unit/test_wsl.py`** — `run_repo_bash` injects the five `LLM_*` env vars from a resolved `Settings` and no longer sources `.llm-env`.
+- **`tests/integration/test_cli_setup.py`** — `llm setup --default` is non-interactive, records `repo_root = cwd`, writes the expected file + creates data dirs; `llm settings show` reflects both stored and resolved; `llm settings env` round-trips through bash `eval`; `llm settings edit data_root --default` resets; `llm settings edit runtimes_dir --default` removes the override; `llm settings edit repo_root --default` errors clearly.
+- **`tests/integration/test_cli_milestone2.py`** — switched to redirect `XDG_CONFIG_HOME=tmp_path/cfg` and prewrite a settings file pointing `repo_root` at the test repo fixture. `LLM_REPO_ROOT` is no longer used anywhere.
+- **Removed:** any test that asserted `paths.yaml` / `.llm-env` / `LLM_REPO_ROOT` behavior. The Milestone-1 `llm init` tests are deleted with the command.
 
 ## 11. Documentation updates
 
