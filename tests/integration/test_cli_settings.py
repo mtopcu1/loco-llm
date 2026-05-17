@@ -82,3 +82,44 @@ def test_settings_edit_unknown_key_errors(tmp_path) -> None:
 
     assert result.exit_code != 0
     assert "nope" in result.stdout
+
+
+def test_settings_edit_default_data_root_resets(tmp_path) -> None:
+    _write_settings(
+        data_root=str(tmp_path / "old"), repo_root=str(tmp_path / "r")
+    )
+
+    result = runner.invoke(
+        app, ["settings", "edit", "data_root", "--default"], catch_exceptions=False
+    )
+
+    assert result.exit_code == 0, result.stdout
+    stored = yaml.safe_load(settings_path().read_text(encoding="utf-8"))
+    assert stored["data_root"] == "~/llm"
+
+
+def test_settings_edit_default_runtimes_dir_removes_override(tmp_path) -> None:
+    _write_settings(
+        data_root=str(tmp_path / "dr"),
+        repo_root=str(tmp_path / "r"),
+        runtimes_dir=str(tmp_path / "override"),
+    )
+
+    result = runner.invoke(
+        app, ["settings", "edit", "runtimes_dir", "--default"], catch_exceptions=False
+    )
+
+    assert result.exit_code == 0, result.stdout
+    stored = yaml.safe_load(settings_path().read_text(encoding="utf-8"))
+    assert "runtimes_dir" not in stored
+
+
+def test_settings_edit_default_repo_root_errors(tmp_path) -> None:
+    _write_settings(data_root="~/llm", repo_root=str(tmp_path / "r"))
+
+    result = runner.invoke(
+        app, ["settings", "edit", "repo_root", "--default"], catch_exceptions=False
+    )
+
+    assert result.exit_code != 0
+    assert "repo_root" in result.stdout
