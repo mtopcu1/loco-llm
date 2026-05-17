@@ -2,8 +2,16 @@
 from __future__ import annotations
 
 import socket
+from unittest.mock import MagicMock
 
-from llm_cli.core.serve_spawn import build_serve_inner, port_in_use, wait_for_ready
+import pytest
+
+from llm_cli.core.serve_spawn import (
+    build_serve_inner,
+    port_in_use,
+    spawn_background,
+    wait_for_ready,
+)
 
 
 def test_port_in_use_false_on_free_port() -> None:
@@ -75,3 +83,49 @@ def test_wait_for_ready_times_out() -> None:
 
     ok = wait_for_ready(probe, timeout_s=0.05, poll_s=0.02)
     assert ok is False
+
+
+def test_spawn_background_runs_nohup_and_returns_pid() -> None:
+    runner = MagicMock()
+    runner.return_value = MagicMock(stdout="12345\n", returncode=0)
+    pid = spawn_background(
+        inner="set -e; exec bash 'runtimes/x/serve.sh'",
+        log_path="/repo/state/logs/x.log",
+        env={"LLM_DATA_ROOT": "/root"},
+        runner=runner,
+    )
+    assert pid == 12345
+    assert runner.call_count == 1
+    cmd = runner.call_args[0][0]
+    assert cmd[0] == "bash"
+    assert cmd[1] == "-lc"
+    bash_script = cmd[2]
+    assert "nohup" in bash_script
+    assert ">> '/repo/state/logs/x.log'" in bash_script
+    assert "echo \"$!\"" in bash_script
+    passed_env = runner.call_args[1]["env"]
+    assert passed_env["LLM_DATA_ROOT"] == "/root"
+
+
+def test_spawn_background_raises_when_stdout_has_no_pid() -> None:
+    runner = MagicMock()
+    runner.return_value = MagicMock(stdout="", returncode=0)
+    with pytest.raises(RuntimeError):
+        spawn_background(
+            inner="x",
+            log_path="/repo/log",
+            env={},
+            runner=runner,
+        )
+
+
+def test_spawn_background_raises_on_nonzero_exit() -> None:
+    runner = MagicMock()
+    runner.return_value = MagicMock(stdout="999\n", returncode=2)
+    with pytest.raises(RuntimeError):
+        spawn_background(
+            inner="x",
+            log_path="/repo/log",
+            env={},
+            runner=runner,
+        )
