@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import socket
+import time
+from typing import Callable
 
 
 def _bash_single_quote(host_path: str) -> str:
@@ -40,3 +42,20 @@ def build_serve_inner(repo_posix: str, script_posix_relpath: str) -> str:
         f"cd {_bash_single_quote(repo_posix)}; "
         f"exec bash {_bash_single_quote(rel)}"
     )
+
+
+def wait_for_ready(
+    probe: Callable[[], bool], *, timeout_s: float, poll_s: float = 1.0
+) -> bool:
+    """Poll `probe()` until it returns True or `timeout_s` elapses.
+
+    `probe` is called at least once before timeout is honored. Returns True
+    on success, False on timeout. Probe exceptions propagate (caller's choice).
+    """
+    deadline = time.monotonic() + timeout_s
+    while True:
+        if probe():
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(poll_s)

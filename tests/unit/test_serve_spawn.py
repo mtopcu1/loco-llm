@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import socket
 
-from llm_cli.core.serve_spawn import build_serve_inner, port_in_use
+from llm_cli.core.serve_spawn import build_serve_inner, port_in_use, wait_for_ready
 
 
 def test_port_in_use_false_on_free_port() -> None:
@@ -43,3 +43,35 @@ def test_build_serve_inner_quotes_paths_with_spaces() -> None:
         script_posix_relpath="runtimes/x/serve.sh",
     )
     assert "'/home/me/a repo'" in inner
+
+
+def test_wait_for_ready_succeeds_on_first_call() -> None:
+    calls = {"n": 0}
+
+    def probe() -> bool:
+        calls["n"] += 1
+        return True
+
+    ok = wait_for_ready(probe, timeout_s=5.0, poll_s=0.01)
+    assert ok is True
+    assert calls["n"] == 1
+
+
+def test_wait_for_ready_succeeds_after_some_failures() -> None:
+    calls = {"n": 0}
+
+    def probe() -> bool:
+        calls["n"] += 1
+        return calls["n"] >= 3
+
+    ok = wait_for_ready(probe, timeout_s=5.0, poll_s=0.01)
+    assert ok is True
+    assert calls["n"] == 3
+
+
+def test_wait_for_ready_times_out() -> None:
+    def probe() -> bool:
+        return False
+
+    ok = wait_for_ready(probe, timeout_s=0.05, poll_s=0.02)
+    assert ok is False
