@@ -1,70 +1,190 @@
 # HOWTO: add a runtime
 
-A **runtime** is a folder under `runtimes/{runtime-id}/` that knows how to build and serve one inference stack (vLLM, llama.cpp, etc.). The control plane only shells into your scripts via WSL bash.
+A **runtime** is a folder under `runtimes/{runtime-id}/` that describes how to **build**, **verify**, and **serve** one inference stack (llama.cpp, vLLM, …). The CLI orchestrates your scripts from WSL bash and validates configs against the typed schemas in `manifest.yaml`.
 
-## 1. Create the folder
+## 1. Folder layout
 
 ```text
 runtimes/my-runtime/
-  README.md
-  manifest.yaml
-  build.sh
-  serve.sh
-  healthcheck.sh
+  README.md          # human-facing notes (recommended)
+  manifest.yaml      # id, requires, build/serve param schemas
+  build.sh           # idempotent build under the data root
+  verify.sh          # quick post-install sanity check (exit 0 = pass)
+  serve.sh           # foreground server process
+  healthcheck.sh     # readiness probe for `llm serve`
 ```
 
-Use a stable `runtime-id` (directory name) — it appears in configs and CLI output.
+Use a stable `runtime-id` (directory name). It appears in configs, install paths, and `llm runtime …` output.
 
-## 2. Write `manifest.yaml`
+## 2. `manifest.yaml`
 
-Minimum useful fields:
+Top-level fields:
+
+| Field | Meaning |
+|---|---|
+| `id` | Runtime id (defaults to directory name if omitted). |
+| `display_name`, `description` | Shown in `llm runtime list` / `llm list`. |
+| `official` | Optional marker for curated packages in this repo. |
+| `requires` | External tools with `verify:` hooks for `llm doctor --runtime <id>`. |
+| `build` | Mapping of **build-time** parameters (schema → env during `install`/`rebuild`). |
+| `serve` | Mapping of **serve-time** parameters (must align with `serve.params` in configs). |
+
+### Full example: `llamacpp` (this repo)
+
+See [`runtimes/llamacpp/manifest.yaml`](../runtimes/llamacpp/manifest.yaml):
 
 ```yaml
-id: my-runtime                     # optional if same as directory name
-display_name: My runtime (CUDA)
+id: llamacpp
+display_name: llama.cpp (llama-server)
+official: true
 description: >
-  One-line summary for `llm list` and docs.
+  Builds upstream llama.cpp and serves GGUF weights via the OpenAI-compatible
+  HTTP API (`llama-server`).
+
+requires:
+  - id: cmake
+    verify:
+      cmd: cmake --version
+      version_regex: 'cmake version ([\d.]+)'
+      min: "3.16"
+    install_hint: "apt install cmake"
+  - id: nvcc
+    when: { build.flavor: cuda }
+    verify:
+      cmd: nvcc --version
+      version_regex: 'release ([\d.]+)'
+      min: "12.0"
+    install_hint: "Install CUDA toolkit; see NVIDIA docs."
+
+build:
+  flavor:
+    type: enum
+    values: [cuda, cpu, vulkan]
+    default: cuda
+    prompt: "Which backend to build?"
+  jobs:
+    type: int
+    default: 0
+    prompt: "Parallel build jobs (0 = nproc)"
+
+serve:
+  gguf_path:
+    type: path
+    required: true
+    env: LLM_LLAMACPP_GGUF
+  n_gpu_layers:
+    type: int
+    default: -1
+    env: LLM_LLAMACPP_N_GPU_LAYERS
+  ctx:
+    type: int
+    default: 8192
+    env: LLM_LLAMACPP_CTX
+  extra_args:
+    type: string
+    default: ""
+    env: LLM_LLAMACPP_EXTRA_ARGS
 ```
 
-You can add `upstream`, `arg_schema`, and other fields as in the design spec; they are not validated by the CLI yet.
+Minimal smoke runtime (empty schemas):
 
-## 3. Implement the three scripts
+```yaml
+id: stub-runtime
+display_name: Stub Runtime (smoke)
+official: true
+description: >
+  Minimal runtime package for exercising discovery and install flow.
+build: {}
+serve: {}
+```
 
-All are invoked from the **repo root** in WSL. The CLI injects `LLM_DATA_ROOT`, `LLM_REPO_ROOT`, `LLM_RUNTIMES`, `LLM_MODELS`, and `LLM_CACHE` into bash every time it spawns one. For ad-hoc shell use, run:
+## 3. Param types and `env:`
+
+Each key under `build:` / `serve:` is a parameter spec:
+
+| `type` | Accepts |
+|---|---|
+| `string` | Plain string |
+| `int` | Integer (string forms parsed) |
+| `float` | Floating point |
+| `bool` | Boolean-ish strings |
+| `enum` | One of `values:` |
+| `path` | Path string; configs may use `${data_root}/…`; expanded when building serve env |
+
+Optional fields:
+
+- **`required`** — must be set in config (`serve`) or supplied at install (`build`).
+- **`default`** — used when omitted.
+- **`prompt`** — interactive prompt during `llm runtime install` when not passed as `--param key=value`.
+- **`env`** — explicit environment variable name for **serve** params mapped into `serve.sh` / `healthcheck.sh`. If omitted, the CLI derives **`LLM_<RUNTIME_ID>_<PARAM>`** (uppercase; hyphens → underscores).
+
+Build-time values use **`LLM_BUILD_<PARAM>`** with the same normalization; the runtime id is omitted so every `build.sh` sees a uniform contract.
+
+### `when:` on requirements
+
+Each entry in `requires` may include `when:` so a dependency applies only for certain **build** parameter values, for example CUDA toolkit checks only when `build.flavor` is `cuda`. The CLI evaluates these clauses against the resolved build params during `llm doctor --runtime <id>`.
+
+## 4. Script contracts
+
+All scripts run from the **repo root** in WSL. Every invocation receives the standard settings env (`LLM_DATA_ROOT`, `LLM_REPO_ROOT`, `LLM_RUNTIMES`, `LLM_MODELS`, `LLM_CACHE`, …). For ad-hoc use:
 
 ```bash
 eval "$(llm settings env)"
 bash runtimes/my-runtime/build.sh
 ```
 
-| Script | Purpose (today) |
+| Script | Role |
 |---|---|
-| `build.sh` | Idempotent build/install into `$LLM_DATA_ROOT/runtimes/{id}/` (or your layout) |
-| `serve.sh` | Start the server in the **foreground** as a normal process (no `daemonize`). The CLI may wrap it for logging; your script should handle **SIGTERM** by shutting down cleanly so `llm stop` works. |
-| `healthcheck.sh` | Exit **0** when the server is ready to accept traffic; any non-zero means “not ready.” The CLI invokes it repeatedly (about once per second) until success or `readiness.timeout_seconds`. It receives the same `LLM_*` env as `serve.sh`, including `LLM_SERVE_HOST` and `LLM_SERVE_PORT`. |
+| **`build.sh`** | Idempotent clone/build/install under `$LLM_RUNTIMES/<runtime-id>/` (or your documented layout). Receives **`LLM_BUILD_*`** for each build param (see [`runtimes/llamacpp/build.sh`](../runtimes/llamacpp/build.sh)). |
+| **`verify.sh`** | Optional but recommended. Exit **0** after install when the tree looks sane; non-zero fails `install`. |
+| **`serve.sh`** | Start the server in the **foreground**. Handle **SIGTERM** for clean shutdown (`llm stop`). Receives **`LLM_SERVE_HOST`**, **`LLM_SERVE_PORT`**, plus env vars from **`serve`** params (`env:` or derived names). |
+| **`healthcheck.sh`** | Exit **0** when ready for traffic; polled about once per second until timeout. Same env contract as `serve.sh`. |
 
-**`healthcheck.sh` contract:** keep it fast and idempotent; avoid printing noisy errors on stderr every poll. Use it for whatever “ready” means for your stack (TCP connect, HTTP GET, GPU warmup check, …).
+## 5. Install flow and configs
 
-**`serve.sh` signals:** treat **SIGTERM** as a shutdown request; exit once listeners and workers are stopped. **SIGINT** applies mainly to foreground sessions.
+1. **`llm runtime install <runtime-id>`** — prompts for build params (unless `--yes` / `--param`), runs `build.sh`, runs `verify.sh` if present, writes **`$LLM_RUNTIMES/<id>/.installed`** (JSON record with params, script hashes, schema hash).
+2. **`llm runtime info <id>`** — shows manifest path, install state, drift hints.
+3. Launch configs use **`serve.params`** (not free-form `serve.env`): keys must match the manifest `serve:` schema; values are validated and converted to env for serve/switch.
 
-## 4. Verify
+Example stub config:
 
-```bash
-llm list runtimes
-llm config validate    # after you have a config pointing at this runtime
+```yaml
+id: stub-runtime__stub-model__default
+runtime: stub-runtime
+model: stub-model
+serve:
+  host: 127.0.0.1
+  port: 18080
+  params: {}
 ```
 
-## 5. Build artifacts
+Example llamacpp-oriented snippet:
 
-```bash
-llm setup           # once per machine, if not already done
-llm build my-runtime
+```yaml
+serve:
+  host: 127.0.0.1
+  port: 8080
+  params:
+    gguf_path: "${data_root}/models/my-model/weights.gguf"
+    n_gpu_layers: -1
+    ctx: 8192
+    extra_args: ""
 ```
 
-This runs `runtimes/my-runtime/build.sh` under WSL with the repo as cwd and `LLM_*` env injected.
+## 6. Verification commands
+
+```bash
+llm runtime list
+llm runtime info llamacpp
+llm doctor --runtime llamacpp
+llm config validate
+llm serve stub-runtime__stub-model__default
+```
+
+**Serve gate:** if **`$LLM_RUNTIMES/<runtime-id>/.installed`** is missing, `llm serve` / `llm switch` refuse and suggest `llm runtime install <id>`.
 
 ## See also
 
-- [`repo-conventions.md`](repo-conventions.md)
-- [`lifecycle.md`](lifecycle.md) — how the CLI runs `serve.sh` / `healthcheck.sh`
-- [Scaffolding design §6.1](superpowers/specs/2026-05-15-localllm-scaffolding-design.md) (historical layout; lifecycle commands supersede older §7.2/7.3 flow — see note at top of that spec)
+- Spec: [`superpowers/specs/2026-05-17-runtime-manifest-and-installs.md`](superpowers/specs/2026-05-17-runtime-manifest-and-installs.md)
+- Install lifecycle: [`runtime-lifecycle.md`](runtime-lifecycle.md)
+- Repo layout: [`repo-conventions.md`](repo-conventions.md)
