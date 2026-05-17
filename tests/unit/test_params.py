@@ -10,6 +10,7 @@ from llm_cli.core.params import (
     coerce_value,
     derive_env_name,
     parse_schema,
+    validate_params,
 )
 
 
@@ -151,3 +152,43 @@ def test_derive_env_name_fallback_build():
 def test_derive_env_name_normalizes_dashes():
     spec = _spec("n-gpu-layers", "int")
     assert derive_env_name(spec, runtime_id="llamacpp") == "LLM_LLAMACPP_N_GPU_LAYERS"
+
+
+def test_validate_params_fills_defaults():
+    specs = parse_schema(
+        {
+            "ctx": {"type": "int", "default": 8192},
+            "host": {"type": "string", "default": "127.0.0.1"},
+        }
+    )
+    out, errors = validate_params(specs, {})
+    assert errors == []
+    assert out == {"ctx": 8192, "host": "127.0.0.1"}
+
+
+def test_validate_params_required_missing_errors():
+    specs = parse_schema({"name": {"type": "string", "required": True}})
+    out, errors = validate_params(specs, {})
+    assert out == {}
+    assert any("name" in e and "required" in e for e in errors)
+
+
+def test_validate_params_unknown_key_errors():
+    specs = parse_schema({"ctx": {"type": "int", "default": 8}})
+    out, errors = validate_params(specs, {"ctxx": 16})
+    assert out == {}
+    assert any("unknown" in e and "ctxx" in e for e in errors)
+
+
+def test_validate_params_type_mismatch_errors():
+    specs = parse_schema({"ctx": {"type": "int", "default": 8}})
+    out, errors = validate_params(specs, {"ctx": "huge"})
+    assert out == {}
+    assert any("ctx" in e for e in errors)
+
+
+def test_validate_params_returns_coerced():
+    specs = parse_schema({"jobs": {"type": "int", "default": 0}})
+    out, errors = validate_params(specs, {"jobs": "4"})
+    assert errors == []
+    assert out == {"jobs": 4}

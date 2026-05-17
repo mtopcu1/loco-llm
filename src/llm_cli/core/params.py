@@ -203,3 +203,37 @@ def coerce_value(spec: ParamSpec, raw: Any) -> Any:
     if spec.type is ParamType.PATH:
         return str(raw)
     raise ParamValidationError(f"param {spec.key!r}: unhandled type {spec.type!r}")
+
+
+def validate_params(
+    specs: list[ParamSpec], raw: dict[str, Any] | None
+) -> tuple[dict[str, Any], list[str]]:
+    """Validate a raw param map against `specs`. Returns (coerced, errors).
+
+    Order of checks: unknown keys first (block); then per-spec coercion + required.
+    On any error the coerced dict is empty so callers won't half-use bad input.
+    """
+    raw = dict(raw or {})
+    errors: list[str] = []
+    spec_by_key = {s.key: s for s in specs}
+
+    for key in raw:
+        if key not in spec_by_key:
+            valid = ", ".join(sorted(spec_by_key)) or "(none)"
+            errors.append(f"unknown param {key!r}; valid: {valid}")
+
+    coerced: dict[str, Any] = {}
+    for spec in specs:
+        if spec.key in raw:
+            try:
+                coerced[spec.key] = coerce_value(spec, raw[spec.key])
+            except ParamValidationError as exc:
+                errors.append(str(exc))
+        elif spec.required:
+            errors.append(f"param {spec.key!r}: required")
+        elif spec.default is not None:
+            coerced[spec.key] = spec.default
+
+    if errors:
+        return {}, errors
+    return coerced, []
