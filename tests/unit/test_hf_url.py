@@ -55,3 +55,29 @@ def test_parse_blob_nested_file():
 def test_parse_blob_url_missing_file():
     with pytest.raises(HFUrlError, match="missing file path"):
         parse_hf_url("https://huggingface.co/Qwen/Qwen2.5-7B-Instruct/blob/main/")
+
+
+def test_parse_hf_co_short_host():
+    p = parse_hf_url("https://hf.co/Qwen/Qwen2.5-7B-Instruct/blob/main/weights.gguf")
+    assert p.repo == "Qwen/Qwen2.5-7B-Instruct"
+    assert p.file == "weights.gguf"
+
+
+def test_parse_uppercase_host():
+    p = parse_hf_url("https://HuggingFace.CO/Qwen/Qwen2.5-7B-Instruct")
+    assert p.repo == "Qwen/Qwen2.5-7B-Instruct"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "ftp://huggingface.co/Qwen/Qwen2.5-7B-Instruct",
+        "https://example.com/Qwen/Qwen2.5-7B-Instruct",
+        "https://huggingface.co/Qwen",
+        "https://huggingface.co/",
+        "https://huggingface.co/Qwen/repo/bogus/x",
+    ],
+)
+def test_parse_bad_urls_raise(url):
+    with pytest.raises(HFUrlError):
+        parse_hf_url(url)
