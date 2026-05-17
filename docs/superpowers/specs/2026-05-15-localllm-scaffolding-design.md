@@ -3,6 +3,10 @@
 _Date: 2026-05-15_
 _Status: Approved by user, ready for implementation planning_
 
+> **Updated 2026-05-17:** the `paths.yaml` / `llm init` / `.llm-env` mechanics
+> in this document are superseded by the settings & setup redesign — see
+> [`2026-05-17-settings-and-setup-redesign.md`](2026-05-17-settings-and-setup-redesign.md).
+
 ## 1. Purpose
 
 A personal repository for documenting and storing different local-LLM runtime configurations, with the ability to benchmark them, switch between them, and pin one as a "daily driver" that serves an OpenAI-compatible endpoint.
