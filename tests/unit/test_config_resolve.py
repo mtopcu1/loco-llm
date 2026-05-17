@@ -119,3 +119,49 @@ def test_resolve_model_path_in_serve_params(tmp_path: Path) -> None:
     out = resolve_config_for_display(cfg, s)
     expected = (s.models_dir / "my-model" / "weights.gguf").as_posix()
     assert out["serve"]["params"]["gguf_path"] == expected
+
+
+import pytest
+
+from llm_cli.core.params import ParamValidationError
+
+
+def test_resolve_errors_when_model_path_used_without_model(tmp_path: Path) -> None:
+    s = _settings(tmp_path)
+    s.models_dir.mkdir(parents=True)
+    cfg = ConfigRecord(
+        id="c",
+        path=tmp_path / "c.yaml",
+        data={
+            "id": "c",
+            "runtime": "rt",
+            "serve": {
+                "host": "127.0.0.1",
+                "port": 8080,
+                "params": {"gguf_path": "${model_path}"},
+            },
+        },
+    )
+    with pytest.raises(ParamValidationError, match=r"\$\{model_path\}"):
+        resolve_config_for_display(cfg, s)
+
+
+def test_resolve_errors_when_model_path_uses_missing_id(tmp_path: Path) -> None:
+    s = _settings(tmp_path)
+    s.models_dir.mkdir(parents=True)
+    cfg = ConfigRecord(
+        id="c",
+        path=tmp_path / "c.yaml",
+        data={
+            "id": "c",
+            "runtime": "rt",
+            "model": "ghost-id",
+            "serve": {
+                "host": "127.0.0.1",
+                "port": 8080,
+                "params": {"gguf_path": "${model_path}"},
+            },
+        },
+    )
+    with pytest.raises(ParamValidationError, match="ghost-id"):
+        resolve_config_for_display(cfg, s)

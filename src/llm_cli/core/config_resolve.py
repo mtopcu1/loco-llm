@@ -38,7 +38,17 @@ def resolve_config_for_display(cfg: ConfigRecord, settings: Settings) -> dict[st
             for key, val in list(params.items()):
                 if isinstance(val, str):
                     expanded = val
-                    if model_entry is not None and "${model_path}" in expanded:
+                    if "${model_path}" in expanded:
+                        if not model_id:
+                            raise ParamValidationError(
+                                f"{cfg.id}: serve.params.{key} uses ${{model_path}} "
+                                "but no `model:` is set"
+                            )
+                        if model_entry is None:
+                            raise ParamValidationError(
+                                f"{cfg.id}: serve.params.{key} references model "
+                                f"{model_id!r} which is not in the registry"
+                            )
                         expanded = _resolve_model_path_in(expanded, model_entry, settings)
                     try:
                         params[key] = expand_path(expanded, settings)
