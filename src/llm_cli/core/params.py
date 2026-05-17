@@ -71,3 +71,57 @@ def parse_schema(raw: dict[str, Any]) -> list[ParamSpec]:
             )
         )
     return out
+
+
+class ParamValidationError(ValueError):
+    """Raised when a value cannot be coerced/validated against its ParamSpec."""
+
+
+_BOOL_TRUE = {"true", "1", "yes", "y", "on"}
+_BOOL_FALSE = {"false", "0", "no", "n", "off"}
+
+
+def coerce_value(spec: ParamSpec, raw: Any) -> Any:
+    """Coerce a YAML scalar / CLI string into the spec's declared type.
+
+    Path expansion is handled separately by `expand_path` after coercion;
+    here we only validate that the raw value is a non-empty string-ish.
+    """
+    if spec.type is ParamType.STRING:
+        return str(raw)
+    if spec.type is ParamType.INT:
+        try:
+            return int(raw)
+        except (TypeError, ValueError) as exc:
+            raise ParamValidationError(
+                f"param {spec.key!r}: expected int, got {raw!r}"
+            ) from exc
+    if spec.type is ParamType.FLOAT:
+        try:
+            return float(raw)
+        except (TypeError, ValueError) as exc:
+            raise ParamValidationError(
+                f"param {spec.key!r}: expected float, got {raw!r}"
+            ) from exc
+    if spec.type is ParamType.BOOL:
+        if isinstance(raw, bool):
+            return raw
+        token = str(raw).strip().lower()
+        if token in _BOOL_TRUE:
+            return True
+        if token in _BOOL_FALSE:
+            return False
+        raise ParamValidationError(
+            f"param {spec.key!r}: expected bool, got {raw!r}"
+        )
+    if spec.type is ParamType.ENUM:
+        token = str(raw)
+        if token not in spec.values:
+            raise ParamValidationError(
+                f"param {spec.key!r}: must be one of "
+                f"{', '.join(spec.values)}; got {raw!r}"
+            )
+        return token
+    if spec.type is ParamType.PATH:
+        return str(raw)
+    raise ParamValidationError(f"param {spec.key!r}: unhandled type {spec.type!r}")
