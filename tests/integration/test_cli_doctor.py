@@ -4,9 +4,14 @@ import pytest
 from typer.testing import CliRunner
 
 from llm_cli.core.doctor import CheckStatus, Requirement, RequirementResult
+from llm_cli.core.settings import save_settings
 from llm_cli.main import app
 
 runner = CliRunner()
+
+
+def _configure(tmp_path: Path, repo: Path) -> None:
+    save_settings({"data_root": str(tmp_path / "data"), "repo_root": str(repo)})
 
 
 def _write_requirements(repo: Path) -> None:
@@ -29,10 +34,9 @@ def test_doctor_render_requirements_writes_md(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
     _write_requirements(repo)
+    _configure(tmp_path, repo)
 
-    result = runner.invoke(
-        app, ["doctor", "render-requirements"], env={"LLM_REPO_ROOT": str(repo)}
-    )
+    result = runner.invoke(app, ["doctor", "render-requirements"])
 
     assert result.exit_code == 0, result.stdout
     md = (repo / "requirements.md").read_text(encoding="utf-8")
@@ -45,6 +49,7 @@ def test_doctor_runs_all_checks_and_succeeds(tmp_path: Path, monkeypatch) -> Non
     repo = tmp_path / "repo"
     repo.mkdir()
     _write_requirements(repo)
+    _configure(tmp_path, repo)
 
     def fake_check_all(requirements, **kw):
         return [
@@ -53,7 +58,7 @@ def test_doctor_runs_all_checks_and_succeeds(tmp_path: Path, monkeypatch) -> Non
         ]
 
     monkeypatch.setattr("llm_cli.commands.doctor.check_all", fake_check_all)
-    result = runner.invoke(app, ["doctor"], env={"LLM_REPO_ROOT": str(repo)})
+    result = runner.invoke(app, ["doctor"])
 
     assert result.exit_code == 0
     assert "python" in result.stdout
@@ -64,6 +69,7 @@ def test_doctor_exits_nonzero_when_any_check_fails(tmp_path: Path, monkeypatch) 
     repo = tmp_path / "repo"
     repo.mkdir()
     _write_requirements(repo)
+    _configure(tmp_path, repo)
 
     def fake_check_all(requirements, **kw):
         results = []
@@ -73,7 +79,7 @@ def test_doctor_exits_nonzero_when_any_check_fails(tmp_path: Path, monkeypatch) 
         return results
 
     monkeypatch.setattr("llm_cli.commands.doctor.check_all", fake_check_all)
-    result = runner.invoke(app, ["doctor"], env={"LLM_REPO_ROOT": str(repo)})
+    result = runner.invoke(app, ["doctor"])
 
     assert result.exit_code != 0
 
@@ -81,6 +87,7 @@ def test_doctor_exits_nonzero_when_any_check_fails(tmp_path: Path, monkeypatch) 
 def test_doctor_missing_requirements_yaml_errors(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
-    result = runner.invoke(app, ["doctor"], env={"LLM_REPO_ROOT": str(repo)})
+    _configure(tmp_path, repo)
+    result = runner.invoke(app, ["doctor"])
     assert result.exit_code != 0
     assert "requirements.yaml" in (result.stdout or "") + (result.stderr or "")
