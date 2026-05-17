@@ -133,6 +133,28 @@ def expand_path(raw: str, settings: Settings) -> str:
     return _TOKEN_RE.sub(_sub, expanded)
 
 
+def _normalize_token(token: str) -> str:
+    return token.replace("-", "_").upper()
+
+
+def derive_env_name(
+    spec: ParamSpec, *, runtime_id: str, scope: str = "serve"
+) -> str:
+    """Resolve the env-var name for a param.
+
+    Precedence:
+    1. spec.env if declared.
+    2. scope == "build" -> LLM_BUILD_<KEY> (runtime id intentionally omitted;
+       build.sh sees a uniform contract regardless of runtime).
+    3. otherwise -> LLM_<RUNTIME>_<KEY>.
+    """
+    if spec.env:
+        return spec.env
+    if scope == "build":
+        return f"LLM_BUILD_{_normalize_token(spec.key)}"
+    return f"LLM_{_normalize_token(runtime_id)}_{_normalize_token(spec.key)}"
+
+
 _BOOL_TRUE = {"true", "1", "yes", "y", "on"}
 _BOOL_FALSE = {"false", "0", "no", "n", "off"}
 

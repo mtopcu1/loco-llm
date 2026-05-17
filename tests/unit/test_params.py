@@ -8,6 +8,7 @@ from llm_cli.core.params import (
     ParamType,
     ParamValidationError,
     coerce_value,
+    derive_env_name,
     parse_schema,
 )
 
@@ -130,3 +131,23 @@ def test_expand_path_unknown_token_raises(tmp_path):
 def test_expand_path_passthrough_when_no_token(tmp_path):
     s = _settings(tmp_path)
     assert expand_path("/abs/path", s) == "/abs/path"
+
+
+def test_derive_env_name_uses_declared_env():
+    spec = _spec("gguf_path", "path", env="LLM_LLAMACPP_GGUF")
+    assert derive_env_name(spec, runtime_id="llamacpp") == "LLM_LLAMACPP_GGUF"
+
+
+def test_derive_env_name_fallback_runtime_serve():
+    spec = _spec("ctx", "int")
+    assert derive_env_name(spec, runtime_id="llamacpp") == "LLM_LLAMACPP_CTX"
+
+
+def test_derive_env_name_fallback_build():
+    spec = _spec("flavor", "enum", values=["a", "b"])
+    assert derive_env_name(spec, runtime_id="llamacpp", scope="build") == "LLM_BUILD_FLAVOR"
+
+
+def test_derive_env_name_normalizes_dashes():
+    spec = _spec("n-gpu-layers", "int")
+    assert derive_env_name(spec, runtime_id="llamacpp") == "LLM_LLAMACPP_N_GPU_LAYERS"
