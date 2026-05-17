@@ -13,3 +13,15 @@ def test_parse_bare_repo_url():
 def test_parse_bare_repo_trailing_slash():
     p = parse_hf_url("https://huggingface.co/Qwen/Qwen2.5-7B-Instruct/")
     assert p == ParsedHFUrl(repo="Qwen/Qwen2.5-7B-Instruct", revision="main", file=None)
+
+
+def test_parse_tree_url_with_revision():
+    p = parse_hf_url("https://huggingface.co/Qwen/Qwen2.5-7B-Instruct/tree/main")
+    assert p == ParsedHFUrl(repo="Qwen/Qwen2.5-7B-Instruct", revision="main", file=None)
+
+
+def test_parse_tree_url_with_branch_revision():
+    p = parse_hf_url("https://huggingface.co/Qwen/Qwen2.5-7B-Instruct/tree/feature-branch")
+    assert p == ParsedHFUrl(
+        repo="Qwen/Qwen2.5-7B-Instruct", revision="feature-branch", file=None
+    )
