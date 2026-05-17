@@ -1,7 +1,9 @@
 """Tests for systemd_unit: template, write-if-different, and systemctl wrappers."""
 from __future__ import annotations
 
-from llm_cli.core.systemd_unit import desired_unit_text
+from pathlib import Path
+
+from llm_cli.core.systemd_unit import desired_unit_text, unit_path
 
 
 def test_desired_unit_text_contains_config_and_exec() -> None:
@@ -20,3 +22,15 @@ def test_desired_unit_text_contains_config_and_exec() -> None:
 def test_desired_unit_text_is_deterministic() -> None:
     assert desired_unit_text("a") == desired_unit_text("a")
     assert desired_unit_text("a") != desired_unit_text("b")
+
+
+def test_unit_path_uses_xdg_config_home(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    assert unit_path() == tmp_path / "systemd" / "user" / "llm.service"
+
+
+def test_unit_path_falls_back_to_home(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    assert unit_path() == tmp_path / ".config" / "systemd" / "user" / "llm.service"
