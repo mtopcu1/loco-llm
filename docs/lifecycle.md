@@ -27,6 +27,8 @@ There is **no** separate “daily driver” pin: the running service is the acti
 
 ## Readiness
 
+Before any spawn, the CLI checks **`${LLM_RUNTIMES}/<runtime-id>/.installed`** (equivalently the resolved runtimes dir from settings). If that marker is absent, **`llm serve`** and **`llm switch`** refuse with a hint to run **`llm runtime install <id>`**.
+
 After spawn, the CLI polls `runtimes/<runtime-id>/healthcheck.sh` about once per second until it exits **0** or `readiness.timeout_seconds` in the config elapses (default 600). Runtimes should treat exit 0 as “ready to accept traffic.”
 
 ## Troubleshooting

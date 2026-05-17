@@ -14,6 +14,11 @@ _Status: Approved by user, ready for implementation planning_
 > **no** `state/active.yaml`, **no** `llm default` pin, and **one** managed user unit
 > `llm.service` written by `llm serve --systemd`.
 
+> **Runtime manifests & installs (2026-05-17):** typed runtime `manifest.yaml`
+> schemas, `llm runtime` / `llm model`, `serve.params`, `.installed` gating for serve,
+> and scoped `llm doctor` are specified in
+> [`2026-05-17-runtime-manifest-and-installs.md`](2026-05-17-runtime-manifest-and-installs.md).
+
 ## 1. Purpose
 
 A personal repository for documenting and storing different local-LLM runtime configurations, with the ability to benchmark them, switch between them, and pin one as a "daily driver" that serves an OpenAI-compatible endpoint.

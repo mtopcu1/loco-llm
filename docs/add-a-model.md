@@ -48,10 +48,12 @@ llm config validate
 
 ```bash
 llm setup           # once per machine, if not already done
-llm pull my-model
+llm model pull my-model
 ```
 
 This runs `models/my-model/pull.sh` in WSL from the repo root with `LLM_*` env injected.
+
+> **Note:** Model parameter schemas are a follow-up spec — for now, `pull.sh` keeps its free-form env contract from settings/`LLM_*`, unlike runtimes where `serve.params` is typed against `manifest.yaml`.
 
 ## See also
 

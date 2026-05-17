@@ -26,13 +26,19 @@ llm settings show
 # 4. Document the machine
 llm specs
 
-# 5. Smoke: serve stub config (after: llm config validate)
-llm serve stub-runtime__stub-model__default
+# 5. Install a runtime and model, validate config, serve
+llm setup --default
+llm runtime install llamacpp --yes
+llm model pull unsloth-qwen3.6-35b-a3b
+llm config validate
+llm serve llamacpp__unsloth-qwen3.6-35b-a3b__default
 llm status
 llm stop
 ```
 
-See [`docs/lifecycle.md`](docs/lifecycle.md) for modes, switching, and logs.
+For a minimal smoke without llamacpp weights, use `llm runtime install stub-runtime --yes` and `llm serve stub-runtime__stub-model__default` instead.
+
+See [`docs/lifecycle.md`](docs/lifecycle.md) for modes, switching, and logs. See [`docs/runtime-lifecycle.md`](docs/runtime-lifecycle.md) for `llm runtime install` / `.installed`.
 
 ## Layout
 
@@ -65,10 +71,16 @@ for the full design.
 | `llm doctor` | Run all checks from `requirements.yaml`; prints a **systemd-linger** advisory when `loginctl` reports `Linger=no` |
 | `llm doctor render-requirements` | Regenerate `requirements.md` from `requirements.yaml` |
 | `llm list` | List runtimes, models, configs, and benchmarks |
-| `llm config show <id>` | Print a single launch config (with `${data_root}` expanded in `serve.env`) |
+| `llm config show <id>` | Print a single launch config (with `${data_root}` expanded in `serve.params` paths) |
 | `llm config validate` | Validate every `configs/*.yaml` against manifests and script layout |
-| `llm build <runtime-id>` | Run `runtimes/<id>/build.sh` via WSL bash with `LLM_*` env injected |
-| `llm pull <model-id>` | Run `models/<id>/pull.sh` via WSL bash with `LLM_*` env injected |
+| `llm runtime list` | List discovered runtimes |
+| `llm runtime info <id>` | Show manifest path, install record, drift hints |
+| `llm runtime install <id>` | Build/install runtime; writes `$LLM_RUNTIMES/<id>/.installed` |
+| `llm runtime uninstall <id>` | Remove install marker (optional `--purge` deletes artifacts) |
+| `llm runtime rebuild <id>` | Re-run install; `--reset` drops stored build params |
+| `llm model list` | List discovered models |
+| `llm model info <id>` | Show model manifest summary |
+| `llm model pull <id>` | Run `models/<id>/pull.sh` via WSL bash with `LLM_*` env injected |
 | `llm serve <config>` | Start a config (background by default; `--foreground`, `--systemd`) |
 | `llm switch <config>` | Stop current + start new config in the same mode |
 | `llm stop` | Stop the running service |
