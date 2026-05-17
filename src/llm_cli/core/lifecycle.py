@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os as _os
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -85,3 +86,27 @@ def append_history(repo: Path, event: dict[str, Any]) -> None:
     line.setdefault("ts", _utc_now_iso())
     with history_path(repo).open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(line, sort_keys=True) + "\n")
+
+
+def is_alive(pid: int) -> bool:
+    """Return True if pid identifies a live process owned by this user.
+
+    POSIX: `kill(pid, 0)` raises ESRCH if dead, EPERM if alive-but-not-ours,
+    or succeeds if alive-and-ours. We treat EPERM as alive (the process exists).
+
+    Windows: best-effort; lifecycle commands run in WSL, so a False return on
+    Windows is fine for unit tests on the host.
+    """
+    if pid <= 0:
+        return False
+    if _os.name == "nt":
+        return False
+    try:
+        _os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True

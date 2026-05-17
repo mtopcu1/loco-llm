@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from llm_cli.core.lifecycle import (
     append_history,
     clear_running,
     history_path,
+    is_alive,
     logs_dir,
     read_running,
     running_path,
@@ -123,3 +125,19 @@ def test_append_history_does_not_overwrite_provided_ts(tmp_path: Path) -> None:
     append_history(tmp_path, {"ts": "fixed", "action": "x"})
     line = (tmp_path / "state" / "history.jsonl").read_text(encoding="utf-8").strip()
     assert json.loads(line)["ts"] == "fixed"
+
+
+def test_is_alive_true_for_self() -> None:
+    if os.name == "nt":
+        pytest.skip("is_alive is POSIX-oriented; Windows host uses False")
+    assert is_alive(os.getpid()) is True
+
+
+def test_is_alive_false_for_invalid() -> None:
+    # PID 0 is special everywhere; never a real process we own.
+    assert is_alive(0) is False
+
+
+def test_is_alive_false_for_dead_pid() -> None:
+    # PID 999999 — likely outside the process table; if not, this is still a safe sentinel.
+    assert is_alive(999_999) is False
