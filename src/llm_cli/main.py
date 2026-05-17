@@ -5,6 +5,7 @@ import typer
 
 from llm_cli import __version__
 from llm_cli.commands import init as init_cmd
+from llm_cli.commands import setup as setup_cmd
 from llm_cli.commands import specs as specs_cmd
 from llm_cli.commands.doctor import doctor_app
 
@@ -35,5 +36,6 @@ def root(
 
 
 app.command("init", help="Read paths.yaml, create data-root dirs, write .llm-env.")(init_cmd.init)
+app.command("setup", help="Configure machine-local settings.")(setup_cmd.setup)
 app.command("specs", help="Regenerate the auto block in specs.md.")(specs_cmd.specs_command)
 app.add_typer(doctor_app, name="doctor")
