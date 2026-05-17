@@ -49,3 +49,67 @@ def derive_model_id(parsed: ParsedHFUrl) -> str:
         return base
     suffix = _quant_suffix(parsed.file, parsed.repo)
     return f"{base}__{suffix}" if suffix else base
+
+
+@dataclass(frozen=True)
+class InferResult:
+    format: str
+    include: tuple[str, ...]
+
+
+class FormatInferenceError(ValueError):
+    """Raised when the format cannot be inferred from a URL + repo listing."""
+
+
+def _strip_shard(name: str) -> str:
+    return _SHARD_SUFFIX.sub("", _GGUF_SUFFIX.sub("", name))
+
+
+def _gguf_families(files: list[str]) -> dict[str, list[str]]:
+    out: dict[str, list[str]] = {}
+    for name in files:
+        if not _GGUF_SUFFIX.search(name):
+            continue
+        family = _strip_shard(name)
+        out.setdefault(family, []).append(name)
+    return {k: sorted(v) for k, v in out.items()}
+
+
+def infer_format(parsed: ParsedHFUrl, repo_files: list[str]) -> InferResult:
+    if parsed.file is not None:
+        if _GGUF_SUFFIX.search(parsed.file):
+            family_base = _strip_shard(parsed.file)
+            matches = [
+                f
+                for f in repo_files
+                if _strip_shard(f) == family_base and _GGUF_SUFFIX.search(f)
+            ]
+            include = tuple(sorted(matches)) if matches else (parsed.file,)
+            return InferResult(format="gguf", include=include)
+        raise FormatInferenceError(
+            f"file {parsed.file!r} has unsupported extension; "
+            "re-run with --format and/or --include to disambiguate"
+        )
+
+    families = _gguf_families(repo_files)
+    has_safetensors = any(f.endswith(".safetensors") for f in repo_files)
+    has_config = any(f == "config.json" for f in repo_files)
+    if families and has_safetensors:
+        raise FormatInferenceError(
+            "repo mixes GGUF and safetensors files; "
+            "re-run with --format and/or --include"
+        )
+    if not families and has_safetensors and has_config:
+        return InferResult(format="safetensors-dir", include=())
+    if families and not has_safetensors:
+        if len(families) == 1:
+            (only,) = families.values()
+            return InferResult(format="gguf", include=tuple(only))
+        raise FormatInferenceError(
+            "repo contains multiple GGUF quants; "
+            f"re-run with --include for one of: {sorted(families)}"
+        )
+    raise FormatInferenceError(
+        "could not infer format from repo contents; "
+        "re-run with --format and/or --include"
+    )
