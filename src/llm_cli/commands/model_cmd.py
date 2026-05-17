@@ -25,6 +25,7 @@ from llm_cli.core.model_registry import (
     encode_entry,
     get_entry,
     load_registry,
+    remove_entry,
     upsert_entry,
 )
 from llm_cli.core.model_resolve import (
@@ -365,3 +366,30 @@ def model_add(
     )
     upsert_entry(models_dir, entry)
     console.print(f"[green]registered[/green] {model_id}")
+
+
+@model_app.command("uninstall", help="Remove a registered model.")
+def model_uninstall(
+    model_id: str = typer.Argument(...),
+    purge: bool = typer.Option(False, "--purge", help="Also delete $LLM_MODELS/<id>/."),
+    yes: bool = typer.Option(False, "--yes", help="Skip confirmation."),
+) -> None:
+    models_dir = _models_dir()
+    if get_entry(models_dir, model_id) is None:
+        console.print(f"[red]error:[/red] unknown model {model_id!r}")
+        raise typer.Exit(code=1)
+    if not yes:
+        msg = (
+            f"Purge {models_dir / model_id}? (removes weights/symlinks)"
+            if purge
+            else f"Remove registry entry {model_id!r}?"
+        )
+        if not typer.confirm(msg, default=False):
+            console.print("aborted")
+            raise typer.Exit(code=1)
+    remove_entry(models_dir, model_id)
+    if purge:
+        target = models_dir / model_id
+        if target.exists():
+            shutil.rmtree(target)
+    console.print(f"[green]uninstalled[/green] {model_id}")

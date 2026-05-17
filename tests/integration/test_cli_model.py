@@ -226,6 +226,39 @@ def test_model_add_rejects_missing_path(tmp_path: Path) -> None:
     assert "does not exist" in result.stdout
 
 
+def test_model_uninstall_removes_registry_row(tmp_path: Path) -> None:
+    models_dir = _configure(tmp_path)
+    _seed_entry(models_dir, "x")
+    (models_dir / "x").mkdir(exist_ok=True)
+    (models_dir / "x" / "weights.gguf").write_bytes(b"x")
+    result = runner.invoke(app, ["model", "uninstall", "x", "--yes"], catch_exceptions=False)
+    assert result.exit_code == 0
+    from llm_cli.core.model_registry import get_entry
+    assert get_entry(models_dir, "x") is None
+    assert (models_dir / "x" / "weights.gguf").exists()
+
+
+def test_model_uninstall_with_purge_removes_files(tmp_path: Path) -> None:
+    models_dir = _configure(tmp_path)
+    _seed_entry(models_dir, "x")
+    (models_dir / "x").mkdir(exist_ok=True)
+    (models_dir / "x" / "weights.gguf").write_bytes(b"x")
+    result = runner.invoke(
+        app, ["model", "uninstall", "x", "--purge", "--yes"], catch_exceptions=False
+    )
+    assert result.exit_code == 0
+    assert not (models_dir / "x").exists()
+
+
+def test_model_uninstall_unknown_id_errors(tmp_path: Path) -> None:
+    _configure(tmp_path)
+    result = runner.invoke(
+        app, ["model", "uninstall", "ghost", "--yes"], catch_exceptions=False
+    )
+    assert result.exit_code == 1
+    assert "unknown model" in result.stdout
+
+
 def test_model_pull_url_happy_path(tmp_path: Path) -> None:
     models_dir = _configure(tmp_path)
     url = (
