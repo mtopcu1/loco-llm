@@ -1,12 +1,14 @@
 """Tests for state/running.json, state/history.jsonl, and reconcile helpers."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 
 from llm_cli.core.lifecycle import (
     LifecycleRecord,
+    append_history,
     clear_running,
     history_path,
     logs_dir,
@@ -103,3 +105,21 @@ def test_read_running_rejects_garbage(tmp_path: Path) -> None:
     path.write_text("not json", encoding="utf-8")
     with pytest.raises(ValueError):
         read_running(tmp_path)
+
+
+def test_append_history_creates_file_and_appends(tmp_path: Path) -> None:
+    append_history(tmp_path, {"action": "start", "mode": "background"})
+    append_history(tmp_path, {"action": "stop", "mode": "background"})
+    lines = (
+        (tmp_path / "state" / "history.jsonl").read_text(encoding="utf-8").splitlines()
+    )
+    assert len(lines) == 2
+    first = json.loads(lines[0])
+    assert first["action"] == "start"
+    assert "ts" in first  # auto-added timestamp
+
+
+def test_append_history_does_not_overwrite_provided_ts(tmp_path: Path) -> None:
+    append_history(tmp_path, {"ts": "fixed", "action": "x"})
+    line = (tmp_path / "state" / "history.jsonl").read_text(encoding="utf-8").strip()
+    assert json.loads(line)["ts"] == "fixed"

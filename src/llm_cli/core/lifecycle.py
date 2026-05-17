@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -69,3 +71,17 @@ def clear_running(repo: Path) -> None:
     path = running_path(repo)
     if path.is_file():
         path.unlink()
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def append_history(repo: Path, event: dict[str, Any]) -> None:
+    """Append a JSON object as one line to state/history.jsonl."""
+    sd = state_dir(repo)
+    sd.mkdir(parents=True, exist_ok=True)
+    line = dict(event)
+    line.setdefault("ts", _utc_now_iso())
+    with history_path(repo).open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(line, sort_keys=True) + "\n")
