@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os as _os
+import subprocess as _subprocess
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -110,3 +111,50 @@ def is_alive(pid: int) -> bool:
     except OSError:
         return False
     return True
+
+
+def _systemd_is_active(unit: str) -> bool:
+    """True if `systemctl --user is-active <unit>` prints 'active'."""
+    try:
+        r = _subprocess.run(
+            ["systemctl", "--user", "is-active", unit],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (FileNotFoundError, _subprocess.TimeoutExpired):
+        return False
+    return r.stdout.strip() == "active"
+
+
+def reconcile(repo: Path) -> None:
+    """Drop a stale record from running.json. Side-effect: history append on drop."""
+    rec = read_running(repo)
+    if rec is None:
+        return
+    if rec.mode in ("foreground", "background"):
+        if rec.pid is None or not is_alive(rec.pid):
+            append_history(
+                repo,
+                {
+                    "action": "reap-stale",
+                    "mode": rec.mode,
+                    "config_id": rec.config_id,
+                    "reason": "pid-gone",
+                },
+            )
+            clear_running(repo)
+        return
+    if rec.mode == "systemd":
+        if not rec.unit or not _systemd_is_active(rec.unit):
+            append_history(
+                repo,
+                {
+                    "action": "reap-stale",
+                    "mode": "systemd",
+                    "config_id": rec.config_id,
+                    "reason": "unit-inactive",
+                },
+            )
+            clear_running(repo)
+        return

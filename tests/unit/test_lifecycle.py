@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -15,6 +16,7 @@ from llm_cli.core.lifecycle import (
     is_alive,
     logs_dir,
     read_running,
+    reconcile,
     running_path,
     state_dir,
     write_running,
@@ -141,3 +143,69 @@ def test_is_alive_false_for_invalid() -> None:
 def test_is_alive_false_for_dead_pid() -> None:
     # PID 999999 — likely outside the process table; if not, this is still a safe sentinel.
     assert is_alive(999_999) is False
+
+
+def test_reconcile_keeps_live_pid(tmp_path: Path) -> None:
+    if os.name == "nt":
+        pytest.skip("is_alive is False on Windows; reconcile would reap own PID")
+    rec = LifecycleRecord(
+        mode="background",
+        config_id="cfg-a",
+        port=1,
+        started_at="t",
+        pid=os.getpid(),
+        log_path="x",
+    )
+    write_running(tmp_path, rec)
+    reconcile(tmp_path)
+    assert read_running(tmp_path) == rec
+
+
+def test_reconcile_drops_dead_pid(tmp_path: Path) -> None:
+    rec = LifecycleRecord(
+        mode="background",
+        config_id="cfg-a",
+        port=1,
+        started_at="t",
+        pid=999_999,
+        log_path="x",
+    )
+    write_running(tmp_path, rec)
+    reconcile(tmp_path)
+    assert read_running(tmp_path) is None
+    hist = (tmp_path / "state" / "history.jsonl").read_text(encoding="utf-8").strip()
+    assert "reap-stale" in hist
+    assert "cfg-a" in hist
+
+
+def test_reconcile_drops_systemd_when_inactive(tmp_path: Path) -> None:
+    rec = LifecycleRecord(
+        mode="systemd",
+        config_id="cfg-a",
+        port=1,
+        started_at="t",
+        unit="llm.service",
+    )
+    write_running(tmp_path, rec)
+    with patch("llm_cli.core.lifecycle._systemd_is_active", return_value=False):
+        reconcile(tmp_path)
+    assert read_running(tmp_path) is None
+
+
+def test_reconcile_keeps_systemd_when_active(tmp_path: Path) -> None:
+    rec = LifecycleRecord(
+        mode="systemd",
+        config_id="cfg-a",
+        port=1,
+        started_at="t",
+        unit="llm.service",
+    )
+    write_running(tmp_path, rec)
+    with patch("llm_cli.core.lifecycle._systemd_is_active", return_value=True):
+        reconcile(tmp_path)
+    assert read_running(tmp_path) == rec
+
+
+def test_reconcile_with_no_record_is_noop(tmp_path: Path) -> None:
+    reconcile(tmp_path)
+    assert read_running(tmp_path) is None
