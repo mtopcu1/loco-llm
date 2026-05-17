@@ -6,6 +6,8 @@ import shlex
 import subprocess
 from pathlib import Path, PureWindowsPath
 
+from llm_cli.core.settings import Settings
+
 
 def is_windows() -> bool:
     return os.name == "nt"
@@ -50,26 +52,25 @@ def to_wsl_path(path: Path) -> str:
 
 
 def run_repo_bash(
-    repo: Path,
+    settings: Settings,
     script_posix_relpath: str,
     script_args: list[str] | None = None,
     *,
-    env: dict[str, str] | None = None,
+    extra_env: dict[str, str] | None = None,
 ) -> int:
-    """Run a bash script relative to repo. Sources `.llm-env` when present.
+    """Run a bash script relative to settings.repo_root with LLM_* env injected.
 
     On Windows, uses `wsl -e bash -lc ...`. On POSIX, uses `bash -lc ...`.
     Returns the child process exit code.
     """
     script_args = script_args or []
-    repo_wsl = to_wsl_path(repo)
+    repo_wsl = to_wsl_path(settings.repo_root)
     script_wsl = f"{repo_wsl}/{script_posix_relpath.lstrip('/')}"
     args_str = " ".join(shlex.quote(a) for a in script_args)
     cmd_tail = f"bash {shlex.quote(script_wsl)}" + (f" {args_str}" if args_str else "")
     inner = (
         "set -euo pipefail; "
         f"cd {shlex.quote(repo_wsl)}; "
-        "if [ -f .llm-env ]; then set -a && . ./.llm-env && set +a; fi; "
         f"{cmd_tail}"
     )
     bash = ["bash", "-lc", inner]
@@ -78,6 +79,15 @@ def run_repo_bash(
     else:
         full_cmd = bash
     merged = os.environ.copy()
-    if env:
-        merged.update(env)
+    merged.update(
+        {
+            "LLM_DATA_ROOT": settings.data_root.as_posix(),
+            "LLM_REPO_ROOT": settings.repo_root.as_posix(),
+            "LLM_RUNTIMES": settings.runtimes_dir.as_posix(),
+            "LLM_MODELS": settings.models_dir.as_posix(),
+            "LLM_CACHE": settings.cache_dir.as_posix(),
+        }
+    )
+    if extra_env:
+        merged.update(extra_env)
     return int(subprocess.call(full_cmd, env=merged))
