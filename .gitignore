@@ -28,3 +28,6 @@ benchmarks/*/results/**/raw/_large/
 build/
 dist/
 *.egg
+
+# Local agent scratch
+.commit-msg.tmp
