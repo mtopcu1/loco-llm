@@ -109,3 +109,36 @@ def save_settings(values: dict[str, str]) -> Path:
         encoding="utf-8",
     )
     return path
+
+
+class MissingSettingError(ValueError):
+    """Raised when a required setting (e.g. repo_root) is absent."""
+
+
+def _expand(value: str) -> Path:
+    return Path(value).expanduser()
+
+
+def resolve(values: dict[str, str]) -> Settings:
+    """Return a fully-populated Settings, filling defaults + derived dir keys."""
+    data_root_raw = values.get("data_root", KEY_REGISTRY["data_root"]["default"])
+    data_root = _expand(data_root_raw)
+
+    repo_root_raw = values.get("repo_root")
+    if not repo_root_raw:
+        raise MissingSettingError(
+            "repo_root is not configured; run `llm setup` from inside the repo"
+        )
+    repo_root = _expand(repo_root_raw)
+
+    def _dir(key: str, suffix: str) -> Path:
+        override = values.get(key)
+        return _expand(override) if override else data_root / suffix
+
+    return Settings(
+        data_root=data_root,
+        repo_root=repo_root,
+        runtimes_dir=_dir("runtimes_dir", "runtimes"),
+        models_dir=_dir("models_dir", "models"),
+        cache_dir=_dir("cache_dir", "cache"),
+    )

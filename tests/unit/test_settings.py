@@ -7,10 +7,12 @@ import pytest
 
 from llm_cli.core.settings import (
     KEY_REGISTRY,
+    MissingSettingError,
     Settings,
     UnknownSettingError,
     default_settings,
     load_settings,
+    resolve,
     save_settings,
     settings_path,
 )
@@ -111,3 +113,44 @@ def test_save_settings_rejects_unknown_keys(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
     with pytest.raises(UnknownSettingError):
         save_settings({"oops": "yes"})
+
+
+def test_resolve_derives_dir_keys_from_data_root() -> None:
+    out = resolve({"data_root": "/dr", "repo_root": "/repo"})
+    assert out.data_root == Path("/dr")
+    assert out.repo_root == Path("/repo")
+    assert out.runtimes_dir == Path("/dr/runtimes")
+    assert out.models_dir == Path("/dr/models")
+    assert out.cache_dir == Path("/dr/cache")
+
+
+def test_resolve_honors_explicit_dir_overrides() -> None:
+    out = resolve(
+        {
+            "data_root": "/dr",
+            "repo_root": "/repo",
+            "runtimes_dir": "/mnt/d/rt",
+        }
+    )
+    assert out.runtimes_dir == Path("/mnt/d/rt")
+    assert out.models_dir == Path("/dr/models")
+
+
+def test_resolve_expands_tilde(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    out = resolve({"data_root": "~/llm", "repo_root": "~/r"})
+    assert out.data_root == tmp_path / "llm"
+    assert out.repo_root == tmp_path / "r"
+    assert out.runtimes_dir == tmp_path / "llm" / "runtimes"
+
+
+def test_resolve_uses_default_for_data_root_when_missing() -> None:
+    out = resolve({"repo_root": "/r"})
+    assert out.data_root == Path("~/llm").expanduser()
+
+
+def test_resolve_raises_when_repo_root_missing() -> None:
+    with pytest.raises(MissingSettingError) as exc:
+        resolve({"data_root": "/dr"})
+    assert "repo_root" in str(exc.value)
