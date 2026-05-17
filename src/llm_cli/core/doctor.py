@@ -6,10 +6,13 @@ import shlex
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 import yaml
 
+from llm_cli.core import registry as _registry
+from llm_cli.core.install_record import read_record
+from llm_cli.core.params import evaluate_when
 from llm_cli.core.shell import CommandResult, run_command as _real_run_command
 from llm_cli.core.versions import compare_versions
 
@@ -122,6 +125,68 @@ def check_all(
     run_command: RunCommand = _real_run_command,
 ) -> list[RequirementResult]:
     return [check_requirement(r, run_command=run_command) for r in requirements]
+
+
+def _req_from_entry(entry: dict[str, Any], owner: str) -> Requirement | None:
+    if "id" not in entry or "verify" not in entry:
+        return None
+    verify = entry["verify"]
+    if not isinstance(verify, dict) or "cmd" not in verify or "version_regex" not in verify:
+        return None
+    return Requirement(
+        id=str(entry["id"]),
+        name=str(entry.get("name", entry["id"])),
+        why=str(entry.get("why", f"required by {owner}")),
+        verify_cmd=str(verify["cmd"]),
+        version_regex=str(verify["version_regex"]),
+        min_version=verify.get("min"),
+        install_hint=str(entry.get("install_hint", "")),
+    )
+
+
+def requirements_for_runtime(
+    repo: Path, runtime_id: str, *, build_params: dict[str, Any]
+) -> list[Requirement]:
+    """Return requirements declared by a single runtime, filtered by `when:` clauses."""
+    mf = _registry.get_runtime_manifest(repo, runtime_id)
+    if mf is None:
+        return []
+
+    out: list[Requirement] = []
+    for entry in mf.requires:
+        if not evaluate_when(entry.get("when"), build_params=build_params):
+            continue
+        req = _req_from_entry(entry, owner=runtime_id)
+        if req is not None:
+            out.append(req)
+    return out
+
+
+def _default_build_params(mf: _registry.RuntimeManifest) -> dict[str, Any]:
+    return {spec.key: spec.default for spec in mf.build_schema if spec.default is not None}
+
+
+def requirements_for_all_runtimes(
+    repo: Path, runtimes_dir: Path, *, installed_only: bool
+) -> list[Requirement]:
+    """Aggregate per-runtime requirements.
+
+    Installed runtimes use their recorded build params. Uninstalled runtimes are
+    included only for full sweeps, using build-schema defaults for `when:`.
+    """
+    out: list[Requirement] = []
+    seen: set[str] = set()
+    for mf in _registry.load_runtime_manifests(repo):
+        rec = read_record(runtimes_dir, mf.id)
+        if installed_only and rec is None:
+            continue
+        build_params = dict(rec.build_params) if rec is not None else _default_build_params(mf)
+        for req in requirements_for_runtime(repo, mf.id, build_params=build_params):
+            if req.id in seen:
+                continue
+            seen.add(req.id)
+            out.append(req)
+    return out
 
 
 def systemd_linger_advisory(
