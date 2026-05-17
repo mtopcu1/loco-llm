@@ -49,6 +49,13 @@ def test_doctor_render_requirements_writes_md(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
     _write_requirements(repo)
+    _write_runtime(
+        repo,
+        "rt-a",
+        "  - id: cmake\n"
+        "    verify: { cmd: cmake --version, version_regex: '([0-9.]+)' }\n"
+        "    install_hint: install cmake\n",
+    )
     _configure(tmp_path, repo)
 
     result = runner.invoke(app, ["doctor", "render-requirements"])
@@ -57,6 +64,8 @@ def test_doctor_render_requirements_writes_md(tmp_path: Path) -> None:
     md = (repo / "requirements.md").read_text(encoding="utf-8")
     assert "| python |" in md
     assert "| git |" in md
+    assert "## Runtime: rt-a" in md
+    assert "| cmake |" in md
     assert "auto-generated" in md.lower()
 
 

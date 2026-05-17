@@ -1,4 +1,8 @@
-from llm_cli.core.doctor import Requirement, render_requirements_md
+from llm_cli.core.doctor import (
+    Requirement,
+    render_requirements_md,
+    render_requirements_md_grouped,
+)
 
 
 def test_render_requirements_md_contains_table_headers_and_rows() -> None:
@@ -35,3 +39,37 @@ def test_render_requirements_md_contains_table_headers_and_rows() -> None:
     assert "apt install python3.11" in md
     assert "| git |" in md
     assert "—" in md  # min=None rendered as em dash
+
+
+def test_render_requirements_md_grouped_has_universal_and_runtime_sections() -> None:
+    universal = [
+        Requirement(
+            id="python",
+            name="Python",
+            why="base",
+            verify_cmd="python3 --version",
+            version_regex="([\\d.]+)",
+            min_version="3.11",
+            install_hint="",
+        )
+    ]
+    by_runtime = {
+        "llamacpp": [
+            Requirement(
+                id="cmake",
+                name="cmake",
+                why="builds llama.cpp",
+                verify_cmd="cmake --version",
+                version_regex="([\\d.]+)",
+                min_version="3.16",
+                install_hint="apt install cmake",
+            )
+        ]
+    }
+
+    md = render_requirements_md_grouped(universal, by_runtime)
+
+    assert "## Universal" in md
+    assert "## Runtime: llamacpp" in md
+    assert "python" in md
+    assert "cmake" in md

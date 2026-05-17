@@ -11,7 +11,6 @@ from llm_cli.core.doctor import (
     CheckStatus,
     check_all,
     load_requirements,
-    render_requirements_md,
     systemd_linger_advisory,
 )
 from llm_cli.core.repo import repo_root
@@ -129,12 +128,24 @@ def doctor(
 
 
 @doctor_app.command(
-    "render-requirements", help="Regenerate requirements.md from requirements.yaml."
+    "render-requirements", help="Regenerate requirements.md (universal + per-runtime)."
 )
 def render_requirements() -> None:
+    from llm_cli.core import registry as _registry
+    from llm_cli.core.doctor import (
+        render_requirements_md_grouped,
+        requirements_for_runtime,
+    )
+
     repo = repo_root()
-    reqs = load_requirements(_requirements_yaml(repo))
-    md = render_requirements_md(reqs)
+    universal = load_requirements(_requirements_yaml(repo))
+    by_runtime: dict[str, list] = {}
+    for mf in _registry.load_runtime_manifests(repo):
+        defaults = {spec.key: spec.default for spec in mf.build_schema if spec.default is not None}
+        reqs = requirements_for_runtime(repo, mf.id, build_params=defaults)
+        if reqs:
+            by_runtime[mf.id] = reqs
+    md = render_requirements_md_grouped(universal, by_runtime)
     out = repo / "requirements.md"
     out.write_text(md, encoding="utf-8")
     console.print(f"[green]wrote[/green] {out}")

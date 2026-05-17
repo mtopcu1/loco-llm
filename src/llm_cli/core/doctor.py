@@ -231,12 +231,9 @@ def _escape_pipes(text: str) -> str:
     return text.replace("|", "\\|")
 
 
-def render_requirements_md(requirements: list[Requirement]) -> str:
-    """Render requirements.yaml to a Markdown table for human reading."""
-    lines: list[str] = [_REQ_HEADER.rstrip(), ""]
-    lines.append("| ID | Name | Min | Verify | Install | Why |")
-    lines.append("|---|---|---|---|---|---|")
-    for req in requirements:
+def _render_table(reqs: list[Requirement]) -> list[str]:
+    lines = ["| ID | Name | Min | Verify | Install | Why |", "|---|---|---|---|---|---|"]
+    for req in reqs:
         min_v = req.min_version if req.min_version else "—"
         lines.append(
             "| {id} | {name} | {min} | `{verify}` | {install} | {why} |".format(
@@ -248,4 +245,23 @@ def render_requirements_md(requirements: list[Requirement]) -> str:
                 why=_escape_pipes(req.why),
             )
         )
+    return lines
+
+
+def render_requirements_md(requirements: list[Requirement]) -> str:
+    """Render requirements.yaml to a Markdown table for human reading."""
+    lines: list[str] = [_REQ_HEADER.rstrip(), ""]
+    lines.extend(_render_table(requirements))
+    return "\n".join(lines) + "\n"
+
+
+def render_requirements_md_grouped(
+    universal: list[Requirement], by_runtime: dict[str, list[Requirement]]
+) -> str:
+    """Render universal requirements plus one table per runtime."""
+    lines: list[str] = [_REQ_HEADER.rstrip(), "", "## Universal", ""]
+    lines.extend(_render_table(universal))
+    for runtime_id in sorted(by_runtime):
+        lines.extend(["", f"## Runtime: {runtime_id}", ""])
+        lines.extend(_render_table(by_runtime[runtime_id]))
     return "\n".join(lines) + "\n"
