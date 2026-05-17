@@ -2,8 +2,19 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import MagicMock
 
-from llm_cli.core.systemd_unit import desired_unit_text, unit_path, write_if_different
+import pytest
+
+from llm_cli.core.systemd_unit import (
+    daemon_reload,
+    desired_unit_text,
+    is_active,
+    restart_unit,
+    stop_unit,
+    unit_path,
+    write_if_different,
+)
 
 
 def test_desired_unit_text_contains_config_and_exec() -> None:
@@ -56,3 +67,52 @@ def test_write_if_different_replaces_on_change(tmp_path: Path, monkeypatch) -> N
     changed = write_if_different("v2\n")
     assert changed is True
     assert unit_path().read_text(encoding="utf-8") == "v2\n"
+
+
+def test_daemon_reload_calls_systemctl_user() -> None:
+    runner = MagicMock(return_value=MagicMock(returncode=0, stdout="", stderr=""))
+    daemon_reload(runner=runner)
+    runner.assert_called_once()
+    cmd = runner.call_args[0][0]
+    assert cmd == ["systemctl", "--user", "daemon-reload"]
+
+
+def test_restart_unit_calls_systemctl_restart() -> None:
+    runner = MagicMock(return_value=MagicMock(returncode=0, stdout="", stderr=""))
+    restart_unit("llm.service", runner=runner)
+    cmd = runner.call_args[0][0]
+    assert cmd == ["systemctl", "--user", "restart", "llm.service"]
+
+
+def test_stop_unit_calls_systemctl_stop() -> None:
+    runner = MagicMock(return_value=MagicMock(returncode=0, stdout="", stderr=""))
+    stop_unit("llm.service", runner=runner)
+    cmd = runner.call_args[0][0]
+    assert cmd == ["systemctl", "--user", "stop", "llm.service"]
+
+
+def test_is_active_true_when_stdout_active() -> None:
+    runner = MagicMock(
+        return_value=MagicMock(returncode=0, stdout="active\n", stderr="")
+    )
+    assert is_active("llm.service", runner=runner) is True
+
+
+def test_is_active_false_when_stdout_inactive() -> None:
+    runner = MagicMock(
+        return_value=MagicMock(returncode=3, stdout="inactive\n", stderr="")
+    )
+    assert is_active("llm.service", runner=runner) is False
+
+
+def test_is_active_false_when_systemctl_missing() -> None:
+    def runner(cmd, **kw):
+        raise FileNotFoundError("systemctl")
+
+    assert is_active("llm.service", runner=runner) is False
+
+
+def test_restart_unit_raises_on_nonzero() -> None:
+    runner = MagicMock(return_value=MagicMock(returncode=2, stdout="", stderr="boom"))
+    with pytest.raises(RuntimeError):
+        restart_unit("llm.service", runner=runner)
