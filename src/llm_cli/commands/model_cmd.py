@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import hashlib
 import json as _json
+import os
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from subprocess import run as _subprocess_run
@@ -17,6 +19,7 @@ from llm_cli.core.hf_url import HFUrlError, parse_hf_url
 from llm_cli.core.model_registry import (
     Artifact,
     HFSource,
+    LocalSource,
     Metadata,
     RegistryEntry,
     encode_entry,
@@ -291,3 +294,74 @@ def model_pull(
     )
     upsert_entry(models_dir, refreshed)
     console.print(f"[green]refreshed[/green] {existing.id}")
+
+
+def _symlink_or_copy(src: Path, dst: Path) -> None:
+    if dst.exists() or dst.is_symlink():
+        dst.unlink()
+    try:
+        os.symlink(src, dst)
+    except (OSError, NotImplementedError):
+        if src.is_dir():
+            shutil.copytree(src, dst)
+        else:
+            shutil.copy2(src, dst)
+        console.print(f"[yellow][info][/yellow] symlink unavailable; copied {src} -> {dst}")
+
+
+@model_app.command("add", help="Register pre-existing local weights under a model id.")
+def model_add(
+    model_id: str = typer.Argument(...),
+    path: Path = typer.Argument(...),
+    fmt: str = typer.Option(..., "--format", help="gguf | safetensors-dir"),
+) -> None:
+    if not path.exists():
+        console.print(f"[red]error:[/red] path does not exist: {path}")
+        raise typer.Exit(code=1)
+    models_dir = _models_dir()
+    target = models_dir / model_id
+    target.mkdir(parents=True, exist_ok=True)
+
+    if fmt == "gguf":
+        if path.is_file():
+            _symlink_or_copy(path, target / path.name)
+        elif path.is_dir():
+            for entry in sorted(path.iterdir()):
+                if entry.suffix.lower() == ".gguf":
+                    _symlink_or_copy(entry, target / entry.name)
+        else:
+            console.print(f"[red]error:[/red] unsupported gguf path: {path}")
+            raise typer.Exit(code=1)
+    elif fmt == "safetensors-dir":
+        if not path.is_dir():
+            console.print(
+                f"[red]error:[/red] safetensors-dir requires a directory: {path}"
+            )
+            raise typer.Exit(code=1)
+        if not (path / "config.json").is_file():
+            console.print(
+                f"[red]error:[/red] safetensors-dir missing config.json: {path}"
+            )
+            raise typer.Exit(code=1)
+        for entry in sorted(path.iterdir()):
+            _symlink_or_copy(entry, target / entry.name)
+    else:
+        console.print(f"[red]error:[/red] unknown --format {fmt!r}")
+        raise typer.Exit(code=1)
+
+    try:
+        artifact = build_artifact(target, fmt)
+    except ValueError as exc:
+        console.print(f"[red]error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    entry = RegistryEntry(
+        id=model_id,
+        format=fmt,
+        source=LocalSource(original_path=str(path.resolve())),
+        artifact=artifact,
+        metadata=Metadata(display_name=model_id),
+        installed_at=_utc_now_iso(),
+    )
+    upsert_entry(models_dir, entry)
+    console.print(f"[green]registered[/green] {model_id}")

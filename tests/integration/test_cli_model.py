@@ -169,6 +169,63 @@ def test_model_pull_ambiguous_url_errors(tmp_path: Path) -> None:
     assert load_registry(models_dir) == {}
 
 
+def test_model_add_safetensors_dir(tmp_path: Path) -> None:
+    models_dir = _configure(tmp_path)
+    src = tmp_path / "src"; src.mkdir()
+    (src / "config.json").write_text("{}", encoding="utf-8")
+    (src / "tokenizer.json").write_text("{}", encoding="utf-8")
+    (src / "model.safetensors").write_bytes(b"x" * 32)
+    result = runner.invoke(
+        app, ["model", "add", "my-ft", str(src), "--format", "safetensors-dir"],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0, result.stdout
+    target = models_dir / "my-ft"
+    assert (target / "config.json").exists()
+    from llm_cli.core.model_registry import get_entry
+    e = get_entry(models_dir, "my-ft")
+    assert e.format == "safetensors-dir"
+    assert e.source.kind == "local"
+    assert e.artifact.primary == "."
+
+
+def test_model_add_gguf_single_file(tmp_path: Path) -> None:
+    models_dir = _configure(tmp_path)
+    f = tmp_path / "weights.gguf"; f.write_bytes(b"x" * 16)
+    result = runner.invoke(
+        app, ["model", "add", "single-q", str(f), "--format", "gguf"],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0, result.stdout
+    target = models_dir / "single-q"
+    assert (target / "weights.gguf").exists()
+    from llm_cli.core.model_registry import get_entry
+    e = get_entry(models_dir, "single-q")
+    assert e.artifact.primary == "weights.gguf"
+
+
+def test_model_add_rejects_safetensors_dir_without_config(tmp_path: Path) -> None:
+    _configure(tmp_path)
+    src = tmp_path / "src"; src.mkdir()
+    (src / "model.safetensors").write_bytes(b"x")
+    result = runner.invoke(
+        app, ["model", "add", "bad", str(src), "--format", "safetensors-dir"],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 1
+    assert "config.json" in result.stdout
+
+
+def test_model_add_rejects_missing_path(tmp_path: Path) -> None:
+    _configure(tmp_path)
+    result = runner.invoke(
+        app, ["model", "add", "x", str(tmp_path / "nope"), "--format", "gguf"],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 1
+    assert "does not exist" in result.stdout
+
+
 def test_model_pull_url_happy_path(tmp_path: Path) -> None:
     models_dir = _configure(tmp_path)
     url = (
