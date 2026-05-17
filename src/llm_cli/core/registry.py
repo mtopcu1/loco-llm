@@ -33,6 +33,7 @@ class RuntimeManifest:
     build_schema: list[ParamSpec]
     serve_schema: list[ParamSpec]
     requires: list[dict[str, Any]]
+    accepts_formats: tuple[str, ...]
     path: Path
     raw: dict[str, Any]
 
@@ -142,6 +143,10 @@ def _to_manifest(rec: RuntimeRecord) -> RuntimeManifest:
     requires = data.get("requires") or []
     if not isinstance(requires, list):
         raise ValueError(f"{rec.id}: requires must be a list")
+    raw_formats = data.get("accepts_formats", [])
+    if not isinstance(raw_formats, list):
+        raise ValueError(f"{rec.id}: accepts_formats must be a list of strings")
+    accepts_formats = tuple(str(f) for f in raw_formats)
     return RuntimeManifest(
         id=rec.id,
         display_name=str(data.get("display_name", rec.id)),
@@ -150,6 +155,7 @@ def _to_manifest(rec: RuntimeRecord) -> RuntimeManifest:
         build_schema=parse_schema(data.get("build") or {}),
         serve_schema=parse_schema(data.get("serve") or {}),
         requires=[r for r in requires if isinstance(r, dict)],
+        accepts_formats=accepts_formats,
         path=rec.path,
         raw=data,
     )

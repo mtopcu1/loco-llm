@@ -209,3 +209,39 @@ def test_validate_config_warns_uninstalled_runtime(tmp_path: Path) -> None:
     errs, warnings = registry.validate_config_v2(repo, cfg)
     assert errs == []
     assert any("not installed" in w for w in warnings)
+
+
+import pytest
+
+
+def _write_runtime_manifest(repo: Path, rid: str, body: dict) -> None:
+    rt = repo / "runtimes" / rid
+    rt.mkdir(parents=True, exist_ok=True)
+    (rt / "manifest.yaml").write_text(yaml.safe_dump(body, sort_keys=False), encoding="utf-8")
+    for n in ("build.sh", "serve.sh", "healthcheck.sh"):
+        (rt / n).write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+
+
+def test_runtime_manifest_accepts_formats_default_empty(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"; repo.mkdir()
+    _write_runtime_manifest(repo, "rt", {"id": "rt", "official": True})
+    mf = registry.get_runtime_manifest(repo, "rt")
+    assert mf.accepts_formats == ()
+
+
+def test_runtime_manifest_accepts_formats_list(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"; repo.mkdir()
+    _write_runtime_manifest(
+        repo, "rt", {"id": "rt", "official": True, "accepts_formats": ["gguf"]}
+    )
+    mf = registry.get_runtime_manifest(repo, "rt")
+    assert mf.accepts_formats == ("gguf",)
+
+
+def test_runtime_manifest_accepts_formats_invalid_type(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"; repo.mkdir()
+    _write_runtime_manifest(
+        repo, "rt", {"id": "rt", "official": True, "accepts_formats": "gguf"}
+    )
+    with pytest.raises(ValueError, match="accepts_formats must be a list"):
+        registry.get_runtime_manifest(repo, "rt")
