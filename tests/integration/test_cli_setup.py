@@ -33,3 +33,22 @@ def test_setup_default_writes_settings_and_creates_dirs(
     assert stored["data_root"] == str(data)
     assert data.is_dir()
     assert (data / "runtimes").is_dir()
+
+
+def test_setup_interactive_default_layout(tmp_path, monkeypatch) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    data = tmp_path / "mydata"
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+    user_input = f"{data}\n\n"
+    result = runner.invoke(app, ["setup"], input=user_input, catch_exceptions=False)
+    assert result.exit_code == 0, result.stdout
+
+    cfg = settings_path()
+    stored = yaml.safe_load(cfg.read_text(encoding="utf-8"))
+    assert stored == {"data_root": str(data), "repo_root": str(repo)}
+    assert (data / "runtimes").is_dir()
+

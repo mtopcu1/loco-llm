@@ -31,19 +31,33 @@ def setup(
 ) -> None:
     """Configure machine-local settings (~/.config/llm/config.yaml)."""
     repo_root = Path.cwd().resolve()
-    data_root = _default_data_root()
-    stored = {"data_root": data_root, "repo_root": str(repo_root)}
+    stored: dict[str, str] = {"repo_root": str(repo_root)}
 
-    if not default:
-        console.print(
-            "[yellow]interactive setup not yet implemented; "
-            "re-run with --default[/yellow]"
+    if default:
+        stored["data_root"] = _default_data_root()
+    else:
+        stored["data_root"] = typer.prompt(
+            KEY_REGISTRY["data_root"]["prompt"],
+            default=_default_data_root(),
         )
-        raise typer.Exit(code=2)
+        granular = typer.confirm(
+            "Use default subdirectory layout under data_root?",
+            default=True,
+        )
+        if not granular:
+            stored.update(_prompt_dir_overrides(stored["data_root"]))
 
     path = save_settings(stored)
     resolved = resolve(load_settings())
     ensure_data_dirs(resolved)
     console.print(f"[green]wrote[/green] {path}")
     console.print(f"[green]data_root[/green]: {resolved.data_root}")
+    console.print(f"[green]runtimes_dir[/green]: {resolved.runtimes_dir}")
+    console.print(f"[green]models_dir[/green]: {resolved.models_dir}")
+    console.print(f"[green]cache_dir[/green]: {resolved.cache_dir}")
     console.print(f"[green]repo_root[/green]: {resolved.repo_root}")
+
+
+def _prompt_dir_overrides(data_root: str) -> dict[str, str]:
+    """Placeholder; granular prompts are added in Task 10."""
+    return {}
