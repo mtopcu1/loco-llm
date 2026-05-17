@@ -12,7 +12,7 @@ import typer
 from rich.console import Console
 
 from llm_cli.core import registry
-from llm_cli.core.config_resolve import resolve_config_for_display
+from llm_cli.core.install_record import is_installed
 from llm_cli.core.lifecycle import (
     LifecycleRecord,
     append_history,
@@ -32,6 +32,14 @@ from llm_cli.core.serve_spawn import (
     spawn_foreground,
     wait_for_ready,
 )
+from llm_cli.core.params import (
+    ParamSpec,
+    ParamType,
+    derive_env_name,
+    expand_path,
+    validate_params,
+)
+from llm_cli.core.registry import get_runtime_manifest
 from llm_cli.core.settings import Settings, load_settings, resolve
 from llm_cli.core.systemd_unit import (
     daemon_reload,
@@ -69,10 +77,19 @@ def _resolve_cfg(repo: Path, config_id: str) -> "ConfigRecord":
     return cfg
 
 
-def _serve_env(settings: Settings, cfg_data: dict[str, Any]) -> dict[str, str]:
-    """Merge LLM_* baseline + cfg.serve.{host,port,env} into one env dict."""
+def _serve_env_from_params(
+    settings: Settings, cfg_data: dict[str, Any], schema: list[ParamSpec]
+) -> dict[str, str]:
+    """Build the env dict for serve.sh from validated serve.params."""
     serve = cfg_data["serve"]
-    env = {
+    raw_params = serve.get("params") or {}
+    coerced, errors = validate_params(schema, raw_params)
+    if errors:
+        for error in errors:
+            console.print(f"[red]error:[/red] {cfg_data.get('id')}: {error}")
+        raise typer.Exit(code=1)
+
+    env: dict[str, str] = {
         "LLM_DATA_ROOT": settings.data_root.as_posix(),
         "LLM_REPO_ROOT": settings.repo_root.as_posix(),
         "LLM_RUNTIMES": settings.runtimes_dir.as_posix(),
@@ -82,10 +99,15 @@ def _serve_env(settings: Settings, cfg_data: dict[str, Any]) -> dict[str, str]:
         "LLM_SERVE_HOST": str(serve["host"]),
         "LLM_SERVE_PORT": str(serve["port"]),
     }
-    user_env = serve.get("env") or {}
-    if isinstance(user_env, dict):
-        for k, v in user_env.items():
-            env[str(k)] = str(v)
+    runtime_id = str(cfg_data["runtime"])
+    for spec in schema:
+        if spec.key not in coerced:
+            continue
+        value = coerced[spec.key]
+        if spec.type is ParamType.PATH:
+            value = expand_path(str(value), settings)
+        env[derive_env_name(spec, runtime_id=runtime_id)] = str(value)
+
     merged = os.environ.copy()
     merged.update(env)
     return merged
@@ -315,9 +337,17 @@ def serve(
     reconcile(repo)
     cfg = _resolve_cfg(repo, config_id)
     settings = resolve(load_settings())
-    cfg_resolved = resolve_config_for_display(cfg, settings)
-    cfg_for_env = registry.ConfigRecord(id=cfg.id, path=cfg.path, data=cfg_resolved)
-    env = _serve_env(settings, cfg_for_env.data)
+    runtime_id = str(cfg.data["runtime"])
+    if not is_installed(settings.runtimes_dir, runtime_id):
+        console.print(f"[red]error:[/red] runtime {runtime_id!r} is not installed")
+        console.print(f"hint:  llm runtime install {runtime_id}")
+        raise typer.Exit(code=1)
+    mf = get_runtime_manifest(repo, runtime_id)
+    if mf is None:
+        console.print(f"[red]error:[/red] unknown runtime {runtime_id!r}")
+        raise typer.Exit(code=1)
+    cfg_for_env = registry.ConfigRecord(id=cfg.id, path=cfg.path, data=cfg.data)
+    env = _serve_env_from_params(settings, cfg_for_env.data, mf.serve_schema)
 
     existing = read_running(repo)
     if (
@@ -374,11 +404,19 @@ def switch(
 
     settings = resolve(load_settings())
     new_cfg = _resolve_cfg(repo, config_id)
-    cfg_resolved = resolve_config_for_display(new_cfg, settings)
+    runtime_id = str(new_cfg.data["runtime"])
+    if not is_installed(settings.runtimes_dir, runtime_id):
+        console.print(f"[red]error:[/red] runtime {runtime_id!r} is not installed")
+        console.print(f"hint:  llm runtime install {runtime_id}")
+        raise typer.Exit(code=1)
+    mf = get_runtime_manifest(repo, runtime_id)
+    if mf is None:
+        console.print(f"[red]error:[/red] unknown runtime {runtime_id!r}")
+        raise typer.Exit(code=1)
     new_for_env = registry.ConfigRecord(
-        id=new_cfg.id, path=new_cfg.path, data=cfg_resolved
+        id=new_cfg.id, path=new_cfg.path, data=new_cfg.data
     )
-    env = _serve_env(settings, new_for_env.data)
+    env = _serve_env_from_params(settings, new_for_env.data, mf.serve_schema)
     old_id = rec.config_id
 
     if rec.mode == "background":

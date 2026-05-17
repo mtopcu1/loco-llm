@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from typer.testing import CliRunner
 
+from llm_cli.core.install_record import InstallRecord, write_record
 from llm_cli.core.lifecycle import LifecycleRecord, read_running, write_running
 from llm_cli.core.settings import save_settings
 from llm_cli.main import app
@@ -18,12 +19,20 @@ def _configure(tmp_path: Path, repo: Path) -> None:
     save_settings({"data_root": str(tmp_path / "data"), "repo_root": str(repo)})
 
 
-def _make_repo(root: Path, port: int = 18080) -> Path:
+def _make_repo(root: Path, port: int = 18080, *, installed: bool = True) -> Path:
     repo = root / "repo"
     repo.mkdir()
     rt = repo / "runtimes" / "rt-a"
     rt.mkdir(parents=True)
-    (rt / "manifest.yaml").write_text("id: rt-a\n", encoding="utf-8")
+    (rt / "manifest.yaml").write_text(
+        "id: rt-a\n"
+        "serve:\n"
+        "  token:\n"
+        "    type: string\n"
+        "    default: default-token\n"
+        "    env: LLM_RT_A_TOKEN\n",
+        encoding="utf-8",
+    )
     for name in ("build.sh", "serve.sh", "healthcheck.sh"):
         (rt / name).write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
     md = repo / "models" / "md-a"
@@ -32,9 +41,21 @@ def _make_repo(root: Path, port: int = 18080) -> Path:
     (md / "pull.sh").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
     (repo / "configs").mkdir()
     (repo / "configs" / "cfg-a.yaml").write_text(
-        f"id: cfg-a\nruntime: rt-a\nmodel: md-a\nserve:\n  host: 127.0.0.1\n  port: {port}\n",
+        f"id: cfg-a\nruntime: rt-a\nmodel: md-a\nserve:\n  host: 127.0.0.1\n  port: {port}\n  params:\n    token: test-token\n",
         encoding="utf-8",
     )
+    if installed:
+        write_record(
+            root / "data" / "runtimes",
+            InstallRecord(
+                runtime_id="rt-a",
+                installed_at="2026-05-17T00:00:00Z",
+                build_params={},
+                build_sh_sha256="x",
+                verify_passed=True,
+                schema_hash="y",
+            ),
+        )
     return repo
 
 
@@ -72,6 +93,15 @@ def test_serve_fails_when_unknown_config(tmp_path: Path) -> None:
     result = runner.invoke(app, ["serve", "nope"], catch_exceptions=False)
     assert result.exit_code != 0
     assert "unknown config" in result.stdout.lower()
+
+
+def test_serve_refuses_when_runtime_uninstalled(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path, port=18120, installed=False)
+    _configure(tmp_path, repo)
+    result = runner.invoke(app, ["serve", "cfg-a"], catch_exceptions=False)
+    assert result.exit_code != 0
+    assert "not installed" in result.stdout.lower()
+    assert "llm runtime install" in result.stdout
 
 
 def test_serve_readiness_timeout_kills_child_and_clears_state(tmp_path: Path) -> None:

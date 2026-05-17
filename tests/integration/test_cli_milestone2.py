@@ -21,7 +21,15 @@ def _make_repo(root: Path) -> Path:
     repo.mkdir()
     rt = repo / "runtimes" / "rt-a"
     rt.mkdir(parents=True)
-    (rt / "manifest.yaml").write_text("id: rt-a\ndisplay_name: A\n", encoding="utf-8")
+    (rt / "manifest.yaml").write_text(
+        "id: rt-a\n"
+        "display_name: A\n"
+        "serve:\n"
+        "  weights:\n"
+        "    type: path\n"
+        "    env: LLM_RT_A_WEIGHTS\n",
+        encoding="utf-8",
+    )
     for name in ("build.sh", "serve.sh", "healthcheck.sh"):
         (rt / name).write_text("#!/usr/bin/env bash\necho ok\n", encoding="utf-8")
     md = repo / "models" / "md-a"
@@ -37,7 +45,9 @@ def _make_repo(root: Path) -> Path:
         "  host: 127.0.0.1\n"
         "  port: 9\n"
         "  env:\n"
-        "    X: ${data_root}/mark\n",
+        "    X: ${data_root}/mark\n"
+        "  params:\n"
+        "    weights: ${models_dir}/m.gguf\n",
         encoding="utf-8",
     )
     bench = repo / "benchmarks" / "bench-a"
@@ -105,7 +115,9 @@ def test_config_show_resolves_env(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0
     assert "${data_root}" not in result.stdout
+    assert "${models_dir}" not in result.stdout
     assert "/mark" in result.stdout
+    assert "/m.gguf" in result.stdout
 
 
 @patch("llm_cli.commands.artifacts.run_repo_bash", return_value=0)
