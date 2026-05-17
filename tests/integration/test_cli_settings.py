@@ -57,3 +57,28 @@ def test_settings_env_shell_escapes_values(tmp_path) -> None:
 
     assert result.exit_code == 0
     assert "'" in result.stdout
+
+
+def test_settings_edit_updates_existing_key(tmp_path) -> None:
+    _write_settings(data_root="~/llm", repo_root=str(tmp_path / "r"))
+    new_data_root = tmp_path / "new"
+
+    result = runner.invoke(
+        app,
+        ["settings", "edit", "data_root"],
+        input=f"{new_data_root}\n",
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 0, result.stdout
+    stored = yaml.safe_load(settings_path().read_text(encoding="utf-8"))
+    assert stored["data_root"] == str(new_data_root)
+
+
+def test_settings_edit_unknown_key_errors(tmp_path) -> None:
+    _write_settings(data_root="~/llm", repo_root=str(tmp_path / "r"))
+
+    result = runner.invoke(app, ["settings", "edit", "nope"], catch_exceptions=False)
+
+    assert result.exit_code != 0
+    assert "nope" in result.stdout

@@ -6,7 +6,14 @@ import shlex
 import typer
 from rich.console import Console
 
-from llm_cli.core.settings import KEY_REGISTRY, load_settings, resolve, settings_path
+from llm_cli.core.settings import (
+    KEY_REGISTRY,
+    ensure_data_dirs,
+    load_settings,
+    resolve,
+    save_settings,
+    settings_path,
+)
 
 console = Console(soft_wrap=True)
 
@@ -47,3 +54,46 @@ def env() -> None:
     for var, attr in _ENV_MAPPING:
         value = getattr(resolved, attr).as_posix()
         typer.echo(f"export {var}={shlex.quote(value)}")
+
+
+@settings_app.command("edit")
+def edit(
+    key: str = typer.Argument(..., help="Setting key to edit."),
+    default: bool = typer.Option(
+        False, "--default", help="Reset key to its built-in default."
+    ),
+) -> None:
+    """Edit a single settings key, interactively by default."""
+    if key not in KEY_REGISTRY:
+        console.print(
+            f"[red]error:[/red] unknown setting {key!r}. "
+            f"Valid keys: {', '.join(sorted(KEY_REGISTRY))}"
+        )
+        raise typer.Exit(code=1)
+
+    stored = load_settings()
+    meta = KEY_REGISTRY[key]
+
+    if default:
+        if meta.get("required") and meta.get("default") is None:
+            console.print(
+                f"[red]error:[/red] {key!r} has no built-in default; "
+                f"use `llm settings edit {key}` to set a new value."
+            )
+            raise typer.Exit(code=1)
+        if meta["default"] is None:
+            stored.pop(key, None)
+        else:
+            stored[key] = meta["default"]
+    else:
+        current = stored.get(key) or meta.get("default") or ""
+        answer = typer.prompt(meta["prompt"], default=current).strip()
+        if answer:
+            stored[key] = answer
+        else:
+            stored.pop(key, None)
+
+    save_settings(stored)
+    resolved = resolve(stored)
+    ensure_data_dirs(resolved)
+    console.print(f"[green]updated[/green] {key}")
