@@ -3,7 +3,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from llm_cli.core.settings import KEY_REGISTRY, Settings, default_settings, settings_path
+import pytest
+
+from llm_cli.core.settings import (
+    KEY_REGISTRY,
+    Settings,
+    UnknownSettingError,
+    default_settings,
+    load_settings,
+    settings_path,
+)
 
 
 def test_settings_dataclass_has_expected_fields() -> None:
@@ -49,3 +58,37 @@ def test_settings_path_honors_xdg_config_home(monkeypatch, tmp_path) -> None:
     xdg = tmp_path / "xdg"
     monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg))
     assert settings_path() == xdg / "llm" / "config.yaml"
+
+
+def test_load_settings_missing_file_returns_empty_dict(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    assert load_settings() == {}
+
+
+def test_load_settings_reads_yaml(tmp_path, monkeypatch) -> None:
+    cfg = tmp_path / "cfg" / "llm"
+    cfg.mkdir(parents=True)
+    (cfg / "config.yaml").write_text(
+        "data_root: ~/x\nrepo_root: /tmp/repo\n", encoding="utf-8"
+    )
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    assert load_settings() == {"data_root": "~/x", "repo_root": "/tmp/repo"}
+
+
+def test_load_settings_rejects_unknown_keys(tmp_path, monkeypatch) -> None:
+    cfg = tmp_path / "cfg" / "llm"
+    cfg.mkdir(parents=True)
+    (cfg / "config.yaml").write_text("oops: yes\n", encoding="utf-8")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    with pytest.raises(UnknownSettingError) as exc:
+        load_settings()
+    assert "oops" in str(exc.value)
+
+
+def test_load_settings_rejects_non_mapping(tmp_path, monkeypatch) -> None:
+    cfg = tmp_path / "cfg" / "llm"
+    cfg.mkdir(parents=True)
+    (cfg / "config.yaml").write_text("- a\n- b\n", encoding="utf-8")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    with pytest.raises(ValueError):
+        load_settings()

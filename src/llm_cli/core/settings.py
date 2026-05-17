@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -66,3 +68,26 @@ def settings_path() -> Path:
     xdg = os.environ.get("XDG_CONFIG_HOME")
     base = Path(xdg) if xdg else Path.home() / ".config"
     return base / "llm" / "config.yaml"
+
+
+class UnknownSettingError(ValueError):
+    """Raised when the settings file contains a key that is not in KEY_REGISTRY."""
+
+
+def load_settings() -> dict[str, str]:
+    """Load raw settings from disk. Missing file -> empty dict."""
+    path = settings_path()
+    if not path.is_file():
+        return {}
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"{path}: top-level must be a mapping")
+    unknown = sorted(k for k in raw if k not in KEY_REGISTRY)
+    if unknown:
+        raise UnknownSettingError(
+            f"{path}: unknown setting(s): {', '.join(unknown)}. "
+            f"Valid keys: {', '.join(sorted(KEY_REGISTRY))}"
+        )
+    return {str(k): str(v) for k, v in raw.items()}
