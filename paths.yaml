@@ -1,7 +1,0 @@
-# Single source of truth for where LLM data lives in WSL.
-# Edit and re-run `llm init` to relocate.
-
-data_root: ~/llm
-runtimes: ${data_root}/runtimes
-models:   ${data_root}/models
-cache:    ${data_root}/cache
