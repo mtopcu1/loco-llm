@@ -30,3 +30,13 @@ def unit_path() -> Path:
     xdg = os.environ.get("XDG_CONFIG_HOME")
     base = Path(xdg) if xdg else Path.home() / ".config"
     return base / "systemd" / "user" / "llm.service"
+
+
+def write_if_different(text: str) -> bool:
+    """Write unit text to disk only if it differs. Returns True on change."""
+    path = unit_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_file() and path.read_text(encoding="utf-8") == text:
+        return False
+    path.write_text(text, encoding="utf-8")
+    return True
