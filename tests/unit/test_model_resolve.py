@@ -127,8 +127,8 @@ def test_build_artifact_split_gguf(tmp_path: Path):
 
 
 def test_build_artifact_safetensors_dir(tmp_path: Path):
-    (tmp_path / "config.json").write_text("{}", encoding="utf-8")
-    (tmp_path / "tokenizer.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "config.json").write_bytes(b"")
+    (tmp_path / "tokenizer.json").write_bytes(b"")
     (tmp_path / "model-00001-of-00002.safetensors").write_bytes(b"x" * 50)
     (tmp_path / "model-00002-of-00002.safetensors").write_bytes(b"x" * 50)
     art = build_artifact(tmp_path, "safetensors-dir")
