@@ -69,3 +69,66 @@ def test_model_info_missing(tmp_path: Path) -> None:
     result = runner.invoke(app, ["model", "info", "ghost"], catch_exceptions=False)
     assert result.exit_code == 1
     assert "unknown model" in result.stdout
+
+
+from unittest.mock import patch
+
+from llm_cli.core.hf_client import HFRepoInfo, HFSibling
+
+
+def _fake_repo_info() -> HFRepoInfo:
+    return HFRepoInfo(
+        repo="unsloth/Qwen3.6-235B-A22B-GGUF",
+        revision="main",
+        sha="abc",
+        license="apache-2.0",
+        siblings=[
+            HFSibling(
+                rfilename="Qwen3.6-235B-A22B-UD-Q4_K_XL-00001-of-00002.gguf",
+                size=100,
+                lfs_sha256="111",
+            ),
+            HFSibling(
+                rfilename="Qwen3.6-235B-A22B-UD-Q4_K_XL-00002-of-00002.gguf",
+                size=200,
+                lfs_sha256="222",
+            ),
+            HFSibling(rfilename="README.md", size=10, lfs_sha256=None),
+        ],
+    )
+
+
+def _fake_download(repo, revision, include, exclude, target_dir):
+    for name in (
+        "Qwen3.6-235B-A22B-UD-Q4_K_XL-00001-of-00002.gguf",
+        "Qwen3.6-235B-A22B-UD-Q4_K_XL-00002-of-00002.gguf",
+    ):
+        p = Path(target_dir) / name
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(b"x" * (100 if "00001" in name else 200))
+    return 0
+
+
+def test_model_pull_url_happy_path(tmp_path: Path) -> None:
+    models_dir = _configure(tmp_path)
+    url = (
+        "https://huggingface.co/unsloth/Qwen3.6-235B-A22B-GGUF/blob/main/"
+        "Qwen3.6-235B-A22B-UD-Q4_K_XL-00001-of-00002.gguf"
+    )
+    with patch(
+        "llm_cli.commands.model_cmd.fetch_repo_revision", return_value=_fake_repo_info()
+    ), patch(
+        "llm_cli.commands.model_cmd.hf_download", side_effect=_fake_download
+    ), patch(
+        "llm_cli.commands.model_cmd._verify_sha256", return_value=[]
+    ):
+        result = runner.invoke(app, ["model", "pull", url], catch_exceptions=False)
+    assert result.exit_code == 0, result.stdout
+    from llm_cli.core.model_registry import get_entry
+    e = get_entry(models_dir, "unsloth-qwen3.6-235b-a22b__ud-q4-k-xl")
+    assert e is not None
+    assert e.format == "gguf"
+    assert e.source.kind == "hf"
+    assert e.source.repo == "unsloth/Qwen3.6-235B-A22B-GGUF"
+    assert e.artifact.primary == "Qwen3.6-235B-A22B-UD-Q4_K_XL-00001-of-00002.gguf"
+    assert len(e.artifact.files) == 2
