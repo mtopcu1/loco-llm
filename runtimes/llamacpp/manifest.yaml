@@ -1,0 +1,50 @@
+id: llamacpp
+display_name: llama.cpp (llama-server)
+official: true
+description: >
+  Builds upstream llama.cpp and serves GGUF weights via the OpenAI-compatible
+  HTTP API (`llama-server`).
+
+requires:
+  - id: cmake
+    verify:
+      cmd: cmake --version
+      version_regex: 'cmake version ([\d.]+)'
+      min: "3.16"
+    install_hint: "apt install cmake"
+  - id: nvcc
+    when: { build.flavor: cuda }
+    verify:
+      cmd: nvcc --version
+      version_regex: 'release ([\d.]+)'
+      min: "12.0"
+    install_hint: "Install CUDA toolkit; see NVIDIA docs."
+
+build:
+  flavor:
+    type: enum
+    values: [cuda, cpu, vulkan]
+    default: cuda
+    prompt: "Which backend to build?"
+  jobs:
+    type: int
+    default: 0
+    prompt: "Parallel build jobs (0 = nproc)"
+
+serve:
+  gguf_path:
+    type: path
+    required: true
+    env: LLM_LLAMACPP_GGUF
+  n_gpu_layers:
+    type: int
+    default: -1
+    env: LLM_LLAMACPP_N_GPU_LAYERS
+  ctx:
+    type: int
+    default: 8192
+    env: LLM_LLAMACPP_CTX
+  extra_args:
+    type: string
+    default: ""
+    env: LLM_LLAMACPP_EXTRA_ARGS
