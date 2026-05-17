@@ -1,61 +1,83 @@
 # HOWTO: add a model
 
-A **model** is a folder under `models/{model-id}/` that describes a weight set and implements how to materialize it under the WSL data root.
+Models live in a per-machine registry at `$LLM_MODELS/registry.json` (not in git). You don't write any YAML or scripts by hand; the CLI manages everything.
 
-## 1. Create the folder
+## Pull from Hugging Face (one shot)
 
-```text
-models/my-model/
-  README.md
-  manifest.yaml
-  pull.sh
+For a single GGUF quant (URL points at the file):
+
+```bash
+llm model pull \
+  https://huggingface.co/unsloth/Qwen3.6-235B-A22B-GGUF/blob/main/Qwen3.6-235B-A22B-UD-Q4_K_XL-00001-of-00010.gguf
 ```
 
-## 2. Write `manifest.yaml`
+For a whole safetensors-style repo:
 
-Minimum fields:
+```bash
+llm model pull https://huggingface.co/Qwen/Qwen2.5-7B-Instruct
+```
+
+If the repo is ambiguous (mixed formats, multiple GGUF quants) `pull` will refuse and tell you to add `--format` and/or `--include`:
+
+```bash
+llm model pull https://huggingface.co/unsloth/Qwen3.6-235B-A22B-GGUF \
+  --include "*UD-Q4_K_XL*"
+```
+
+Re-pulling an existing id refreshes the on-disk artifact and bumps `installed_at`:
+
+```bash
+llm model pull qwen-qwen2.5-7b-instruct
+```
+
+## Register local weights
+
+```bash
+llm model add my-finetune /home/me/llm/staging/my-finetune --format safetensors-dir
+llm model add q4-local   /home/me/llm/staging/q4.gguf      --format gguf
+```
+
+Files are symlinked into `$LLM_MODELS/<id>/` (copied as a fallback if the FS rejects symlinks). The originals are untouched.
+
+## Reference models in configs
+
+Configs reference a model by id and use the `${model_path}` template inside `serve.params`:
 
 ```yaml
-id: my-model
-display_name: My quantized weights
-description: >
-  Source (HF repo, URL, …), quant, size, context — whatever you need to remember.
+runtime: llamacpp
+model: unsloth-qwen3.6-235b-a22b__ud-q4-k-xl
+serve:
+  host: 127.0.0.1
+  port: 8080
+  params:
+    gguf_path: "${model_path}"
+    n_gpu_layers: -1
+    ctx: 8192
 ```
 
-Add `source`, checksums, and other metadata as you harden reproducibility (see design spec §6.2).
+`llm config validate` enforces:
+- `model:` is **required** when the runtime declares `accepts_formats: [...]` (non-empty).
+- `model:` must be **absent** when the runtime declares `accepts_formats: []`.
+- The model's `format` must be in the runtime's `accepts_formats`.
+- The id must resolve to an entry in `$LLM_MODELS/registry.json`.
 
-## 3. Implement `pull.sh`
-
-- Must populate **`$LLM_MODELS/{model-id}/`** (or subpaths you document), where `LLM_MODELS` comes from resolved settings.
-- Should be **idempotent** (safe to re-run).
-- Use `set -euo pipefail` and verify downloads when you have checksums in the manifest.
-
-The CLI injects `LLM_DATA_ROOT`, `LLM_REPO_ROOT`, `LLM_RUNTIMES`, `LLM_MODELS`, and `LLM_CACHE` into bash every time it spawns one. For ad-hoc shell use, run:
+## Verify and uninstall
 
 ```bash
-eval "$(llm settings env)"
-bash models/my-model/pull.sh
+llm model list
+llm model info <id>
+llm model uninstall <id> [--purge]
 ```
 
-## 4. Verify
+`--purge` removes the symlinked / downloaded files under `$LLM_MODELS/<id>/` in addition to the registry row.
 
-```bash
-llm list models
-llm config validate
-```
+## Source kinds
 
-## 5. Pull weights
-
-```bash
-llm setup           # once per machine, if not already done
-llm model pull my-model
-```
-
-This runs `models/my-model/pull.sh` in WSL from the repo root with `LLM_*` env injected.
-
-> **Note:** Model parameter schemas are a follow-up spec — for now, `pull.sh` keeps its free-form env contract from settings/`LLM_*`, unlike runtimes where `serve.params` is typed against `manifest.yaml`.
+Every registry entry has one of two `source` kinds:
+- `hf` — pulled from Hugging Face; `pull <id>` will refresh it.
+- `local` — registered with `llm model add`; `pull <id>` will refuse it.
 
 ## See also
 
-- [`repo-conventions.md`](repo-conventions.md)
-- [Design spec §6.2](superpowers/specs/2026-05-15-localllm-scaffolding-design.md)
+- [`runtime-lifecycle.md`](runtime-lifecycle.md)
+- [Models registry redesign spec](superpowers/specs/2026-05-17-models-registry-redesign.md)
