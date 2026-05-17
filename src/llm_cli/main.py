@@ -7,6 +7,8 @@ from llm_cli import __version__
 from llm_cli.commands import artifacts, config_cmd, list_cmd
 from llm_cli.commands import setup as setup_cmd
 from llm_cli.commands import specs as specs_cmd
+from llm_cli.commands import lifecycle_cmds
+from llm_cli.commands import serve as serve_cmd
 from llm_cli.commands.doctor import doctor_app
 from llm_cli.commands.settings_cmd import settings_app
 
@@ -50,4 +52,16 @@ app.command("build", help="Run runtimes/<id>/build.sh in WSL with LLM_* env.")(
 )
 app.command("pull", help="Run models/<id>/pull.sh in WSL with LLM_* env.")(
     artifacts.pull_model
+)
+
+# Lifecycle: serve, switch, stop, status, logs.
+app.command("serve", help="Start a config in fg/bg/systemd mode.")(serve_cmd.serve)
+app.command(
+    "switch",
+    help="Stop the current service and start a new config in the same mode.",
+)(serve_cmd.switch)
+app.command("stop", help="Stop the currently-running service.")(lifecycle_cmds.stop)
+app.command("status", help="Show what's currently running.")(lifecycle_cmds.status)
+app.command("logs", help="Tail logs of the currently-running service.")(
+    lifecycle_cmds.logs
 )

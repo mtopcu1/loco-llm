@@ -1,7 +1,7 @@
 # Repository conventions
 
-This document matches the **current** repo layout and CLI behavior (Milestone 2).
-Future commands (`start`, `bench`, …) will extend the same contracts.
+This document matches the **current** repo layout and CLI behavior through lifecycle commands (`serve`, `stop`, …).
+Future milestones (`bench`, …) will extend the same contracts.
 
 ## Root files
 
@@ -29,6 +29,7 @@ For manual bash, `eval "$(llm settings env)"` injects `LLM_DATA_ROOT`, `LLM_REPO
 | `models/{id}/` | `manifest.yaml`, `pull.sh`, `README.md` |
 | `configs/{config-id}.yaml` | One launch unit (runtime + model + `serve` block) |
 | `benchmarks/{id}/` | `bench.yaml`, `run.sh`, `README.md`, optional `results/` |
+| `state/` | **Not committed.** `running.json`, `history.jsonl`, per-session logs under `logs/` — see `docs/lifecycle.md` |
 | `src/llm_cli/` | Python Typer CLI |
 | `docs/` | HOWTOs and reference |
 
@@ -47,7 +48,7 @@ Heavy artifacts (cloned runtimes, venvs, weights) live under the **data root** f
 ## Git: what to commit
 
 - Commit manifests, configs, scripts, benchmark metadata, and (per design) small benchmark results under `results/` once the benchmark workflow is wired.
-- Do **not** commit machine-local settings, generated env files, or live state files like `state/running.json` when those exist (see design spec for the full gitignore story).
+- Do **not** commit machine-local settings, generated env files, or runtime state under `state/` (`running.json`, `history.jsonl`, `state/logs/*`) — that directory is for process-local data only. See `docs/lifecycle.md`.
 
 ## Stub packages
 

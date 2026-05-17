@@ -7,6 +7,13 @@ _Status: Approved by user, ready for implementation planning_
 > in this document are superseded by the settings & setup redesign — see
 > [`2026-05-17-settings-and-setup-redesign.md`](2026-05-17-settings-and-setup-redesign.md).
 
+> **Lifecycle & serve (2026-05-17):** `llm serve`, `llm stop`, `llm switch`,
+> `llm status`, and `llm logs` are specified in
+> [`2026-05-17-lifecycle-and-serve.md`](2026-05-17-lifecycle-and-serve.md).
+> They supersede the original **§7.2 / §7.3** orchestration diagrams here: there is
+> **no** `state/active.yaml`, **no** `llm default` pin, and **one** managed user unit
+> `llm.service` written by `llm serve --systemd`.
+
 ## 1. Purpose
 
 A personal repository for documenting and storing different local-LLM runtime configurations, with the ability to benchmark them, switch between them, and pin one as a "daily driver" that serves an OpenAI-compatible endpoint.

@@ -124,6 +124,32 @@ def check_all(
     return [check_requirement(r, run_command=run_command) for r in requirements]
 
 
+def systemd_linger_advisory(
+    *,
+    run_command: RunCommand = _real_run_command,
+) -> str | None:
+    """Return a warning message if user lingering is off; None if OK or not applicable.
+
+    User systemd units (e.g. ``llm serve --systemd``) keep running after logout only
+    when lingering is enabled. Missing ``loginctl`` or unexpected output is ignored.
+    """
+    result = run_command(
+        ["loginctl", "show-user", "--property=Linger"],
+        timeout_sec=6.0,
+    )
+    if not result.found or result.timed_out or result.exit_code != 0:
+        return None
+    line = (result.stdout or "").strip()
+    if line == "Linger=yes":
+        return None
+    if line == "Linger=no":
+        return (
+            "User systemd services stop at logout unless lingering is enabled "
+            "(sudo loginctl enable-linger $USER)."
+        )
+    return None
+
+
 # ---------- requirements.md rendering ----------
 
 _REQ_HEADER = (

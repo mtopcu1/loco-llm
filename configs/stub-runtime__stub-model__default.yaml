@@ -1,0 +1,10 @@
+id: stub-runtime__stub-model__default
+runtime: stub-runtime
+model: stub-model
+serve:
+  host: 127.0.0.1
+  port: 18080
+  env:
+    STUB_MARK: "${data_root}/stub-mark"
+readiness:
+  timeout_seconds: 120

@@ -1,8 +1,7 @@
 # LocalLLM
 
 Personal control plane for local LLM runtimes — manage runtime configurations,
-benchmark them, and pin one as a "daily driver" that serves an OpenAI-compatible
-endpoint.
+benchmark them, and **serve** a chosen config via `llm serve` (foreground, background, or systemd).
 
 This repo contains **text only** — manifests, configs, scripts, benchmark
 results. Runtime source trees and model weights live in WSL2's native
@@ -26,7 +25,14 @@ llm settings show
 
 # 4. Document the machine
 llm specs
+
+# 5. Smoke: serve stub config (after: llm config validate)
+llm serve stub-runtime__stub-model__default
+llm status
+llm stop
 ```
+
+See [`docs/lifecycle.md`](docs/lifecycle.md) for modes, switching, and logs.
 
 ## Layout
 
@@ -36,14 +42,14 @@ llm specs
 | `models/{id}/` | Manifest + pull script for one model (no weights — those live in `~/llm/models/`) |
 | `configs/{id}.yaml` | One launch unit (runtime + model + flags) |
 | `benchmarks/{id}/` | Wrapper around an existing benchmark tool, plus committed results |
-| `state/` | Pinned daily driver, currently-running processes, history |
+| `state/` | Runtime state: `running.json`, `history.jsonl`, `logs/` (gitignored; see `docs/lifecycle.md`) |
 | `docs/` | HOWTOs and reference notes |
 | `src/llm_cli/` | The Python CLI implementation |
 
 See [`docs/superpowers/specs/2026-05-15-localllm-scaffolding-design.md`](docs/superpowers/specs/2026-05-15-localllm-scaffolding-design.md)
 for the full design.
 
-## CLI commands (Milestone 1–2)
+## CLI commands (Milestone 1–2 + lifecycle)
 
 | Command | Purpose |
 |---|---|
@@ -56,15 +62,20 @@ for the full design.
 | `llm specs` | Regenerate the auto block in `specs.md` |
 | `llm specs --check` | Exit nonzero if `specs.md` differs from current detection |
 | `llm specs --print` | Print detection without writing |
-| `llm doctor` | Run all checks from `requirements.yaml` |
+| `llm doctor` | Run all checks from `requirements.yaml`; prints a **systemd-linger** advisory when `loginctl` reports `Linger=no` |
 | `llm doctor render-requirements` | Regenerate `requirements.md` from `requirements.yaml` |
 | `llm list` | List runtimes, models, configs, and benchmarks |
 | `llm config show <id>` | Print a single launch config (with `${data_root}` expanded in `serve.env`) |
 | `llm config validate` | Validate every `configs/*.yaml` against manifests and script layout |
 | `llm build <runtime-id>` | Run `runtimes/<id>/build.sh` via WSL bash with `LLM_*` env injected |
 | `llm pull <model-id>` | Run `models/<id>/pull.sh` via WSL bash with `LLM_*` env injected |
+| `llm serve <config>` | Start a config (background by default; `--foreground`, `--systemd`) |
+| `llm switch <config>` | Stop current + start new config in the same mode |
+| `llm stop` | Stop the running service |
+| `llm status [--json]` | Show mode, config, port, uptime |
+| `llm logs [-f] [-n N]` | Tail logs (file or journalctl) |
 
-Future milestones add `llm status / start / stop / switch / default / bench / results`.
+Future milestones add `llm bench` / `llm results`.
 
 ## Discipline
 

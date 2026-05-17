@@ -55,6 +55,16 @@ Re-open WSL, then verify:
 systemctl is-system-running    # 'running' or 'degraded' is fine
 ```
 
+If you plan to use **`llm serve --systemd`**, enable **user lingering** so the service survives closing all interactive sessions when systemd is your session manager:
+
+```bash
+loginctl show-user --property=Linger   # want Linger=yes
+# if you see Linger=no:
+sudo loginctl enable-linger "$USER"
+```
+
+`llm doctor` prints an advisory when it detects `Linger=no`.
+
 ### 4. Tune WSL memory and swap (optional but recommended)
 
 Edit `~/.wslconfig` on the **Windows** host (for example `C:\Users\you\.wslconfig`):
@@ -83,7 +93,7 @@ pip install -U huggingface_hub[cli]
 cd /mnt/c/Private/Projects/LocalLLM   # or wherever the repo lives
 ./install.sh
 export PATH="$HOME/.local/bin:$PATH"
-llm init
+llm setup
 llm specs
 llm doctor
 ```

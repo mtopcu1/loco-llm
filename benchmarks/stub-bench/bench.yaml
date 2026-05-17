@@ -1,0 +1,3 @@
+id: stub-bench
+needs_server: false
+description: Stub benchmark for layout discovery (does not need a running LLM).

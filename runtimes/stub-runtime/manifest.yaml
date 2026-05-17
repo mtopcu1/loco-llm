@@ -1,0 +1,5 @@
+id: stub-runtime
+display_name: Stub Runtime (smoke)
+description: >
+  Minimal runtime package for exercising discovery, `llm build`, and layout
+  validation. Replace with a real inference server (vLLM, llama.cpp, …).

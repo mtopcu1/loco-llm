@@ -12,5 +12,6 @@ Machine-local settings live at `~/.config/llm/config.yaml` and are managed with
 | [`add-a-model.md`](add-a-model.md) | Add `models/{id}/` and `pull.sh` |
 | [`add-a-config.md`](add-a-config.md) | Add `configs/*.yaml` and validate |
 | [`add-a-benchmark.md`](add-a-benchmark.md) | Add `benchmarks/{id}/` layout |
+| [`lifecycle.md`](lifecycle.md) | `llm serve` / `stop` / `switch` / `status` / `logs` |
 
 (Per-runtime deep dives can live under `docs/runtimes/{runtime-id}.md` when needed.)

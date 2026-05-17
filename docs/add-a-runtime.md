@@ -40,10 +40,12 @@ bash runtimes/my-runtime/build.sh
 | Script | Purpose (today) |
 |---|---|
 | `build.sh` | Idempotent build/install into `$LLM_DATA_ROOT/runtimes/{id}/` (or your layout) |
-| `serve.sh` | Intended to start the server in the foreground for a given config (full contract in design doc) |
-| `healthcheck.sh` | Exits 0 when the OpenAI-compatible endpoint is ready |
+| `serve.sh` | Start the server in the **foreground** as a normal process (no `daemonize`). The CLI may wrap it for logging; your script should handle **SIGTERM** by shutting down cleanly so `llm stop` works. |
+| `healthcheck.sh` | Exit **0** when the server is ready to accept traffic; any non-zero means “not ready.” The CLI invokes it repeatedly (about once per second) until success or `readiness.timeout_seconds`. It receives the same `LLM_*` env as `serve.sh`, including `LLM_SERVE_HOST` and `LLM_SERVE_PORT`. |
 
-**Tip:** Keep scripts `set -euo pipefail` and fail loudly when env vars are missing.
+**`healthcheck.sh` contract:** keep it fast and idempotent; avoid printing noisy errors on stderr every poll. Use it for whatever “ready” means for your stack (TCP connect, HTTP GET, GPU warmup check, …).
+
+**`serve.sh` signals:** treat **SIGTERM** as a shutdown request; exit once listeners and workers are stopped. **SIGINT** applies mainly to foreground sessions.
 
 ## 4. Verify
 
@@ -64,4 +66,5 @@ This runs `runtimes/my-runtime/build.sh` under WSL with the repo as cwd and `LLM
 ## See also
 
 - [`repo-conventions.md`](repo-conventions.md)
-- [Design spec §6.1](superpowers/specs/2026-05-15-localllm-scaffolding-design.md)
+- [`lifecycle.md`](lifecycle.md) — how the CLI runs `serve.sh` / `healthcheck.sh`
+- [Scaffolding design §6.1](superpowers/specs/2026-05-15-localllm-scaffolding-design.md) (historical layout; lifecycle commands supersede older §7.2/7.3 flow — see note at top of that spec)

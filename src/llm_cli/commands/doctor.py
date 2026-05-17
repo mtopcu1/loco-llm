@@ -12,6 +12,7 @@ from llm_cli.core.doctor import (
     check_all,
     load_requirements,
     render_requirements_md,
+    systemd_linger_advisory,
 )
 from llm_cli.core.repo import repo_root
 
@@ -74,6 +75,12 @@ def doctor(ctx: typer.Context) -> None:
         )
 
     console.print(table)
+    linger = systemd_linger_advisory()
+    if linger:
+        console.print(
+            "[yellow]advisory (systemd-linger):[/yellow] "
+            + linger
+        )
     if bad:
         console.print(f"[red]{bad} requirement(s) need attention[/red]")
         raise typer.Exit(code=1)

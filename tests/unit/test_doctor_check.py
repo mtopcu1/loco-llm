@@ -6,6 +6,7 @@ from llm_cli.core.doctor import (
     RequirementResult,
     check_requirement,
     load_requirements,
+    systemd_linger_advisory,
 )
 from llm_cli.core.shell import CommandResult
 
@@ -70,6 +71,51 @@ def test_check_requirement_no_min_marks_ok_when_present() -> None:
     )
     result = check_requirement(req, run_command=_ok_run("hi\n"))
     assert result.status == CheckStatus.OK
+
+
+def test_systemd_linger_advisory_none_when_linger_yes() -> None:
+    def run(cmd, **kw):
+        return CommandResult(
+            exit_code=0,
+            stdout="Linger=yes\n",
+            stderr="",
+            found=True,
+            timed_out=False,
+        )
+
+    assert systemd_linger_advisory(run_command=run) is None
+
+
+def test_systemd_linger_advisory_warns_when_linger_no() -> None:
+    def run(cmd, **kw):
+        return CommandResult(
+            exit_code=0,
+            stdout="Linger=no\n",
+            stderr="",
+            found=True,
+            timed_out=False,
+        )
+
+    msg = systemd_linger_advisory(run_command=run)
+    assert msg is not None
+    assert "linger" in msg.lower()
+
+
+def test_systemd_linger_advisory_skips_when_loginctl_missing() -> None:
+    assert systemd_linger_advisory(run_command=_missing_run()) is None
+
+
+def test_systemd_linger_advisory_skips_on_nonzero_exit() -> None:
+    def run(cmd, **kw):
+        return CommandResult(
+            exit_code=1,
+            stdout="",
+            stderr="nope",
+            found=True,
+            timed_out=False,
+        )
+
+    assert systemd_linger_advisory(run_command=run) is None
 
 
 def test_load_requirements_parses_yaml(tmp_path: Path) -> None:
