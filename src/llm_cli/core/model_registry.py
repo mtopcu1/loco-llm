@@ -122,3 +122,56 @@ def decode_entry(entry_id: str, raw: dict[str, Any]) -> RegistryEntry:
         ),
         installed_at=str(raw.get("installed_at", "")),
     )
+
+
+def registry_path(models_dir: Path) -> Path:
+    return models_dir / REGISTRY_FILENAME
+
+
+def load_registry(models_dir: Path) -> dict[str, RegistryEntry]:
+    """Return all entries; an absent file is a clean empty registry."""
+    p = registry_path(models_dir)
+    if not p.is_file():
+        return {}
+    try:
+        payload = json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{p}: malformed registry.json ({exc})") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"{p}: registry.json top-level must be a mapping")
+    version = payload.get("version")
+    if version != SCHEMA_VERSION:
+        raise ValueError(
+            f"{p}: unsupported registry version {version!r}; expected {SCHEMA_VERSION}"
+        )
+    models = payload.get("models") or {}
+    if not isinstance(models, dict):
+        raise ValueError(f"{p}: models must be a mapping")
+    out: dict[str, RegistryEntry] = {}
+    for mid, raw in models.items():
+        if not isinstance(raw, dict):
+            raise ValueError(f"{p}: entry {mid!r} must be a mapping")
+        out[str(mid)] = decode_entry(str(mid), raw)
+    return out
+
+
+def write_registry(models_dir: Path, entries: dict[str, RegistryEntry]) -> Path:
+    """Atomically write the registry; creates parent dir if needed."""
+    models_dir.mkdir(parents=True, exist_ok=True)
+    p = registry_path(models_dir)
+    payload = {
+        "version": SCHEMA_VERSION,
+        "models": {mid: encode_entry(e) for mid, e in sorted(entries.items())},
+    }
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=".registry.", suffix=".tmp", dir=str(models_dir)
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, sort_keys=True)
+        os.replace(tmp_name, p)
+    except Exception:
+        if os.path.exists(tmp_name):
+            os.remove(tmp_name)
+        raise
+    return p

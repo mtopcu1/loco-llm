@@ -13,6 +13,9 @@ from llm_cli.core.model_registry import (
     RegistryEntry,
     encode_entry,
     decode_entry,
+    load_registry,
+    write_registry,
+    registry_path,
 )
 
 
@@ -68,3 +71,34 @@ def test_decode_local_entry():
     assert isinstance(entry.source, LocalSource)
     assert entry.source.original_path == "/home/u/my"
     assert entry.metadata.ctx_length is None
+
+
+def test_load_missing_returns_empty(tmp_path: Path):
+    reg = load_registry(tmp_path)
+    assert reg == {}
+
+
+def test_write_then_load_roundtrip(tmp_path: Path):
+    entry = _hf_entry()
+    write_registry(tmp_path, {entry.id: entry})
+    reg = load_registry(tmp_path)
+    assert list(reg.keys()) == [entry.id]
+    assert reg[entry.id] == entry
+    p = registry_path(tmp_path)
+    on_disk = json.loads(p.read_text(encoding="utf-8"))
+    assert on_disk["version"] == 1
+    assert entry.id in on_disk["models"]
+
+
+def test_load_malformed_raises(tmp_path: Path):
+    registry_path(tmp_path).write_text("{not json", encoding="utf-8")
+    with pytest.raises(ValueError, match="registry.json"):
+        load_registry(tmp_path)
+
+
+def test_load_wrong_version_raises(tmp_path: Path):
+    registry_path(tmp_path).write_text(
+        json.dumps({"version": 99, "models": {}}), encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="unsupported registry version"):
+        load_registry(tmp_path)
