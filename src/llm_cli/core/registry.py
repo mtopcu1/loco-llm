@@ -7,7 +7,8 @@ from typing import Any
 
 import yaml
 
-from llm_cli.core.params import ParamSpec, parse_schema
+from llm_cli.core.install_record import is_installed
+from llm_cli.core.params import ParamSpec, parse_schema, validate_params
 from llm_cli.core.settings import (
     MissingSettingError,
     UnknownSettingError,
@@ -192,19 +193,20 @@ def validate_model_layout(m: ModelRecord) -> list[str]:
     return errs
 
 
-def validate_config(
-    repo: Path, cfg: ConfigRecord
-) -> list[str]:
+def validate_config_v2(repo: Path, cfg: ConfigRecord) -> tuple[list[str], list[str]]:
+    """Return (errors, warnings). Errors fail validation; warnings are advisory."""
     errs: list[str] = []
+    warnings: list[str] = []
     rt_id = cfg.data.get("runtime")
     md_id = cfg.data.get("model")
     if not isinstance(rt_id, str):
         errs.append(f"{cfg.id}: runtime must be a string")
-        return errs
+        return errs, warnings
     if not isinstance(md_id, str):
         errs.append(f"{cfg.id}: model must be a string")
-        return errs
+        return errs, warnings
     rt = get_runtime(repo, rt_id)
+    rt_manifest = _to_manifest(rt) if rt is not None else None
     if rt is None:
         errs.append(f"{cfg.id}: unknown runtime {rt_id!r}")
     else:
@@ -221,6 +223,13 @@ def validate_config(
         for key in ("host", "port"):
             if key not in serve:
                 errs.append(f"{cfg.id}: serve.{key} is required")
+        if rt_manifest is not None:
+            params = serve.get("params", {})
+            if not isinstance(params, dict):
+                errs.append(f"{cfg.id}: serve.params must be a mapping")
+            else:
+                _, param_errs = validate_params(rt_manifest.serve_schema, params)
+                errs.extend(f"{cfg.id}: {e}" for e in param_errs)
     ready = cfg.data.get("readiness")
     if ready is not None and not isinstance(ready, dict):
         errs.append(f"{cfg.id}: readiness must be a mapping when present")
@@ -228,7 +237,18 @@ def validate_config(
     if yaml_id is not None and yaml_id != cfg.id:
         errs.append(f"{cfg.id}: file id {yaml_id!r} does not match filename/config id")
     try:
-        resolve(load_settings())
+        settings = resolve(load_settings())
     except (MissingSettingError, UnknownSettingError, ValueError) as exc:
         errs.append(f"settings: {exc}")
-    return errs
+        return errs, warnings
+    if rt_manifest is not None and not is_installed(settings.runtimes_dir, rt_id):
+        warnings.append(
+            f"{cfg.id}: runtime {rt_id!r} is not installed; "
+            f"run `llm runtime install {rt_id}` before `llm serve`."
+        )
+    return errs, warnings
+
+
+def validate_config(repo: Path, cfg: ConfigRecord) -> list[str]:
+    errors, _ = validate_config_v2(repo, cfg)
+    return errors

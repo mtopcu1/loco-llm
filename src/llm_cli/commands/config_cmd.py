@@ -46,7 +46,7 @@ def config_validate() -> None:
 
     bad = 0
     for cfg in configs:
-        errors = registry.validate_config(repo, cfg)
+        errors, warnings = registry.validate_config_v2(repo, cfg)
         if errors:
             bad += 1
             console.print(f"[red]{cfg.id}[/red]")
@@ -54,6 +54,8 @@ def config_validate() -> None:
                 console.print(f"  - {e}")
         else:
             console.print(f"[green]ok[/green] {cfg.id}")
+        for w in warnings:
+            console.print(f"[yellow]warning:[/yellow] {w}")
 
     if bad:
         raise typer.Exit(code=1)

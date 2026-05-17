@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
+
 from llm_cli.core import registry
 from llm_cli.core.settings import save_settings
 
@@ -11,11 +13,20 @@ def _settings(tmp_path: Path, repo: Path) -> None:
     save_settings({"data_root": str(tmp_path / "data"), "repo_root": str(repo)})
 
 
-def _write_runtime(repo: Path, rid: str, *, with_scripts: bool = True) -> None:
+def _write_runtime(
+    repo: Path,
+    rid: str,
+    *,
+    with_scripts: bool = True,
+    serve_schema: dict | None = None,
+) -> None:
     root = repo / "runtimes" / rid
     root.mkdir(parents=True)
+    body = f"id: {rid}\ndisplay_name: {rid}\n"
+    if serve_schema is not None:
+        body += yaml.safe_dump({"serve": serve_schema}, sort_keys=False)
     (root / "manifest.yaml").write_text(
-        f"id: {rid}\ndisplay_name: {rid}\n",
+        body,
         encoding="utf-8",
     )
     if with_scripts:
@@ -34,15 +45,33 @@ def _write_model(repo: Path, mid: str, *, with_pull: bool = True) -> None:
         (root / "pull.sh").write_text("#!/usr/bin/env bash\necho ok\n", encoding="utf-8")
 
 
-def _write_config(repo: Path, cid: str, runtime: str, model: str) -> None:
+def _write_config(
+    repo: Path,
+    cid: str,
+    runtime: str,
+    model: str,
+    *,
+    params: dict | None = None,
+) -> None:
     (repo / "configs").mkdir(parents=True)
-    (repo / "configs" / f"{cid}.yaml").write_text(
+    body = (
         f"id: {cid}\n"
         f"runtime: {runtime}\n"
         f"model: {model}\n"
         "serve:\n"
         "  host: 127.0.0.1\n"
-        "  port: 1\n",
+        "  port: 1\n"
+    )
+    if params is not None:
+        if params:
+            dumped = yaml.safe_dump(params, sort_keys=False)
+            body += "  params:\n" + "".join(
+                f"    {line}\n" for line in dumped.splitlines()
+            )
+        else:
+            body += "  params: {}\n"
+    (repo / "configs" / f"{cid}.yaml").write_text(
+        body,
         encoding="utf-8",
     )
 
@@ -131,3 +160,52 @@ def test_runtime_manifest_typed(tmp_path: Path) -> None:
     assert [s.key for s in rt.serve_schema] == ["ctx"]
     assert len(rt.requires) == 1
     assert rt.requires[0]["id"] == "cmake"
+
+
+def test_validate_config_rejects_unknown_param(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _settings(tmp_path, repo)
+    _write_runtime(
+        repo,
+        "rt-a",
+        serve_schema={"ctx": {"type": "int", "default": 8}},
+    )
+    _write_model(repo, "md-a")
+    _write_config(repo, "c1", "rt-a", "md-a", params={"ctxx": 16})
+    cfg = registry.discover_configs(repo)[0]
+    errs = registry.validate_config(repo, cfg)
+    assert any("unknown param" in e and "ctxx" in e for e in errs)
+
+
+def test_validate_config_required_param_missing(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _settings(tmp_path, repo)
+    _write_runtime(
+        repo,
+        "rt-a",
+        serve_schema={"gguf": {"type": "string", "required": True}},
+    )
+    _write_model(repo, "md-a")
+    _write_config(repo, "c1", "rt-a", "md-a", params={})
+    cfg = registry.discover_configs(repo)[0]
+    errs = registry.validate_config(repo, cfg)
+    assert any("required" in e for e in errs)
+
+
+def test_validate_config_warns_uninstalled_runtime(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _settings(tmp_path, repo)
+    _write_runtime(
+        repo,
+        "rt-a",
+        serve_schema={"ctx": {"type": "int", "default": 8}},
+    )
+    _write_model(repo, "md-a")
+    _write_config(repo, "c1", "rt-a", "md-a", params={"ctx": 16})
+    cfg = registry.discover_configs(repo)[0]
+    errs, warnings = registry.validate_config_v2(repo, cfg)
+    assert errs == []
+    assert any("not installed" in w for w in warnings)
