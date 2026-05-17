@@ -31,3 +31,29 @@ def test_settings_show_prints_path_and_resolved(tmp_path) -> None:
     assert str(tmp_path / "d") in result.stdout
     assert str(tmp_path / "r") in result.stdout
     assert "runtimes_dir" in result.stdout
+
+
+def test_settings_env_prints_export_lines(tmp_path) -> None:
+    _write_settings(
+        data_root=str(tmp_path / "d"), repo_root=str(tmp_path / "r")
+    )
+
+    result = runner.invoke(app, ["settings", "env"], catch_exceptions=False)
+
+    assert result.exit_code == 0, result.stdout
+    lines = result.stdout.strip().splitlines()
+    assert f"export LLM_DATA_ROOT={(tmp_path / 'd').as_posix()}" in lines
+    assert f"export LLM_REPO_ROOT={(tmp_path / 'r').as_posix()}" in lines
+    assert f"export LLM_RUNTIMES={(tmp_path / 'd' / 'runtimes').as_posix()}" in lines
+    assert f"export LLM_MODELS={(tmp_path / 'd' / 'models').as_posix()}" in lines
+    assert f"export LLM_CACHE={(tmp_path / 'd' / 'cache').as_posix()}" in lines
+
+
+def test_settings_env_shell_escapes_values(tmp_path) -> None:
+    weird = tmp_path / "with space"
+    _write_settings(data_root=str(weird), repo_root=str(tmp_path / "r"))
+
+    result = runner.invoke(app, ["settings", "env"], catch_exceptions=False)
+
+    assert result.exit_code == 0
+    assert "'" in result.stdout

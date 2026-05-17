@@ -1,6 +1,8 @@
 """`llm settings ...` - inspect and edit user-level settings."""
 from __future__ import annotations
 
+import shlex
+
 import typer
 from rich.console import Console
 
@@ -9,6 +11,14 @@ from llm_cli.core.settings import KEY_REGISTRY, load_settings, resolve, settings
 console = Console(soft_wrap=True)
 
 settings_app = typer.Typer(help="Inspect and edit user-level settings.")
+
+_ENV_MAPPING = (
+    ("LLM_DATA_ROOT", "data_root"),
+    ("LLM_REPO_ROOT", "repo_root"),
+    ("LLM_RUNTIMES", "runtimes_dir"),
+    ("LLM_MODELS", "models_dir"),
+    ("LLM_CACHE", "cache_dir"),
+)
 
 
 @settings_app.command("show")
@@ -28,3 +38,12 @@ def show() -> None:
     resolved = resolve(stored)
     for key in KEY_REGISTRY:
         console.print(f"  {key}: {getattr(resolved, key)}")
+
+
+@settings_app.command("env")
+def env() -> None:
+    """Print `export LLM_*=...` lines for `eval "$(llm settings env)"`."""
+    resolved = resolve(load_settings())
+    for var, attr in _ENV_MAPPING:
+        value = getattr(resolved, attr).as_posix()
+        typer.echo(f"export {var}={shlex.quote(value)}")
