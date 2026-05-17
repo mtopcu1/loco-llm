@@ -11,6 +11,7 @@ from llm_cli.core.settings import (
     Settings,
     UnknownSettingError,
     default_settings,
+    ensure_data_dirs,
     load_settings,
     resolve,
     save_settings,
@@ -154,3 +155,19 @@ def test_resolve_raises_when_repo_root_missing() -> None:
     with pytest.raises(MissingSettingError) as exc:
         resolve({"data_root": "/dr"})
     assert "repo_root" in str(exc.value)
+
+
+def test_ensure_data_dirs_creates_all_resolved_dirs(tmp_path) -> None:
+    s = resolve({"data_root": str(tmp_path / "dr"), "repo_root": str(tmp_path)})
+    ensure_data_dirs(s)
+    assert (tmp_path / "dr").is_dir()
+    assert (tmp_path / "dr" / "runtimes").is_dir()
+    assert (tmp_path / "dr" / "models").is_dir()
+    assert (tmp_path / "dr" / "cache").is_dir()
+
+
+def test_ensure_data_dirs_is_idempotent(tmp_path) -> None:
+    s = resolve({"data_root": str(tmp_path / "dr"), "repo_root": str(tmp_path)})
+    ensure_data_dirs(s)
+    ensure_data_dirs(s)
+    assert (tmp_path / "dr").is_dir()

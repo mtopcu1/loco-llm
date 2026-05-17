@@ -142,3 +142,14 @@ def resolve(values: dict[str, str]) -> Settings:
         models_dir=_dir("models_dir", "models"),
         cache_dir=_dir("cache_dir", "cache"),
     )
+
+
+def ensure_data_dirs(settings: Settings) -> None:
+    """Create data_root + the three resolved data subdirectories if absent."""
+    for target in (
+        settings.data_root,
+        settings.runtimes_dir,
+        settings.models_dir,
+        settings.cache_dir,
+    ):
+        target.mkdir(parents=True, exist_ok=True)
