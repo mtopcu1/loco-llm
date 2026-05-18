@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from llm_cli.core.config_resolve import resolve_config_for_display
+from llm_cli.core.config_resolve import expand_path_for_serve, resolve_config_for_display
 from llm_cli.core.registry import ConfigRecord
 from llm_cli.core.settings import Settings
 
@@ -165,3 +165,30 @@ def test_resolve_errors_when_model_path_uses_missing_id(tmp_path: Path) -> None:
     )
     with pytest.raises(ParamValidationError, match="ghost-id"):
         resolve_config_for_display(cfg, s)
+
+
+def test_expand_path_for_serve_resolves_model_path(tmp_path: Path) -> None:
+    s = _settings(tmp_path)
+    s.models_dir.mkdir(parents=True)
+    _seed_entry(s.models_dir)
+    cfg_data = {
+        "id": "c",
+        "runtime": "rt",
+        "model": "my-model",
+        "serve": {"host": "127.0.0.1", "port": 8080},
+    }
+    out = expand_path_for_serve("${model_path}", cfg_data=cfg_data, settings=s)
+    assert out == (s.models_dir / "my-model" / "weights.gguf").as_posix()
+
+
+def test_expand_path_for_serve_unknown_model_path_raises(tmp_path: Path) -> None:
+    s = _settings(tmp_path)
+    s.models_dir.mkdir(parents=True)
+    cfg_data = {
+        "id": "c",
+        "runtime": "rt",
+        "model": "ghost",
+        "serve": {"host": "127.0.0.1", "port": 8080},
+    }
+    with pytest.raises(ParamValidationError, match="ghost"):
+        expand_path_for_serve("${model_path}", cfg_data=cfg_data, settings=s)

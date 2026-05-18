@@ -32,11 +32,11 @@ from llm_cli.core.serve_spawn import (
     spawn_foreground,
     wait_for_ready,
 )
+from llm_cli.core.config_resolve import expand_path_for_serve
 from llm_cli.core.params import (
     ParamSpec,
     ParamType,
     derive_env_name,
-    expand_path,
     validate_params,
 )
 from llm_cli.core.registry import get_runtime_manifest
@@ -105,7 +105,7 @@ def _serve_env_from_params(
             continue
         value = coerced[spec.key]
         if spec.type is ParamType.PATH:
-            value = expand_path(str(value), settings)
+            value = expand_path_for_serve(str(value), cfg_data=cfg_data, settings=settings)
         env[derive_env_name(spec, runtime_id=runtime_id)] = str(value)
 
     merged = os.environ.copy()

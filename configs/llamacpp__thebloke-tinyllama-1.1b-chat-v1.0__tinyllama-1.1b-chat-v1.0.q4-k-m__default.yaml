@@ -1,0 +1,13 @@
+id: llamacpp__thebloke-tinyllama-1.1b-chat-v1.0__tinyllama-1.1b-chat-v1.0.q4-k-m__default
+runtime: llamacpp
+model: thebloke-tinyllama-1.1b-chat-v1.0__tinyllama-1.1b-chat-v1.0.q4-k-m
+serve:
+  host: 127.0.0.1
+  port: 8080
+  params:
+    gguf_path: "${model_path}"
+    n_gpu_layers: -1
+    ctx: 2048
+    extra_args: ""
+readiness:
+  timeout_seconds: 180

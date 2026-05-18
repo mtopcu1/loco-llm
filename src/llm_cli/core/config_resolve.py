@@ -19,6 +19,28 @@ def _resolve_model_path_in(value: str, entry: RegistryEntry, settings: Settings)
     return _MODEL_TOKEN_RE.sub(target, value)
 
 
+def expand_path_for_serve(raw: str, *, cfg_data: dict[str, Any], settings: Settings) -> str:
+    """Expand `${model_path}` (when applicable), then settings tokens via `expand_path`.
+
+    Used by `llm serve` / `switch` when building env for PATH-typed serve params.
+    """
+    cid = str(cfg_data.get("id", "config"))
+    model_id = cfg_data.get("model") if isinstance(cfg_data.get("model"), str) else None
+    expanded = raw
+    if "${model_path}" in expanded:
+        if not model_id:
+            raise ParamValidationError(
+                f"{cid}: path uses ${{model_path}} but no `model:` is set"
+            )
+        entry = get_entry(settings.models_dir, model_id)
+        if entry is None:
+            raise ParamValidationError(
+                f"{cid}: ${{model_path}} references unknown model {model_id!r}"
+            )
+        expanded = _resolve_model_path_in(expanded, entry, settings)
+    return expand_path(expanded, settings)
+
+
 def resolve_config_for_display(cfg: ConfigRecord, settings: Settings) -> dict[str, Any]:
     """Return a deep copy of config data with display-only path templates expanded."""
     data: dict[str, Any] = copy.deepcopy(cfg.data)
