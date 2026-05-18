@@ -6,6 +6,22 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+collect_ignore = ["tui"]
+
+
+@pytest.fixture
+def tui_repo(tmp_path, monkeypatch):
+    from tests.tui.seed import seed_repo
+
+    return seed_repo(tmp_path, monkeypatch, with_qwen=False)
+
+
+@pytest.fixture
+def tui_repo_with_model(tmp_path, monkeypatch):
+    from tests.tui.seed import seed_repo
+
+    return seed_repo(tmp_path, monkeypatch, with_qwen=True)
+
 
 @pytest.fixture(autouse=True)
 def xdg_isolated(tmp_path_factory, monkeypatch):
