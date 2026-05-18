@@ -5,8 +5,26 @@ build-backend = "hatchling.build"
 [project]
 name = "localllm-cli"
 version = "0.2.0"
-description = "Personal control plane for local LLM runtimes"
+description = "Personal control plane for local LLM runtimes."
+readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Melih Topcu" },
+]
+keywords = ["llm", "wsl", "vllm", "llama.cpp", "local"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: System :: Systems Administration",
+]
 dependencies = [
     "typer>=0.12,<1.0",
     "pyyaml>=6.0",
@@ -15,11 +33,18 @@ dependencies = [
     "questionary>=2.0,<3",
 ]
 
+[project.urls]
+Homepage = "https://github.com/mtopcu1/local-llm-scaffold"
+Repository = "https://github.com/mtopcu1/local-llm-scaffold"
+Issues = "https://github.com/mtopcu1/local-llm-scaffold/issues"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
     "pytest-mock>=3.12",
     "pexpect>=4.9; sys_platform != 'win32'",
+    "build>=1.0",
+    "twine>=5.0",
 ]
 
 [project.scripts]
