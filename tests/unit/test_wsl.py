@@ -33,18 +33,21 @@ def _fake_settings(tmp_path: Path) -> Settings:
 
 def test_run_repo_bash_injects_env_from_settings(tmp_path: Path) -> None:
     settings = _fake_settings(tmp_path)
+    scaffold = tmp_path / "scaffold"
+    scaffold.mkdir()
     captured: dict[str, str] = {}
 
     def fake_call(cmd, env=None):
         captured.update(env or {})
         return 0
 
-    with patch.object(wsl.subprocess, "call", side_effect=fake_call):
-        rc = wsl.run_repo_bash(settings, "runtimes/x/build.sh")
+    with patch.object(wsl, "scaffold_root", return_value=scaffold):
+        with patch.object(wsl.subprocess, "call", side_effect=fake_call):
+            rc = wsl.run_repo_bash(settings, "runtimes/x/build.sh")
 
     assert rc == 0
     assert captured["LLM_DATA_ROOT"] == (tmp_path / "d").as_posix()
-    assert captured["LLM_REPO_ROOT"] == (tmp_path / "r").as_posix()
+    assert captured["LLM_REPO_ROOT"] == scaffold.resolve().as_posix()
     assert captured["LLM_RUNTIMES"] == (tmp_path / "d" / "runtimes").as_posix()
     assert captured["LLM_MODELS"] == (tmp_path / "d" / "models").as_posix()
     assert captured["LLM_CACHE"] == (tmp_path / "d" / "cache").as_posix()

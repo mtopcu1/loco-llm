@@ -17,8 +17,9 @@ from llm_cli.core.lifecycle import (
     is_alive,
     read_running,
     reconcile,
+    state_root,
 )
-from llm_cli.core.repo import repo_root
+from llm_cli.core.settings import load_settings, resolve
 from llm_cli.core.systemd_unit import is_active as systemd_is_active
 from llm_cli.core.systemd_unit import stop_unit
 
@@ -39,15 +40,16 @@ def _wait_pid_gone(pid: int, timeout_s: float = 10.0, poll_s: float = 0.2) -> bo
 
 def stop() -> None:
     """Stop whatever is running (idempotent)."""
-    repo = repo_root()
-    reconcile(repo)
-    rec = read_running(repo)
+    settings = resolve(load_settings())
+    state_base = state_root(settings)
+    reconcile(state_base)
+    rec = read_running(state_base)
     if rec is None:
         console.print("nothing running")
         return
     if rec.mode in ("foreground", "background"):
         if rec.pid is None:
-            clear_running(repo)
+            clear_running(state_base)
             console.print("cleared stale record (no pid)")
             return
         try:
@@ -60,9 +62,9 @@ def stop() -> None:
             except ProcessLookupError:
                 pass
             _wait_pid_gone(rec.pid, timeout_s=2.0)
-        clear_running(repo)
+        clear_running(state_base)
         append_history(
-            repo, {"action": "stop", "mode": rec.mode, "config_id": rec.config_id}
+            state_base, {"action": "stop", "mode": rec.mode, "config_id": rec.config_id}
         )
         console.print(f"[green]stopped[/green] {rec.config_id}")
         return
@@ -71,9 +73,9 @@ def stop() -> None:
             stop_unit("llm.service")
         except RuntimeError as exc:
             console.print(f"[yellow]warning:[/yellow] systemctl stop failed: {exc}")
-        clear_running(repo)
+        clear_running(state_base)
         append_history(
-            repo, {"action": "stop", "mode": "systemd", "config_id": rec.config_id}
+            state_base, {"action": "stop", "mode": "systemd", "config_id": rec.config_id}
         )
         console.print(f"[green]stopped[/green] {rec.config_id} (systemd)")
         return
@@ -102,9 +104,10 @@ def status(
     as_json: bool = typer.Option(False, "--json", help="Emit JSON instead of text."),
 ) -> None:
     """Print what's running. Always exits 0."""
-    repo = repo_root()
-    reconcile(repo)
-    rec = read_running(repo)
+    settings = resolve(load_settings())
+    state_base = state_root(settings)
+    reconcile(state_base)
+    rec = read_running(state_base)
     if rec is None:
         if as_json:
             typer.echo(json.dumps({"running": False}))
@@ -157,9 +160,10 @@ def logs(
     lines: int = typer.Option(50, "--lines", "-n", help="Number of trailing lines."),
 ) -> None:
     """Tail the log of the currently-running service."""
-    repo = repo_root()
-    reconcile(repo)
-    rec = read_running(repo)
+    settings = resolve(load_settings())
+    state_base = state_root(settings)
+    reconcile(state_base)
+    rec = read_running(state_base)
     if rec is None:
         console.print("nothing running")
         raise typer.Exit(code=1)
@@ -171,7 +175,7 @@ def logs(
     if rec.log_path is None:
         console.print("[red]error:[/red] running record has no log_path")
         raise typer.Exit(code=1)
-    log_file = (repo / rec.log_path).resolve()
+    log_file = (state_base / rec.log_path).resolve()
     if not log_file.is_file():
         console.print(f"[yellow]warning:[/yellow] log file missing: {log_file}")
         raise typer.Exit(code=0)

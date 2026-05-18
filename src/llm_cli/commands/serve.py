@@ -21,12 +21,12 @@ from llm_cli.core.lifecycle import (
     logs_dir,
     read_running,
     reconcile,
+    state_root,
     write_running,
 )
-from llm_cli.core.repo import repo_root
+from llm_cli.core.repo import scaffold_root
 from llm_cli.core.serve_spawn import (
     _bash_single_quote,
-    build_serve_inner,
     port_in_use,
     spawn_background,
     spawn_foreground,
@@ -40,7 +40,7 @@ from llm_cli.core.params import (
     derive_env_name,
     validate_params,
 )
-from llm_cli.core.registry import get_runtime_manifest
+from llm_cli.core.registry import get_runtime_manifest_merged
 from llm_cli.core.settings import Settings, load_settings, resolve
 from llm_cli.core.systemd_unit import (
     daemon_reload,
@@ -65,17 +65,27 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _resolve_cfg(repo: Path, config_id: str) -> "ConfigRecord":
-    cfg = registry.get_config(repo, config_id)
+def _resolve_cfg(config_id: str) -> "ConfigRecord":
+    cfg = registry.get_config_merged(config_id)
     if cfg is None:
         console.print(f"[red]error:[/red] unknown config {config_id!r}")
         raise typer.Exit(code=1)
-    errs = registry.validate_config(repo, cfg)
+    errs = registry.validate_config(scaffold_root(), cfg)
     if errs:
         for e in errs:
             console.print(f"[red]error:[/red] {e}")
         raise typer.Exit(code=1)
     return cfg
+
+
+def _serve_script_inner(runtime_path: Path, script_name: str) -> str:
+    """Inner bash to cd into runtime asset dir and exec a script."""
+    posix = to_wsl_path(runtime_path)
+    return (
+        "set -euo pipefail; "
+        f"cd {_bash_single_quote(posix)}; "
+        f"exec bash {_bash_single_quote(script_name)}"
+    )
 
 
 def _serve_env_from_params(
@@ -92,7 +102,7 @@ def _serve_env_from_params(
 
     env: dict[str, str] = {
         "LLM_DATA_ROOT": settings.data_root.as_posix(),
-        "LLM_REPO_ROOT": settings.repo_root.as_posix(),
+        "LLM_REPO_ROOT": scaffold_root().as_posix(),
         "LLM_RUNTIMES": settings.runtimes_dir.as_posix(),
         "LLM_MODELS": settings.models_dir.as_posix(),
         "LLM_CACHE": settings.cache_dir.as_posix(),
@@ -132,16 +142,12 @@ def _readiness_timeout(cfg_data: dict[str, Any]) -> int:
 
 
 def _make_healthcheck_probe(
-    settings: Settings, runtime_id: str, env: dict[str, str]
+    runtime_path: Path, env: dict[str, str]
 ):
-    """Return a callable: bash runtimes/<rt>/healthcheck.sh -> True on exit 0."""
+    """Return a callable: bash healthcheck.sh in runtime dir -> True on exit 0."""
     import subprocess
 
-    repo_posix = to_wsl_path(settings.repo_root)
-    inner = build_serve_inner(
-        repo_posix=repo_posix,
-        script_posix_relpath=f"runtimes/{runtime_id}/healthcheck.sh",
-    )
+    inner = _serve_script_inner(runtime_path, "healthcheck.sh")
 
     def probe() -> bool:
         r = subprocess.run(
@@ -167,7 +173,11 @@ def _wait_pid_gone(pid: int, timeout_s: float = 10.0, poll_s: float = 0.2) -> bo
 
 
 def _do_background(
-    settings: Settings, cfg: "ConfigRecord", repo: Path, env: dict[str, str]
+    settings: Settings,
+    cfg: "ConfigRecord",
+    state_base: Path,
+    env: dict[str, str],
+    runtime_path: Path,
 ) -> None:
     serve = cfg.data["serve"]
     host = str(serve["host"])
@@ -176,16 +186,12 @@ def _do_background(
         console.print(f"[red]error:[/red] port {port} is already in use")
         raise typer.Exit(code=1)
 
-    logs_dir(repo).mkdir(parents=True, exist_ok=True)
-    log_path = (logs_dir(repo) / f"{cfg.id}.log").as_posix()
-    repo_posix = to_wsl_path(settings.repo_root)
-    inner = build_serve_inner(
-        repo_posix=repo_posix,
-        script_posix_relpath=f"runtimes/{cfg.data['runtime']}/serve.sh",
-    )
+    logs_dir(state_base).mkdir(parents=True, exist_ok=True)
+    log_path = (logs_dir(state_base) / f"{cfg.id}.log").as_posix()
+    inner = _serve_script_inner(runtime_path, "serve.sh")
     pid = spawn_background(inner=inner, log_path=log_path, env=env)
     timeout = _readiness_timeout(cfg.data)
-    probe = _make_healthcheck_probe(settings, str(cfg.data["runtime"]), env)
+    probe = _make_healthcheck_probe(runtime_path, env)
     if not wait_for_ready(probe, timeout_s=float(timeout), poll_s=1.0):
         try:
             os.kill(pid, signal.SIGTERM)
@@ -204,9 +210,9 @@ def _do_background(
         pid=pid,
         log_path=(Path("state/logs") / f"{cfg.id}.log").as_posix(),
     )
-    write_running(repo, rec)
+    write_running(state_base, rec)
     append_history(
-        repo, {"action": "start", "mode": "background", "config_id": cfg.id}
+        state_base, {"action": "start", "mode": "background", "config_id": cfg.id}
     )
     console.print(f"[green]running[/green] {cfg.id} (pid {pid}, port {port})")
 
@@ -214,8 +220,9 @@ def _do_background(
 def _do_foreground(
     settings: Settings,
     cfg: "ConfigRecord",
-    repo: Path,
+    state_base: Path,
     env: dict[str, str],
+    runtime_path: Path,
     *,
     from_supervisor: bool,
 ) -> None:
@@ -226,24 +233,20 @@ def _do_foreground(
         console.print(f"[red]error:[/red] port {port} is already in use")
         raise typer.Exit(code=1)
 
-    repo_posix = to_wsl_path(settings.repo_root)
     if from_supervisor:
-        inner = build_serve_inner(
-            repo_posix=repo_posix,
-            script_posix_relpath=f"runtimes/{cfg.data['runtime']}/serve.sh",
-        )
+        inner = _serve_script_inner(runtime_path, "serve.sh")
         _, code = spawn_foreground(
             inner=inner, env=env, on_started=lambda _pid: None
         )
         raise typer.Exit(code=code)
 
-    logs_dir(repo).mkdir(parents=True, exist_ok=True)
-    log_path = (logs_dir(repo) / f"{cfg.id}.log").as_posix()
-    rt = str(cfg.data["runtime"])
+    logs_dir(state_base).mkdir(parents=True, exist_ok=True)
+    log_path = (logs_dir(state_base) / f"{cfg.id}.log").as_posix()
+    rt_posix = to_wsl_path(runtime_path)
     inner = (
         "set -euo pipefail; "
-        f"cd {_bash_single_quote(repo_posix)}; "
-        f"exec bash {_bash_single_quote(f'runtimes/{rt}/serve.sh')} "
+        f"cd {_bash_single_quote(rt_posix)}; "
+        f"exec bash serve.sh "
         f"2>&1 | tee -a {_bash_single_quote(log_path)}"
     )
 
@@ -256,23 +259,27 @@ def _do_foreground(
             pid=pid,
             log_path=(Path("state/logs") / f"{cfg.id}.log").as_posix(),
         )
-        write_running(repo, rec)
+        write_running(state_base, rec)
         append_history(
-            repo, {"action": "start", "mode": "foreground", "config_id": cfg.id}
+            state_base, {"action": "start", "mode": "foreground", "config_id": cfg.id}
         )
 
     try:
         _, code = spawn_foreground(inner=inner, env=env, on_started=on_started)
     finally:
-        clear_running(repo)
+        clear_running(state_base)
         append_history(
-            repo, {"action": "stop", "mode": "foreground", "config_id": cfg.id}
+            state_base, {"action": "stop", "mode": "foreground", "config_id": cfg.id}
         )
     raise typer.Exit(code=code)
 
 
 def _do_systemd(
-    settings: Settings, cfg: "ConfigRecord", repo: Path, env: dict[str, str]
+    settings: Settings,
+    cfg: "ConfigRecord",
+    state_base: Path,
+    env: dict[str, str],
+    runtime_path: Path,
 ) -> None:
     serve_obj = cfg.data["serve"]
     host = str(serve_obj["host"])
@@ -284,7 +291,7 @@ def _do_systemd(
     text = desired_unit_text(cfg.id)
     changed = write_if_different(text)
     append_history(
-        repo,
+        state_base,
         {
             "action": "systemd-write",
             "unit": "llm.service",
@@ -297,7 +304,7 @@ def _do_systemd(
     restart_unit("llm.service")
 
     timeout = _readiness_timeout(cfg.data)
-    probe = _make_healthcheck_probe(settings, str(cfg.data["runtime"]), env)
+    probe = _make_healthcheck_probe(runtime_path, env)
 
     def combined_probe() -> bool:
         return systemd_is_active("llm.service") and probe()
@@ -319,8 +326,8 @@ def _do_systemd(
         started_at=_utc_now_iso(),
         unit="llm.service",
     )
-    write_running(repo, rec)
-    append_history(repo, {"action": "start", "mode": "systemd", "config_id": cfg.id})
+    write_running(state_base, rec)
+    append_history(state_base, {"action": "start", "mode": "systemd", "config_id": cfg.id})
     console.print(f"[green]running[/green] {cfg.id} via systemd (port {port})")
 
 
@@ -337,23 +344,24 @@ def serve_dispatch(
             "[red]error:[/red] --foreground and --systemd are mutually exclusive"
         )
         raise typer.Exit(code=1)
-    repo = repo_root()
-    reconcile(repo)
-    cfg = _resolve_cfg(repo, config_id)
     settings = resolve(load_settings())
+    state_base = state_root(settings)
+    reconcile(state_base)
+    cfg = _resolve_cfg(config_id)
     runtime_id = str(cfg.data["runtime"])
     if not is_installed(settings.runtimes_dir, runtime_id):
         console.print(f"[red]error:[/red] runtime {runtime_id!r} is not installed")
         console.print(f"hint:  llm runtime install {runtime_id}")
         raise typer.Exit(code=1)
-    mf = get_runtime_manifest(repo, runtime_id)
+    mf = get_runtime_manifest_merged(runtime_id)
     if mf is None:
         console.print(f"[red]error:[/red] unknown runtime {runtime_id!r}")
         raise typer.Exit(code=1)
+    runtime_path = mf.path
     cfg_for_env = registry.ConfigRecord(id=cfg.id, path=cfg.path, data=cfg.data)
     env = _serve_env_from_params(settings, cfg_for_env.data, mf.serve_schema)
 
-    existing = read_running(repo)
+    existing = read_running(state_base)
     if (
         systemd
         and existing is not None
@@ -378,13 +386,17 @@ def serve_dispatch(
         raise typer.Exit(code=1)
 
     if foreground:
-        _do_foreground(settings, cfg_for_env, repo, env, from_supervisor=False)
+        _do_foreground(
+            settings, cfg_for_env, state_base, env, runtime_path, from_supervisor=False
+        )
     elif foreground_from_supervisor:
-        _do_foreground(settings, cfg_for_env, repo, env, from_supervisor=True)
+        _do_foreground(
+            settings, cfg_for_env, state_base, env, runtime_path, from_supervisor=True
+        )
     elif systemd:
-        _do_systemd(settings, cfg_for_env, repo, env)
+        _do_systemd(settings, cfg_for_env, state_base, env, runtime_path)
     else:
-        _do_background(settings, cfg_for_env, repo, env)
+        _do_background(settings, cfg_for_env, state_base, env, runtime_path)
 
 
 def serve(
@@ -412,9 +424,10 @@ def switch(
     config_id: str = typer.Argument(..., help="New config id."),
 ) -> None:
     """Stop the currently-running service and start <config_id> in the same mode."""
-    repo = repo_root()
-    reconcile(repo)
-    rec = read_running(repo)
+    settings = resolve(load_settings())
+    state_base = state_root(settings)
+    reconcile(state_base)
+    rec = read_running(state_base)
     if rec is None:
         console.print(
             f"[red]error:[/red] nothing running; use `llm serve {config_id}` instead"
@@ -428,16 +441,17 @@ def switch(
         raise typer.Exit(code=1)
 
     settings = resolve(load_settings())
-    new_cfg = _resolve_cfg(repo, config_id)
+    new_cfg = _resolve_cfg(config_id)
     runtime_id = str(new_cfg.data["runtime"])
     if not is_installed(settings.runtimes_dir, runtime_id):
         console.print(f"[red]error:[/red] runtime {runtime_id!r} is not installed")
         console.print(f"hint:  llm runtime install {runtime_id}")
         raise typer.Exit(code=1)
-    mf = get_runtime_manifest(repo, runtime_id)
+    mf = get_runtime_manifest_merged(runtime_id)
     if mf is None:
         console.print(f"[red]error:[/red] unknown runtime {runtime_id!r}")
         raise typer.Exit(code=1)
+    runtime_path = mf.path
     new_for_env = registry.ConfigRecord(
         id=new_cfg.id, path=new_cfg.path, data=new_cfg.data
     )
@@ -457,9 +471,9 @@ def switch(
                 os.kill(rec.pid, _SIGKILL)
             except ProcessLookupError:
                 pass
-        clear_running(repo)
+        clear_running(state_base)
         append_history(
-            repo,
+            state_base,
             {
                 "action": "switch",
                 "mode": "background",
@@ -467,13 +481,13 @@ def switch(
                 "to": config_id,
             },
         )
-        _do_background(settings, new_for_env, repo, env)
+        _do_background(settings, new_for_env, state_base, env, runtime_path)
         return
 
     if rec.mode == "systemd":
-        clear_running(repo)
+        clear_running(state_base)
         append_history(
-            repo,
+            state_base,
             {
                 "action": "switch",
                 "mode": "systemd",
@@ -481,7 +495,7 @@ def switch(
                 "to": config_id,
             },
         )
-        _do_systemd(settings, new_for_env, repo, env)
+        _do_systemd(settings, new_for_env, state_base, env, runtime_path)
         return
 
     console.print(f"[red]error:[/red] unknown mode {rec.mode!r}")

@@ -114,12 +114,13 @@ def test_settings_edit_default_runtimes_dir_removes_override(tmp_path) -> None:
     assert "runtimes_dir" not in stored
 
 
-def test_settings_edit_default_repo_root_errors(tmp_path) -> None:
+def test_settings_edit_default_repo_root_clears_key(tmp_path) -> None:
     _write_settings(data_root="~/llm", repo_root=str(tmp_path / "r"))
 
     result = runner.invoke(
         app, ["settings", "edit", "repo_root", "--default"], catch_exceptions=False
     )
 
-    assert result.exit_code != 0
-    assert "repo_root" in result.stdout
+    assert result.exit_code == 0, result.stdout
+    stored = yaml.safe_load(settings_path().read_text(encoding="utf-8"))
+    assert "repo_root" not in stored

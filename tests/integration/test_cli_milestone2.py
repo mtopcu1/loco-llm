@@ -154,8 +154,8 @@ def test_runtime_install_calls_build_and_verify(
     assert result.exit_code == 0
     mock_build.assert_called_once()
     mock_verify.assert_called_once()
-    assert mock_build.call_args.kwargs["runtime_id"] == "rt-a"
-    assert mock_verify.call_args.kwargs["runtime_id"] == "rt-a"
+    assert mock_build.call_args.kwargs["runtime_path"] == repo / "runtimes" / "rt-a"
+    assert mock_verify.call_args.kwargs["runtime_path"] == repo / "runtimes" / "rt-a"
 
 
 def test_runtime_install_unknown_runtime_errors(tmp_path: Path) -> None:

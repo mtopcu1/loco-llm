@@ -7,7 +7,10 @@ import subprocess as _subprocess
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from llm_cli.core.settings import Settings
 
 
 @dataclass(frozen=True)
@@ -21,6 +24,13 @@ class LifecycleRecord:
     pid: int | None = None
     log_path: str | None = None  # repo-relative POSIX path; None for systemd
     unit: str | None = None  # "llm.service" for systemd; None otherwise
+
+
+def state_root(settings: "Settings") -> Path:
+    """Base directory for state/ (dev checkout or data_root for bundle installs)."""
+    if settings.repo_root is not None:
+        return settings.repo_root
+    return settings.data_root
 
 
 def state_dir(repo: Path) -> Path:

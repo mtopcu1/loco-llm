@@ -64,8 +64,8 @@ def test_runtime_list_includes_vllm(monkeypatch, tmp_path) -> None:
     assert "vllm" in result.stdout
 
 
-@patch("llm_cli.commands.runtime_cmd.run_repo_bash", return_value=0)
-def test_runtime_install_vllm_mocks_bash_pip(mock_run_repo_bash, monkeypatch, tmp_path) -> None:
+@patch("llm_cli.commands.runtime_cmd.run_runtime_bash", return_value=0)
+def test_runtime_install_vllm_mocks_bash_pip(mock_run_runtime_bash, monkeypatch, tmp_path) -> None:
     _seed_repo(tmp_path, monkeypatch)
 
     result = runner.invoke(
@@ -83,10 +83,10 @@ def test_runtime_install_vllm_mocks_bash_pip(mock_run_repo_bash, monkeypatch, tm
         "extra_pip_packages": "",
         "force_reinstall": False,
     }
-    assert mock_run_repo_bash.call_count == 2
-    scripts = [call.args[1] for call in mock_run_repo_bash.call_args_list]
-    assert scripts == ["runtimes/vllm/build.sh", "runtimes/vllm/verify.sh"]
-    build_env = mock_run_repo_bash.call_args_list[0].kwargs["extra_env"]
+    assert mock_run_runtime_bash.call_count == 2
+    scripts = [call.args[2] for call in mock_run_runtime_bash.call_args_list]
+    assert scripts == ["build.sh", "verify.sh"]
+    build_env = mock_run_runtime_bash.call_args_list[0].kwargs["extra_env"]
     assert build_env["LLM_BUILD_VLLM_VERSION"] == "0.8.5"
     assert build_env["LLM_BUILD_PIP_EXTRA"] == "none"
     assert build_env["LLM_BUILD_EXTRA_PIP_PACKAGES"] == ""
@@ -115,7 +115,7 @@ def test_config_new_vllm_injects_model_path(monkeypatch, tmp_path) -> None:
     )
 
     assert result.exit_code == 0, result.output
-    out_path = repo / "configs" / "vllm__qwen-sf__default.yaml"
+    out_path = tmp_path / "data" / "user" / "configs" / "vllm__qwen-sf__default.yaml"
     assert out_path.is_file()
     text = out_path.read_text(encoding="utf-8")
     assert "runtime: vllm" in text

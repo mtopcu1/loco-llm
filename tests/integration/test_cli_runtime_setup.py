@@ -98,7 +98,7 @@ def test_runtime_setup_custom_writes_all_files(monkeypatch, tmp_path):
     result = runner.invoke(app, ["runtime", "setup"])
     assert result.exit_code == 0, result.output
 
-    rt_dir = repo / "runtimes" / "vllm-custom"
+    rt_dir = tmp_path / "data" / "user" / "runtimes" / "vllm-custom"
     assert (rt_dir / "manifest.yaml").is_file()
     assert (rt_dir / "serve.sh").is_file()
     assert (rt_dir / "healthcheck.sh").is_file()
@@ -117,6 +117,9 @@ def test_runtime_setup_custom_writes_all_files(monkeypatch, tmp_path):
 
 def test_runtime_setup_custom_refuses_existing_id(monkeypatch, tmp_path):
     repo = _seed(tmp_path, monkeypatch)
+    user_rt = tmp_path / "data" / "user" / "runtimes" / "llamacpp"
+    user_rt.mkdir(parents=True)
+    (user_rt / "manifest.yaml").write_text("id: llamacpp\n", encoding="utf-8")
 
     from llm_cli.core import wizards
 

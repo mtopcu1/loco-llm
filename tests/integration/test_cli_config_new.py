@@ -54,6 +54,10 @@ def _seed_repo(tmp_path: Path, monkeypatch) -> Path:
     return tmp_path
 
 
+def _user_config_path(tmp_path: Path, name: str) -> Path:
+    return tmp_path / "data" / "user" / "configs" / name
+
+
 def test_config_new_writes_valid_yaml(monkeypatch, tmp_path):
     repo = _seed_repo(tmp_path, monkeypatch)
     result = runner.invoke(
@@ -76,7 +80,7 @@ def test_config_new_writes_valid_yaml(monkeypatch, tmp_path):
         ],
     )
     assert result.exit_code == 0, result.output
-    out_path = repo / "configs" / "llamacpp__qwen-7b__default.yaml"
+    out_path = _user_config_path(tmp_path, "llamacpp__qwen-7b__default.yaml")
     assert out_path.is_file()
     text = out_path.read_text(encoding="utf-8")
     assert "runtime: llamacpp" in text
@@ -104,7 +108,7 @@ def test_config_new_injects_model_path_without_gguf_param(monkeypatch, tmp_path)
         ],
     )
     assert result.exit_code == 0, result.output
-    out_path = repo / "configs" / "llamacpp__qwen-7b__default.yaml"
+    out_path = _user_config_path(tmp_path, "llamacpp__qwen-7b__default.yaml")
     assert out_path.is_file()
     text = out_path.read_text(encoding="utf-8")
     assert "gguf_path: ${model_path}" in text
@@ -163,7 +167,10 @@ def test_config_new_errors_on_invalid_param(monkeypatch, tmp_path):
 
 def test_config_new_overwrite_requires_force(monkeypatch, tmp_path):
     repo = _seed_repo(tmp_path, monkeypatch)
-    (repo / "configs" / "llamacpp__qwen-7b__default.yaml").write_text(
+    ( _user_config_path(tmp_path, "llamacpp__qwen-7b__default.yaml")).parent.mkdir(
+        parents=True, exist_ok=True
+    )
+    ( _user_config_path(tmp_path, "llamacpp__qwen-7b__default.yaml")).write_text(
         "id: llamacpp__qwen-7b__default\nruntime: llamacpp\nmodel: qwen-7b\n",
         encoding="utf-8",
     )

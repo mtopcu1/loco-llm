@@ -44,7 +44,11 @@ def show() -> None:
     console.print("[bold]resolved[/bold]:")
     resolved = resolve(stored)
     for key in KEY_REGISTRY:
-        console.print(f"  {key}: {getattr(resolved, key)}")
+        val = getattr(resolved, key)
+        if val is None:
+            console.print(f"  {key}: (not set)")
+        else:
+            console.print(f"  {key}: {val}")
 
 
 @settings_app.command("env")
@@ -52,7 +56,15 @@ def env() -> None:
     """Print `export LLM_*=...` lines for `eval "$(llm settings env)"`."""
     resolved = resolve(load_settings())
     for var, attr in _ENV_MAPPING:
-        value = getattr(resolved, attr).as_posix()
+        val = getattr(resolved, attr)
+        if attr == "repo_root" and val is None:
+            from llm_cli.core.repo import scaffold_root
+
+            value = scaffold_root().as_posix()
+        elif val is None:
+            continue
+        else:
+            value = val.as_posix()
         typer.echo(f"export {var}={shlex.quote(value)}")
 
 
