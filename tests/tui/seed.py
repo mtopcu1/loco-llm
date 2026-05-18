@@ -13,6 +13,7 @@ from llm_cli.core.model_registry import (
     RegistryEntry,
     upsert_entry,
 )
+from llm_cli.core.scaffold import user_configs_dir, user_runtimes_dir
 from llm_cli.core.settings import ensure_data_dirs, load_settings, resolve, save_settings
 
 
@@ -24,6 +25,7 @@ class RepoFixture:
     models_dir: Path
     runtimes_dir: Path
     configs_dir: Path
+    user_runtimes_dir: Path
 
     def spawn_env(self, *, src_root: Path) -> dict[str, str]:
         env = os.environ.copy()
@@ -50,8 +52,6 @@ def seed_repo(
     home.mkdir()
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    configs_dir = repo_root / "configs"
-    configs_dir.mkdir()
 
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setattr(Path, "home", lambda: home)
@@ -64,9 +64,12 @@ def seed_repo(
             "repo_root": str(repo_root),
         }
     )
-    ensure_data_dirs(resolve(load_settings()))
+    settings = resolve(load_settings())
+    ensure_data_dirs(settings)
 
-    models_dir = resolve(load_settings()).models_dir
+    models_dir = settings.models_dir
+    configs_dir = user_configs_dir(settings)
+    user_rt_dir = user_runtimes_dir(settings)
     if with_qwen:
         upsert_entry(
             models_dir,
@@ -89,8 +92,9 @@ def seed_repo(
         repo_root=repo_root,
         data_root=data_root,
         models_dir=models_dir,
-        runtimes_dir=resolve(load_settings()).runtimes_dir,
+        runtimes_dir=settings.runtimes_dir,
         configs_dir=configs_dir,
+        user_runtimes_dir=user_rt_dir,
     )
 
 

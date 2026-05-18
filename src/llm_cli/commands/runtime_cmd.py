@@ -143,6 +143,13 @@ def _runtime_setup_custom() -> str:
 
     rt_id = wiz.text("Runtime id (slug, e.g. 'vllm-custom')", validate=_slug_ok).strip()
     rt_dir = user_runtimes_dir(settings) / rt_id
+    if registry.get_runtime_merged(rt_id) is not None:
+        console.print(
+            f"[red]error:[/red] runtime {rt_id!r} already exists. "
+            f"Pick a different id, or use `llm runtime uninstall {rt_id} --purge` "
+            f"if you own a user-layer copy."
+        )
+        raise typer.Exit(code=1)
     if rt_dir.exists():
         console.print(
             f"[red]error:[/red] runtime {rt_id!r} already exists at {rt_dir}. "

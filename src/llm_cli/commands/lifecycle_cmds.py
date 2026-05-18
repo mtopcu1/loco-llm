@@ -179,8 +179,10 @@ def logs(
     if not log_file.is_file():
         console.print(f"[yellow]warning:[/yellow] log file missing: {log_file}")
         raise typer.Exit(code=0)
-    cmd: list[str] = ["tail", "-n", str(lines)]
     if follow:
-        cmd.append("-f")
-    cmd.append(str(log_file))
-    raise typer.Exit(code=subprocess.call(cmd))
+        cmd = ["tail", "-f", str(log_file)]
+        raise typer.Exit(code=subprocess.call(cmd))
+    text = log_file.read_text(encoding="utf-8", errors="replace")
+    tail_lines = text.splitlines()[-lines:] if lines > 0 else []
+    for line in tail_lines:
+        console.print(line)

@@ -109,7 +109,7 @@ def test_tui_runtime_setup_custom_template_minimal(tui_repo) -> None:
     finally:
         session.close()
 
-    rt_dir = fixture.repo_root / "runtimes" / "tui-custom"
+    rt_dir = fixture.user_runtimes_dir / "tui-custom"
     assert (rt_dir / "manifest.yaml").is_file()
     assert (rt_dir / "serve.sh").is_file()
     manifest = (rt_dir / "manifest.yaml").read_text(encoding="utf-8")
