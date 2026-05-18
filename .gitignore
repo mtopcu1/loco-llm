@@ -4,7 +4,9 @@ __pycache__/
 *$py.class
 *.egg-info/
 .pytest_cache/
+# Virtualenvs (`.venv/` default; `.venv-wsl`, `.venv-311`, etc. from local/CI runs)
 .venv/
+.venv-*/
 venv/
 
 # OS
