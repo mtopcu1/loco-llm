@@ -1,7 +1,7 @@
 # LocalLLM Update, Distribution & Versioning Design
 
 _Date: 2026-05-19_
-_Status: Drafted, awaiting user review_
+_Status: Approved — implemented on feat/v0.3-distributed-install_
 _Scope: Distribution channel, self-update mechanism, asset-layer split, and release/versioning automation. Migration from the current v0.2.0 editable-clone model to v0.3.0 distributed model._
 
 ## 1. Purpose
