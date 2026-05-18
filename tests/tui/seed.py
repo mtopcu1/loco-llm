@@ -92,3 +92,49 @@ def seed_repo(
         runtimes_dir=resolve(load_settings()).runtimes_dir,
         configs_dir=configs_dir,
     )
+
+
+def add_tiered_build_runtime(repo_root: Path) -> None:
+    """Add a tiny official runtime with common + advanced build params."""
+    rt = repo_root / "runtimes" / "tier-rt"
+    rt.mkdir(parents=True, exist_ok=False)
+    (rt / "manifest.yaml").write_text(
+        "id: tier-rt\n"
+        "display_name: Tiered Runtime\n"
+        "kind: official\n"
+        "accepts_formats: []\n"
+        "build:\n"
+        "  flavor:\n"
+        "    type: enum\n"
+        "    values: [cuda, cpu]\n"
+        "    default: cpu\n"
+        "    tier: common\n"
+        "    description: Build flavor\n"
+        "  extra_jobs:\n"
+        "    type: int\n"
+        "    default: 8\n"
+        "    tier: advanced\n"
+        "    description: Extra parallelism\n",
+        encoding="utf-8",
+    )
+    (rt / "build.sh").write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        ": \"${LLM_DATA_ROOT:?LLM_DATA_ROOT must be set}\"\n"
+        "mkdir -p \"${LLM_DATA_ROOT}/runtimes/tier-rt\"\n"
+        "echo \"flavor=${LLM_BUILD_FLAVOR:-}\" > \"${LLM_DATA_ROOT}/runtimes/tier-rt/build-env.txt\"\n"
+        "echo \"extra_jobs=${LLM_BUILD_EXTRA_JOBS:-}\" >> \"${LLM_DATA_ROOT}/runtimes/tier-rt/build-env.txt\"\n",
+        encoding="utf-8",
+    )
+    (rt / "verify.sh").write_text(
+        "#!/usr/bin/env bash\nset -euo pipefail\nexit 0\n",
+        encoding="utf-8",
+    )
+    (rt / "serve.sh").write_text(
+        "#!/usr/bin/env bash\nset -euo pipefail\nsleep 1\n",
+        encoding="utf-8",
+    )
+    (rt / "healthcheck.sh").write_text(
+        "#!/usr/bin/env bash\nset -euo pipefail\nexit 0\n",
+        encoding="utf-8",
+    )
