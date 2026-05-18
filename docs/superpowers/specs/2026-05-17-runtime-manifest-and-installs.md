@@ -3,6 +3,8 @@
 _Date: 2026-05-17_
 _Status: Approved by user, ready for implementation planning_
 
+> **Updated 2026-05-18:** the serve-time parameter schema lives in a sibling **`params.yaml`**, and manifests gain **`kind: official | custom`** — see [`2026-05-18-wizards-and-advisor.md`](2026-05-18-wizards-and-advisor.md).
+
 ## 1. Purpose
 
 Make runtimes a first-class, schema-driven object in the CLI. Today, adding a runtime is "drop five files in a folder and hope the configs match." This spec turns each runtime into a typed manifest with a build-time and serve-time parameter schema, and adds a `llm runtime` command group that installs, verifies, lists, and uninstalls them. Configs become typed parameter sets validated against the chosen runtime's schema. The CLI is the only thing that translates params to env vars at script-spawn time, so a future web UI can render the same schema as a form with no extra work.

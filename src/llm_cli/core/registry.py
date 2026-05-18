@@ -193,7 +193,11 @@ def get_config(repo: Path, config_id: str) -> ConfigRecord | None:
 
 def validate_runtime_layout(r: RuntimeRecord) -> list[str]:
     errs: list[str] = []
-    for name in ("build.sh", "serve.sh", "healthcheck.sh"):
+    kind = _resolve_kind(r.manifest, r.id)
+    scripts = ["serve.sh", "healthcheck.sh"]
+    if kind == "official":
+        scripts.insert(0, "build.sh")
+    for name in scripts:
         if not (r.path / name).is_file():
             errs.append(f"{r.id}: missing {name}")
     return errs

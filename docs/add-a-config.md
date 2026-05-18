@@ -2,6 +2,8 @@
 
 A **config** is a single file `configs/{config-id}.yaml` that names one runtime + one model and describes how to serve them together.
 
+As of **0.2**, use **`llm config setup`** for an interactive wizard (VRAM-aware hints from the same logic as **`llm advisor`**) or **`llm config new`** for non-interactive scaffolding (`--runtime`, optional **`--model`**, **`--param k=v`**).
+
 ## 1. Naming
 
 Prefer:
@@ -16,6 +18,8 @@ The optional `id:` field inside the file should match the filename stem (without
 
 ## 2. Minimal YAML
 
+Runtime-specific knobs belong under **`serve.params`** and must match the manifest **`serve:`** schema for that runtime.
+
 ```yaml
 id: my-runtime__my-model__default
 runtime: my-runtime
@@ -25,12 +29,15 @@ description: Optional human note
 serve:
   host: 127.0.0.1
   port: 8000
-  args: {}                        # free-form; interpreted by serve.sh when implemented
-  env:
-    HF_HOME: ${data_root}/cache/hf
+  params:
+    # keys depend on the runtime manifest (example for llamacpp-style stacks):
+    gguf_path: "${model_path}"
+    n_gpu_layers: -1
+    ctx: 2048
+    extra_args: ""
 
-readiness:                        # optional today; reserved for orchestration
-  http_get: http://127.0.0.1:8000/v1/models
+readiness:
+  timeout_seconds: 180
 ```
 
 ## 3. `${data_root}` in `serve.env`
@@ -53,5 +60,6 @@ llm config show my-runtime__my-model__default
 
 ## See also
 
+- [`wizards.md`](wizards.md), [`add-a-recommendation.md`](add-a-recommendation.md)
 - [`add-a-runtime.md`](add-a-runtime.md), [`add-a-model.md`](add-a-model.md)
 - [Design spec §6.3](superpowers/specs/2026-05-15-localllm-scaffolding-design.md)

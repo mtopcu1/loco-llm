@@ -36,6 +36,9 @@ def test_setup_default_writes_settings_and_creates_dirs(
 
 
 def test_setup_interactive_default_layout(tmp_path, monkeypatch) -> None:
+    from llm_cli.core import chain
+
+    monkeypatch.setattr(chain, "run_setup_chain", lambda: 0)
     repo = tmp_path / "repo"
     repo.mkdir()
     data = tmp_path / "mydata"
@@ -54,6 +57,9 @@ def test_setup_interactive_default_layout(tmp_path, monkeypatch) -> None:
 
 
 def test_setup_interactive_granular_layout(tmp_path, monkeypatch) -> None:
+    from llm_cli.core import chain
+
+    monkeypatch.setattr(chain, "run_setup_chain", lambda: 0)
     repo = tmp_path / "repo"
     repo.mkdir()
     data = tmp_path / "dr"
@@ -92,6 +98,6 @@ def test_setup_prints_next_steps_panel(tmp_path, monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert "Recommended next steps" in result.stdout
-    assert "llm runtime install" in result.stdout
+    assert "llm runtime setup" in result.stdout
     assert "llm model pull" in result.stdout
     assert "llm serve" in result.stdout

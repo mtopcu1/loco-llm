@@ -33,6 +33,7 @@ from llm_cli.core.serve_spawn import (
     wait_for_ready,
 )
 from llm_cli.core.config_resolve import expand_path_for_serve
+from llm_cli.core.model_registry import get_entry as registry_model_entry
 from llm_cli.core.params import (
     ParamSpec,
     ParamType,
@@ -99,6 +100,14 @@ def _serve_env_from_params(
         "LLM_SERVE_HOST": str(serve["host"]),
         "LLM_SERVE_PORT": str(serve["port"]),
     }
+    model_raw = cfg_data.get("model")
+    if isinstance(model_raw, str):
+        ment = registry_model_entry(settings.models_dir, model_raw)
+        if ment is not None:
+            env["LLM_MODEL_ID"] = model_raw
+            env["LLM_MODEL_PATH"] = (
+                settings.models_dir / model_raw / ment.artifact.primary
+            ).as_posix()
     runtime_id = str(cfg_data["runtime"])
     for spec in schema:
         if spec.key not in coerced:
@@ -315,19 +324,14 @@ def _do_systemd(
     console.print(f"[green]running[/green] {cfg.id} via systemd (port {port})")
 
 
-def serve(
-    config_id: str = typer.Argument(..., help="Config id to start."),
-    foreground: bool = typer.Option(
-        False, "--foreground", help="Run attached to this terminal."
-    ),
-    systemd: bool = typer.Option(
-        False, "--systemd", help="Bind llm.service to this config."
-    ),
-    foreground_from_supervisor: bool = typer.Option(
-        False, "--foreground-from-supervisor", hidden=True
-    ),
+def serve_dispatch(
+    config_id: str,
+    *,
+    foreground: bool = False,
+    systemd: bool = False,
+    foreground_from_supervisor: bool = False,
 ) -> None:
-    """Start a server for <config_id>."""
+    """Programmatic serve entry (raises typer.Exit)."""
     if foreground and systemd:
         console.print(
             "[red]error:[/red] --foreground and --systemd are mutually exclusive"
@@ -381,6 +385,27 @@ def serve(
         _do_systemd(settings, cfg_for_env, repo, env)
     else:
         _do_background(settings, cfg_for_env, repo, env)
+
+
+def serve(
+    config_id: str = typer.Argument(..., help="Config id to start."),
+    foreground: bool = typer.Option(
+        False, "--foreground", help="Run attached to this terminal."
+    ),
+    systemd: bool = typer.Option(
+        False, "--systemd", help="Bind llm.service to this config."
+    ),
+    foreground_from_supervisor: bool = typer.Option(
+        False, "--foreground-from-supervisor", hidden=True
+    ),
+) -> None:
+    """Start a server for <config_id>."""
+    serve_dispatch(
+        config_id,
+        foreground=foreground,
+        systemd=systemd,
+        foreground_from_supervisor=foreground_from_supervisor,
+    )
 
 
 def switch(

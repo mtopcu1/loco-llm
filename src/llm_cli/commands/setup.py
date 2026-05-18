@@ -56,17 +56,23 @@ def setup(
     console.print(f"[green]models_dir[/green]: {resolved.models_dir}")
     console.print(f"[green]cache_dir[/green]: {resolved.cache_dir}")
     console.print(f"[green]repo_root[/green]: {resolved.repo_root}")
+
+    if default:
+        console.print()
+        console.print("[bold]Recommended next steps:[/bold]")
+        console.print("  1. llm doctor                  # verify cross-cutting prereqs")
+        console.print("  2. llm runtime setup           # install or register a runtime")
+        console.print("  3. llm model pull <hf-url>     # download a model")
+        console.print("  4. llm config setup            # scaffold a config")
+        console.print("  5. llm serve <config-id>       # start a server")
+        return
+
     console.print()
-    console.print("[bold]Recommended next steps:[/bold]")
-    console.print("  1. llm doctor                  # verify cross-cutting prereqs")
-    console.print("  2. llm runtime list            # see available runtimes")
-    console.print(
-        "  3. llm runtime install <id>    # install one (e.g. `llm runtime install llamacpp`)"
-    )
-    console.print("  4. llm model list              # browse model definitions")
-    console.print("  5. llm model pull <id>         # download weights")
-    console.print("  6. llm config validate         # check launch configs")
-    console.print("  7. llm serve <config-id>       # start a server")
+    from llm_cli.core.chain import run_setup_chain
+
+    rc = run_setup_chain()
+    if rc != 0:
+        raise typer.Exit(code=rc)
 
 
 def _prompt_dir_overrides(data_root: str) -> dict[str, str]:

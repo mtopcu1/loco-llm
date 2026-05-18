@@ -8,7 +8,7 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from subprocess import run as _subprocess_run
-from typing import Optional
+from typing import Any, Optional
 
 import typer
 from rich.console import Console
@@ -147,6 +147,104 @@ def _verify_sha256(target_dir: Path, expected: dict[str, str]) -> list[str]:
     return errs
 
 
+class PullModelError(Exception):
+    """Non-zero exit path for HF URL pulls without importing Typer."""
+
+
+def pull_hf_url_model_id(
+    url: str,
+    *,
+    fmt: Optional[str] = None,
+    include: Optional[list[str]] = None,
+    exclude: Optional[list[str]] = None,
+    id_override: Optional[str] = None,
+    force: bool = False,
+) -> str:
+    """Register a model from a Hugging Face URL; returns the model id."""
+    models_dir = _models_dir()
+    try:
+        parsed = parse_hf_url(url)
+    except HFUrlError as exc:
+        raise PullModelError(str(exc)) from exc
+
+    try:
+        info = fetch_repo_revision(parsed.repo, revision=parsed.revision)
+    except HFApiError as exc:
+        raise PullModelError(str(exc)) from exc
+
+    include = list(include or [])
+    exclude = list(exclude or [])
+
+    inferred = None
+    if not (fmt and include):
+        try:
+            inferred = infer_format(parsed, [s.rfilename for s in info.siblings])
+        except FormatInferenceError as exc:
+            raise PullModelError(str(exc)) from exc
+
+    chosen_format = fmt or (inferred.format if inferred else "")
+    chosen_include = list(include or (inferred.include if inferred else ()))
+    chosen_exclude = list(exclude)
+
+    if not chosen_format:
+        raise PullModelError("could not determine format; pass --format")
+
+    mid = id_override or derive_model_id(parsed)
+    target_dir = models_dir / mid
+    if get_entry(models_dir, mid) is not None and not force:
+        raise PullModelError(
+            f"{mid!r} already registered; use --force or `llm model uninstall {mid}` first"
+        )
+
+    rc = hf_download(
+        parsed.repo, parsed.revision, chosen_include, chosen_exclude, target_dir
+    )
+    if rc != 0:
+        raise PullModelError(f"hf download failed (exit {rc})")
+
+    artifact = build_artifact(target_dir, chosen_format)
+    sha_map = {
+        s.rfilename: s.lfs_sha256
+        for s in info.siblings
+        if s.lfs_sha256 and s.rfilename in artifact.files
+    }
+    bad = _verify_sha256(target_dir, sha_map)
+    if bad:
+        raise PullModelError("; ".join(bad))
+
+    artifact_with_hashes = Artifact(
+        primary=artifact.primary,
+        files=artifact.files,
+        total_size_bytes=artifact.total_size_bytes,
+        sha256=sha_map,
+    )
+
+    entry = RegistryEntry(
+        id=mid,
+        format=chosen_format,
+        source=HFSource(
+            repo=parsed.repo,
+            revision=parsed.revision,
+            include=tuple(chosen_include),
+            exclude=tuple(chosen_exclude),
+        ),
+        artifact=artifact_with_hashes,
+        metadata=Metadata(
+            display_name=info.repo,
+            license=info.license,
+            ctx_length=None,
+        ),
+        installed_at=_utc_now_iso(),
+    )
+    upsert_entry(models_dir, entry)
+    return mid
+
+
+def do_model_pull(url: str, **kwargs: Any) -> str:
+    """Programmatic HF URL pull (used by `llm setup` chain)."""
+    return pull_hf_url_model_id(url, **kwargs)
+
+
 @model_app.command("pull", help="Pull a model from HF (URL) or re-pull an existing id.")
 def model_pull(
     target: str = typer.Argument(..., help="HF URL or registered model id."),
@@ -173,81 +271,17 @@ def model_pull(
 
     if parsed is not None:
         try:
-            info = fetch_repo_revision(parsed.repo, revision=parsed.revision)
-        except HFApiError as exc:
+            mid = pull_hf_url_model_id(
+                target,
+                fmt=fmt,
+                include=list(include) if include else None,
+                exclude=list(exclude) if exclude else None,
+                id_override=id_override,
+                force=force,
+            )
+        except PullModelError as exc:
             console.print(f"[red]error:[/red] {exc}")
             raise typer.Exit(code=1) from exc
-
-        inferred = None
-        if not (fmt and include):
-            try:
-                inferred = infer_format(
-                    parsed, [s.rfilename for s in info.siblings]
-                )
-            except FormatInferenceError as exc:
-                console.print(f"[red]error:[/red] {exc}")
-                raise typer.Exit(code=1) from exc
-
-        chosen_format = fmt or (inferred.format if inferred else "")
-        chosen_include = list(include or (inferred.include if inferred else ()))
-        chosen_exclude = list(exclude)
-
-        if not chosen_format:
-            console.print("[red]error:[/red] could not determine format; pass --format")
-            raise typer.Exit(code=1)
-
-        mid = id_override or derive_model_id(parsed)
-        target_dir = models_dir / mid
-        if get_entry(models_dir, mid) is not None and not force:
-            console.print(
-                f"[red]error:[/red] {mid!r} already registered; "
-                f"use `--force` to overwrite or `llm model uninstall {mid}` first"
-            )
-            raise typer.Exit(code=1)
-
-        rc = hf_download(
-            parsed.repo, parsed.revision, chosen_include, chosen_exclude, target_dir
-        )
-        if rc != 0:
-            console.print(f"[red]error:[/red] hf download failed (exit {rc})")
-            raise typer.Exit(code=rc)
-
-        artifact = build_artifact(target_dir, chosen_format)
-        sha_map = {
-            s.rfilename: s.lfs_sha256
-            for s in info.siblings
-            if s.lfs_sha256 and s.rfilename in artifact.files
-        }
-        bad = _verify_sha256(target_dir, sha_map)
-        if bad:
-            for line in bad:
-                console.print(f"[red]sha256:[/red] {line}")
-            raise typer.Exit(code=1)
-        artifact_with_hashes = Artifact(
-            primary=artifact.primary,
-            files=artifact.files,
-            total_size_bytes=artifact.total_size_bytes,
-            sha256=sha_map,
-        )
-
-        entry = RegistryEntry(
-            id=mid,
-            format=chosen_format,
-            source=HFSource(
-                repo=parsed.repo,
-                revision=parsed.revision,
-                include=tuple(chosen_include),
-                exclude=tuple(chosen_exclude),
-            ),
-            artifact=artifact_with_hashes,
-            metadata=Metadata(
-                display_name=info.repo,
-                license=info.license,
-                ctx_length=None,
-            ),
-            installed_at=_utc_now_iso(),
-        )
-        upsert_entry(models_dir, entry)
         console.print(f"[green]registered[/green] {mid}")
         console.print(
             f"  next: edit your config to use `model: {mid}` and "

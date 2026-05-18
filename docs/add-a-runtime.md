@@ -1,6 +1,6 @@
 # HOWTO: add a runtime
 
-A **runtime** is a folder under `runtimes/{runtime-id}/` that describes how to **build**, **verify**, and **serve** one inference stack (llama.cpp, vLLM, …). The CLI orchestrates your scripts from WSL bash and validates configs against the typed schemas in `manifest.yaml`.
+A **runtime** is a folder under `runtimes/{runtime-id}/` that describes how to **build** (official only), **verify**, and **serve** one inference stack. As of **0.2**, serve-time knobs live in **`params.yaml`**; `manifest.yaml` carries `kind: official | custom`, `accepts_formats`, and optional `requires`. Use **`llm runtime setup`** for a preset install or to scaffold a **`kind: custom`** runtime (no build scripts). The CLI orchestrates scripts from WSL bash and validates configs against those schemas.
 
 ## 1. Folder layout
 

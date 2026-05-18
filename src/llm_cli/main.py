@@ -11,6 +11,7 @@ from llm_cli.commands import lifecycle_cmds
 from llm_cli.commands.model_cmd import model_app
 from llm_cli.commands.runtime_cmd import runtime_app
 from llm_cli.commands import serve as serve_cmd
+from llm_cli.commands.advisor import advisor as advisor_cmd
 from llm_cli.commands.doctor import doctor_app
 from llm_cli.commands.settings_cmd import settings_app
 
@@ -51,6 +52,11 @@ app.command(
     help="List discovered runtimes, models, configs, and benchmarks.",
 )(list_cmd.list_entities)
 app.add_typer(config_cmd.config_app, name="config")
+
+app.command(
+    "advisor",
+    help="VRAM-aware recommendations for a (runtime, model) pair.",
+)(advisor_cmd)
 
 # Lifecycle: serve, switch, stop, status, logs.
 app.command("serve", help="Start a config in fg/bg/systemd mode.")(serve_cmd.serve)

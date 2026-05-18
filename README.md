@@ -16,35 +16,34 @@ Inside WSL2:
 cat requirements.md
 # (or after install:) llm doctor
 
-# 2. Install the CLI into a venv and run first-time setup
+# 2. Install the CLI into a venv
 ./install.sh
 export PATH="$HOME/.local/bin:$PATH"   # if not already
 
-# 3. Inspect settings (settings live at ~/.config/llm/config.yaml)
-llm settings show
+# 3. Run interactive setup (settings + optional Y/n chain into runtime / model / config / serve)
+llm setup
+```
 
-# 4. Document the machine
-llm specs
+For an existing setup, the granular commands still work as before:
 
-# 5. Install a runtime and model, validate config, serve
-llm setup --default
-llm runtime install llamacpp --yes
+```bash
+llm runtime setup       # interactive picker (preset or custom)
+llm runtime install llamacpp --yes      # non-interactive preset install
 llm model pull https://huggingface.co/Qwen/Qwen2.5-7B-Instruct
-llm config validate
-llm serve llamacpp__qwen-qwen2.5-7b-instruct__default
-llm status
-llm stop
+llm config setup        # interactive
+llm config new --runtime llamacpp --model qwen2-7b --param gguf_path='${model_path}'
+llm serve llamacpp__qwen2-7b__default
 ```
 
 For a minimal smoke without llamacpp weights, use `llm runtime install stub-runtime --yes` and `llm serve stub-runtime__default` instead.
 
-See [`docs/lifecycle.md`](docs/lifecycle.md) for modes, switching, and logs. See [`docs/runtime-lifecycle.md`](docs/runtime-lifecycle.md) for `llm runtime install` / `.installed`.
+See [`docs/lifecycle.md`](docs/lifecycle.md) for modes, switching, and logs. See [`docs/runtime-lifecycle.md`](docs/runtime-lifecycle.md) for `llm runtime install` / `.installed`. User-facing wizard overview: [`docs/wizards.md`](docs/wizards.md).
 
 ## Layout
 
 | Path | What it holds |
 |---|---|
-| `runtimes/{id}/` | Manifest + build/serve/healthcheck scripts for one runtime |
+| `runtimes/{id}/` | Manifest + **`params.yaml`** + build/serve/healthcheck scripts for one runtime |
 | `configs/{id}.yaml` | One launch unit (runtime + optional model + flags) |
 | `benchmarks/{id}/` | Wrapper around an existing benchmark tool, plus committed results |
 | `state/` | Runtime state: `running.json`, `history.jsonl`, `logs/` (gitignored; see `docs/lifecycle.md`) |
@@ -60,8 +59,12 @@ for the full design.
 
 | Command | Purpose |
 |---|---|
-| `llm setup` | Interactive first-time configurator. Writes `~/.config/llm/config.yaml`, creates data-root subdirectories. Re-runnable. |
-| `llm setup --default` | Non-interactive: use built-in defaults for every key. |
+| `llm setup` | Interactive first-time configurator. Writes `~/.config/llm/config.yaml`, creates data-root subdirectories, then optional Y/n chain (runtime / model / config / serve). |
+| `llm setup --default` | Non-interactive settings only; prints suggested next steps (no chain). |
+| `llm advisor` | VRAM-aware param hints (interactive, `--runtime`+`--model`, or `<config-id>`; `--json`). |
+| `llm runtime setup` | Wizard: preset official install or author a `kind: custom` runtime in-repo. |
+| `llm config new` | Non-interactive config YAML (`--runtime`, optional `--model`, `--param k=v`, `--force`). |
+| `llm config setup` | Interactive config YAML with recommendations + review. |
 | `llm settings show` | Print settings file path, stored contents, and resolved view. |
 | `llm settings env` | Print `export LLM_*=...` lines for `eval "$(llm settings env)"`. |
 | `llm settings edit <key>` | Interactive prompt to update one key. |
