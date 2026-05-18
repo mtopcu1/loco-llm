@@ -327,6 +327,9 @@ def _resolve_build_params(
             from llm_cli.core import wizards as wiz
 
             tier_result = wiz.walk_tier(missing)
+            if tier_result.aborted:
+                console.print("[yellow]aborted[/yellow]")
+                raise typer.Exit(code=1)
             raw.update(tier_result.values)
 
     coerced, errors = validate_params(schema, raw)
@@ -470,6 +473,7 @@ def runtime_setup_command() -> None:
     except typer.Exit:
         raise
     if rid is None:
+        console.print("[yellow]aborted[/yellow]")
         raise typer.Exit(code=1)
     console.print(f"[green]done[/green] runtime {rid}")
 

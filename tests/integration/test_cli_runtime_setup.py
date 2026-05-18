@@ -147,6 +147,20 @@ def test_runtime_setup_custom_refuses_existing_id(monkeypatch, tmp_path):
     assert "already exists" in result.output.lower()
 
 
+def test_runtime_setup_abort_on_branch_cancel(monkeypatch, tmp_path):
+    _seed(tmp_path, monkeypatch)
+    from llm_cli.core import wizards
+
+    def cancel_select(*_args, **_kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(wizards, "select", cancel_select)
+
+    result = runner.invoke(app, ["runtime", "setup"])
+    assert result.exit_code != 0
+    assert "aborted" in result.output.lower()
+
+
 def test_runtime_install_refuses_custom_kind(monkeypatch, tmp_path):
     repo = _seed(tmp_path, monkeypatch)
     (repo / "runtimes" / "fake-custom").mkdir(parents=True)

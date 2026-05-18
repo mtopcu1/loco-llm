@@ -10,6 +10,7 @@ pytest.importorskip("pexpect")
 from llm_cli.core.install_record import read_record
 
 from tests.tui import keys as k
+from tests.tui import workflows as wf
 from tests.tui.seed import add_tiered_build_runtime
 from tests.tui.session import TuiSession
 
@@ -47,16 +48,13 @@ def test_tui_runtime_install_common_only_saves_default_build_params(tui_repo) ->
     assert rec.build_params == {"flavor": "cpu", "extra_jobs": 8}
 
 
-@pytest.mark.skip(reason="abort keybindings are not captured reliably in runtime install PTY")
 def test_tui_runtime_install_abort_from_param_grid(tui_repo) -> None:
     fixture = tui_repo
     add_tiered_build_runtime(fixture.repo_root)
     session = TuiSession.spawn(fixture, ["runtime", "install", "tier-rt"])
     try:
         session.expect("Parameters", timeout=20)
-        # Ctrl+X is dedicated abort for this flow in PTY.
-        session.send(k.CTRL_X)
-        session.expect("aborted", timeout=20)
+        wf.abort_params_only(session)
         assert session.wait_exit(timeout=60) != 0
     finally:
         session.close()

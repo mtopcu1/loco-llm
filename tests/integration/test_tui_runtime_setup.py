@@ -7,8 +7,6 @@ import pytest
 
 pytest.importorskip("pexpect")
 
-import pexpect
-
 from llm_cli.core.install_record import read_record
 
 from tests.tui import keys as k
@@ -51,17 +49,15 @@ def test_tui_runtime_setup_preset_installs_stub(tui_repo) -> None:
     assert record.runtime_id == "stub-runtime"
 
 
-@pytest.mark.skip(reason="questionary select does not exit cleanly on SIGINT in PTY")
+@pytest.mark.skip(reason="questionary cancel keys are not delivered reliably in pexpect PTY")
 def test_tui_runtime_setup_abort_on_branch(tui_repo) -> None:
     fixture = tui_repo
     session = TuiSession.spawn(fixture, ["runtime", "setup"])
     try:
         session.expect("Runtime setup", timeout=20)
-        # questionary does not exit cleanly on Ctrl+C in PTY; send SIGINT via kill.
-        session.child.sendintr()
-        session.child.expect(pexpect.EOF, timeout=10)
-        status = session.wait_exit()
-        assert status != 0
+        session.send(k.ESC)
+        session.expect("aborted", timeout=20)
+        assert session.wait_exit() != 0
     finally:
         session.close()
 

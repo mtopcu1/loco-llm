@@ -107,6 +107,8 @@ def confirm(prompt: str, *, default: bool = True) -> bool:
             _maybe_tip_missing_questionary()
         return _confirm_plain(prompt, default=default)
     result = q.confirm(prompt, default=default).ask()
+    if result is None:
+        raise KeyboardInterrupt
     return bool(result)
 
 
@@ -141,7 +143,7 @@ def select(
 
     picked = questionary.select(prompt, choices=choice_list, default=default).ask()
     if picked is None:
-        return choice_list[0]
+        raise KeyboardInterrupt
     return picked
 
 
@@ -180,7 +182,9 @@ def checkbox(
     import questionary
 
     sel = questionary.checkbox(prompt, choices=choice_list).ask()
-    return tuple(sel or ())
+    if sel is None:
+        raise KeyboardInterrupt
+    return tuple(sel)
 
 
 SAVE_SENTINEL = "save"
@@ -229,6 +233,7 @@ def review(
 class WalkTierResult:
     values: dict[str, str] = field(default_factory=dict)
     advanced_revealed: bool = False
+    aborted: bool = False
 
 
 def edit_params(
@@ -261,7 +266,11 @@ def walk_tier(specs: list[Any]) -> WalkTierResult:
     """Prompt for common-tier ParamSpecs via the grid; advanced rows after toggle."""
     result = edit_params(specs, title="Parameters")
     if result.action == "abort":
-        return WalkTierResult(values={}, advanced_revealed=result.advanced_revealed)
+        return WalkTierResult(
+            values={},
+            advanced_revealed=result.advanced_revealed,
+            aborted=True,
+        )
     values = dict(result.values)
     # Match sequential behaviour: omit advanced-tier keys unless advanced was visible on save.
     if not result.advanced_revealed:

@@ -366,3 +366,21 @@ def test_runtime_install_interactive_reveals_advanced_build_params(
     env = mock_build.call_args.kwargs["env"]
     assert env["LLM_BUILD_FLAVOR"] == "cuda"
     assert env["LLM_BUILD_EXTRA_JOBS"] == "16"
+
+
+@patch("llm_cli.core.wizards.walk_tier")
+def test_runtime_install_aborts_when_walk_tier_aborted(
+    mock_walk_tier, tmp_path: Path
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _scaffold_tiered_build_runtime(repo)
+    save_settings({"data_root": str(tmp_path / "data"), "repo_root": str(repo)})
+
+    mock_walk_tier.return_value = WalkTierResult(aborted=True)
+
+    result = runner.invoke(app, ["runtime", "install", "tier-rt"], catch_exceptions=False)
+
+    assert result.exit_code != 0
+    assert "aborted" in result.stdout.lower()
+    assert read_record(tmp_path / "data" / "runtimes", "tier-rt") is None

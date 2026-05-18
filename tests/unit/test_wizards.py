@@ -202,6 +202,22 @@ def test_walk_tier_abort_from_grid_returns_empty_values(monkeypatch):
     result = wizards.walk_tier(specs)
     assert result.values == {}
     assert result.advanced_revealed is True
+    assert result.aborted is True
+
+
+def test_select_raises_keyboard_interrupt_when_questionary_cancelled(monkeypatch):
+    pytest.importorskip("questionary")
+    import questionary
+
+    monkeypatch.setattr(wizards, "use_plain_prompts", lambda: False)
+
+    class FakeSelect:
+        def ask(self):
+            return None
+
+    with patch.object(questionary, "select", return_value=FakeSelect()):
+        with pytest.raises(KeyboardInterrupt):
+            wizards.select("pick one", ["alpha", "beta"])
 
 
 def test_review_save_returns_save(monkeypatch):

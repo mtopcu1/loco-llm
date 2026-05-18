@@ -59,6 +59,12 @@ def save_params_via_footer(
     session.send(k.ENTER)
 
 
+def abort_params_only(session: TuiSession) -> None:
+    """Abort a params-only grid (no meta step)."""
+    session.send(k.ESC)
+    session.expect("aborted", timeout=15)
+
+
 def abort_wizard(session: TuiSession, *, from_params: bool = False) -> None:
     """Abort param-grid wizard (Esc on meta; Esc×2 from params)."""
     if from_params:
