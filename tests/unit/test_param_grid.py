@@ -93,6 +93,17 @@ def test_run_param_grid_tui_builds_keybindings(monkeypatch) -> None:
     assert got is expected
 
 
+def test_run_param_grid_keyboard_interrupt_returns_abort(monkeypatch) -> None:
+    monkeypatch.setattr("llm_cli.core.param_grid.wizards.use_plain_prompts", lambda: False)
+
+    def _raise(*_args, **_kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("llm_cli.core.param_grid._run_param_grid_tui", _raise)
+    got = run_param_grid([], [], title="T")
+    assert got.action == "abort"
+
+
 def test_run_param_grid_falls_back_on_import_error(monkeypatch) -> None:
     expected = ParamGridResult(values={"x": "1"}, meta={}, action="save")
     monkeypatch.setattr("llm_cli.core.param_grid.wizards.use_plain_prompts", lambda: False)

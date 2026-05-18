@@ -62,6 +62,17 @@ def toggle_footer_button(focus: ShellFocus) -> None:
     focus.footer_button = "next" if focus.footer_button == "back" else "back"
 
 
+def footer_next_label(*, phase: str, has_meta: bool) -> str:
+    """Return footer primary action label: ``Next`` between steps, ``Save`` on final page."""
+    if phase == "list":
+        return "Save"
+    if phase == "meta" and has_meta:
+        return "Next"
+    if phase == "detail":
+        return "Next"
+    return "Save"
+
+
 def render_footer(
     *,
     back_label: str = "Back",

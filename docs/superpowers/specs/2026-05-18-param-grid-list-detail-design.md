@@ -64,7 +64,9 @@ The current param grid TUI packs description, hints, and values into a 2×3 card
 ### Focus ladder
 
 - **Content area:** Up/Down move rows (meta form or param list).
-- **← / →** on any list row: wizard Back / Next step (no horizontal row navigation).
+- **← / →** on list rows: move between wizard **pages** only (configuration ↔ parameters). No save or abort on boundary pages.
+- **Esc** / footer **Back** / **Ctrl+X**: abort or step back with confirm semantics (Back from meta aborts).
+- **Ctrl+S** / footer **Next**: advance or save (Next from params saves).
 - **Down on last content row:** focus moves to footer (`Back` selected first).
 - **Footer:** Left/Right toggle Back ↔ Next; Enter activates focused button. Buttons left-aligned with list keys.
 - **Up from footer:** returns to last content row.
@@ -74,7 +76,7 @@ The current param grid TUI packs description, hints, and values into a 2×3 card
 | Key | Meta form | Param list | Param detail |
 |-----|-----------|------------|--------------|
 | Esc | Abort wizard | Back → meta (or abort if no meta) | Cancel edit → list |
-| ← / → | Back / Next step | Back / Next step | — |
+| ← / → | Previous / next page (meta ↔ params only) | Previous / next page | — |
 | Ctrl+S | Next → params | Save & exit | Commit value → list |
 | Enter | Edit focused field / activate footer button | Open detail (non-bool) / footer | Commit value → list |
 | Space | — | Toggle bool | Insert space in edit |

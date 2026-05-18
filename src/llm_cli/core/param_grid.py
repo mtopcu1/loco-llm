@@ -20,6 +20,7 @@ from llm_cli.core.param_grid_theme import DEFAULT_THEME, ParamGridTheme
 from llm_cli.core.params import ParamType, ParamValidationError, coerce_value
 from llm_cli.core.wizard_shell import (
     ShellFocus,
+    footer_next_label,
     move_content,
     move_content_down,
     render_footer,
@@ -112,12 +113,20 @@ def run_param_grid(
     theme: ParamGridTheme = DEFAULT_THEME,
 ) -> ParamGridResult:
     """Run prompt-toolkit wizard when interactive, else Rich/plain fallback."""
-    if wizards.use_plain_prompts():
-        return run_param_grid_plain(cells, meta, title=title, theme=theme)
     try:
-        return _run_param_grid_tui(cells, meta, title=title, theme=theme)
-    except ImportError:
-        return run_param_grid_plain(cells, meta, title=title, theme=theme)
+        if wizards.use_plain_prompts():
+            return run_param_grid_plain(cells, meta, title=title, theme=theme)
+        try:
+            return _run_param_grid_tui(cells, meta, title=title, theme=theme)
+        except ImportError:
+            return run_param_grid_plain(cells, meta, title=title, theme=theme)
+    except KeyboardInterrupt:
+        return ParamGridResult(
+            values={c.key: c.value for c in cells},
+            meta={m.key: m.value for m in meta},
+            action="abort",
+            advanced_revealed=False,
+        )
 
 
 @dataclass
@@ -291,6 +300,24 @@ def _run_param_grid_tui(
             )
         )
 
+    def _navigate_page_back() -> None:
+        """← : previous wizard page only (never abort/save)."""
+        if state.phase == "list" and meta:
+            state.phase = "meta"
+            state.focus = ShellFocus()
+            _clear_error()
+
+    def _navigate_page_next() -> None:
+        """→ : next wizard page only (never abort/save)."""
+        if state.phase == "meta" and meta:
+            err = _validate_meta()
+            if err is not None:
+                _set_error(err)
+                return
+            state.phase = "list"
+            state.focus = ShellFocus()
+            _clear_error()
+
     def _wizard_back() -> None:
         if state.phase == "detail":
             _cancel_detail()
@@ -457,6 +484,7 @@ def _run_param_grid_tui(
         return render_footer(
             focused_button=state.focus.footer_button,
             in_footer=in_footer,
+            next_label=footer_next_label(phase=state.phase, has_meta=bool(meta)),
         )
 
     kb = KeyBindings()
@@ -493,7 +521,7 @@ def _run_param_grid_tui(
             state.focus.footer_button = "back"
             return
         if state.phase in ("meta", "list") and state.focus.zone == "content":
-            _wizard_back()
+            _navigate_page_back()
 
     @kb.add("right")
     def _right(_event) -> None:
@@ -503,7 +531,7 @@ def _run_param_grid_tui(
             state.focus.footer_button = "next"
             return
         if state.phase in ("meta", "list") and state.focus.zone == "content":
-            _wizard_next()
+            _navigate_page_next()
 
     @kb.add("tab")
     def _tab(_event) -> None:
@@ -563,6 +591,11 @@ def _run_param_grid_tui(
     def _ctrl_x(_event) -> None:
         _exit_abort()
 
+    @kb.add("c-c")
+    @kb.add("<sigint>")
+    def _ctrl_c(_event) -> None:
+        _exit_abort()
+
     @kb.add("c-a")
     def _ctrl_a(_event) -> None:
         if state.phase != "list":
@@ -603,7 +636,7 @@ def _run_param_grid_tui(
             lambda: [
                 (
                     "class:text-dim",
-                    "↑↓ rows · ←→ step · Enter detail · Space bool · Esc Back · Ctrl+S Next/Save · Ctrl+A advanced",
+                    "↑↓ rows · ←→ pages · Enter detail · Esc Back · Ctrl+S Save · Ctrl+C abort",
                 )
             ]
         ),

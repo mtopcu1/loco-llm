@@ -47,16 +47,16 @@ Three forms: interactive (pick runtime + model), `llm advisor <config-id>`, or `
 
 | Action | Keys |
 | --- | --- |
-| Next step / save | **Ctrl+S**, or focus **Next** + **Enter** |
+| Next step / save | **Ctrl+S**, or focus **Next** / **Save** + **Enter** |
 | Back / abort step | **Esc**, or focus **Back** + **Enter** |
-| Abort entire wizard | **Ctrl+X** |
+| Abort entire wizard | **Ctrl+C**, **Ctrl+X** |
 | Open field detail | **Enter** (on list row) |
 | Toggle advanced tier | **Ctrl+A** (parameter list only) |
 | Toggle boolean | **Space** (parameter list) |
 | Move focus | **↑** / **↓** (last row **↓** → footer buttons) |
-| Previous / next wizard step | **←** / **→** (any list row), **Esc** / **Ctrl+S**, or footer **Back** / **Next** |
+| Previous / next wizard page | **←** / **→** (between configuration and parameters only) |
 
-Also: **Tab** / **Shift+Tab** cycle rows or footer buttons; in detail view type to edit value, **Enter** commits back to list.
+Also: **Tab** / **Shift+Tab** cycle rows or footer buttons; in detail view type to edit value, **Enter** commits back to list. Footer **Next** becomes **Save** on the parameter step.
 
 ### Param grid fallback (plain / CI)
 
@@ -74,6 +74,16 @@ Colors encode **meaning**, not decoration:
 - **Hint / meta / error** — advisor lines, meta labels, and validation messages.
 
 All palette tokens live in **`src/llm_cli/core/param_grid_theme.py`** (`ParamGridTheme`); adjust that module to re-theme the grid without touching layout code.
+
+### TUI integration tests (Linux / WSL)
+
+PTY-based tests drive real terminal wizards with a stub runtime and fake model. They need `pexpect` and a pseudo-TTY — run in WSL or Linux, not native Windows:
+
+```bash
+pytest -m tui -v
+```
+
+The default full pytest run skips `@pytest.mark.tui` on Windows. See [`docs/superpowers/specs/2026-05-18-tui-pexpect-integration-design.md`](superpowers/specs/2026-05-18-tui-pexpect-integration-design.md) for harness details and scenario coverage.
 
 ## See also
 

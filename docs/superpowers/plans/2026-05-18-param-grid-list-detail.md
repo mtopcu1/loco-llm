@@ -20,6 +20,7 @@ Implemented in this branch:
 - [x] `param_grid.py` — list/detail TUI rewrite
 - [x] `param_grid_plain.py` — two-step meta + params
 - [x] Unit tests + `docs/wizards.md` update
+- [x] Page nav (←/→) vs back/save (Esc/Ctrl+S) separation; dynamic footer **Save** label; Ctrl+C abort
 
 ## Verification
 
