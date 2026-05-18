@@ -1,8 +1,8 @@
 # TUI Pexpect Integration Test Design
 
 **Date:** 2026-05-18  
-**Status:** Draft — pending user review  
-**Scope:** Phase 1 — `llm config setup` + `llm runtime setup` (Option B)
+**Status:** Approved  
+**Scope:** Phase 1 — `llm config setup` + `llm runtime setup` (Option B). Phase 2 starter: `runtime install` walk_tier (implemented).
 
 ## Problem
 
@@ -372,3 +372,16 @@ Default PR job runs `pytest` without `-m tui` on Windows if needed; Linux job ru
 - [x] Consistent with param grid design (`2026-05-18-param-grid-list-detail-design.md`).
 - [x] Windows skip and WSL CI documented.
 - [x] Model/registry fixtures align with `test_cli_config_new.py` / `test_cli_config_setup.py`.
+
+---
+
+## Implementation status (2026-05-18)
+
+Shipped in commits `aa566b2`, `2ea5e14`, `6e89666`:
+
+- Harness: `tests/tui/` (`seed.py`, `session.py`, `keys.py`, `workflows.py`)
+- PTY tests: `test_tui_config_setup.py`, `test_tui_runtime_setup.py`, `test_tui_runtime_install.py`
+- WSL result: 15 passed, 1 skipped (`test_tui_runtime_setup_abort_on_branch` — questionary cancel in pexpect PTY)
+- Product fix: questionary cancel → `KeyboardInterrupt`; `walk_tier.aborted` propagates through `runtime install`
+
+Known gaps vs full scenario catalog: A2 interactive pickers, A5 bool toggle, A6 advanced tier, B2 PTY abort (CliRunner covered). Phase 3 not started.
