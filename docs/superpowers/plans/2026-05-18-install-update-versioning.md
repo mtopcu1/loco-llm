@@ -551,12 +551,17 @@ from llm_cli.core.scaffold import configs_root, scaffold_root
 
 scaffold = scaffold_root()
 configs = configs_root()
+settings = resolve(load_settings())
 ```
 
 Change paths:
 - `repo / "configs" / f"{cid}.yaml"` → `configs / f"{cid}.yaml"`
-- `registry.get_runtime_manifest(scaffold, ...)` (unchanged pattern, variable rename)
-- `append_history(scaffold, ...)` — history stays tied to scaffold root if `state/` lives there in dev; in bundle mode history goes to data_root — check `append_history` and pass `settings.data_root / "state"` or keep using scaffold only in source mode. **Decision:** pass `resolve(load_settings()).data_root` for history in bundle mode; update `append_history` callers in config_cmd to use `settings.data_root` for bundle installs (read `lifecycle.py` — if history is under repo `state/`, bundle mode should use `data_root/state/`). Add `state_root(settings)` helper if needed.
+- `registry.get_runtime_manifest(scaffold, ...)`
+- `append_history(state_root(settings), ...)` — see Step 3b
+
+- [ ] **Step 3b: Refactor lifecycle state paths**
+
+In `src/llm_cli/core/lifecycle.py` add `state_root(settings)` returning `data_root/state` in bundle mode else `scaffold_root/state`. Update `append_history`, `read_running`, `write_running`, `logs_dir` to use it. Add unit test `test_state_root_bundle_uses_data_root`.
 
 - [ ] **Step 4: Update list_cmd, serve, advisor, doctor, lifecycle, specs, chain**
 
