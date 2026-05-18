@@ -76,3 +76,69 @@ class TestCIWorkflow:
         run_steps = [s.get("run", "") for s in build_job["steps"] if "run" in s]
         assert any("python -m build" in cmd for cmd in run_steps)
         assert any("twine check" in cmd for cmd in run_steps)
+
+
+class TestPublishWorkflow:
+    def test_triggers_on_release_published(self):
+        doc = _load("publish.yml")
+        on = _get_on(doc)
+        assert "release" in on
+        types = on["release"].get("types", [])
+        assert "published" in types
+
+    def test_has_id_token_write_permission_for_oidc(self):
+        doc = _load("publish.yml")
+        # Either job-level or workflow-level permissions are acceptable;
+        # we accept the first one that grants id-token: write.
+        def _has(d: dict[str, Any]) -> bool:
+            perms = d.get("permissions", {})
+            return perms.get("id-token") == "write"
+
+        if _has(doc):
+            return
+        for job in doc["jobs"].values():
+            if _has(job):
+                return
+        pytest.fail(
+            "expected id-token: write at workflow or job level for PyPI OIDC"
+        )
+
+    def test_uses_pypi_publish_action(self):
+        doc = _load("publish.yml")
+        all_steps = []
+        for job in doc["jobs"].values():
+            all_steps.extend(job.get("steps", []))
+        uses = [s.get("uses", "") for s in all_steps]
+        assert any(
+            u.startswith("pypa/gh-action-pypi-publish@") for u in uses
+        ), "expected pypa/gh-action-pypi-publish step"
+
+    def test_builds_scaffold_tarball_and_sha256(self):
+        doc = _load("publish.yml")
+        all_steps = []
+        for job in doc["jobs"].values():
+            all_steps.extend(job.get("steps", []))
+        run_blobs = "\n".join(s.get("run", "") for s in all_steps)
+        assert "tar czf" in run_blobs, "expected a tar czf step"
+        assert "scaffold-" in run_blobs, (
+            "expected scaffold-<tag>.tar.gz naming pattern"
+        )
+        assert "sha256sum" in run_blobs, (
+            "expected sha256sum to produce the .sha256 sidecar"
+        )
+
+    def test_attaches_assets_to_github_release(self):
+        doc = _load("publish.yml")
+        all_steps = []
+        for job in doc["jobs"].values():
+            all_steps.extend(job.get("steps", []))
+        uses = [s.get("uses", "") for s in all_steps]
+        run_blobs = "\n".join(s.get("run", "") for s in all_steps)
+        attaches_via_action = any(
+            u.startswith("softprops/action-gh-release@") for u in uses
+        )
+        attaches_via_gh_cli = "gh release upload" in run_blobs
+        assert attaches_via_action or attaches_via_gh_cli, (
+            "expected either softprops/action-gh-release or `gh release upload` "
+            "to attach the scaffold tarball to the GitHub Release"
+        )
