@@ -32,5 +32,8 @@ dist/
 # Local agent scratch
 .commit-msg.tmp
 
+# Git worktrees (project-local; never committed)
+.worktrees/
+
 # Models now live in $LLM_MODELS (data root); keep the repo dir out of git.
 models/
