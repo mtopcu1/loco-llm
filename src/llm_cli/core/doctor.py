@@ -255,6 +255,34 @@ def render_requirements_md(requirements: list[Requirement]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def run_quick_checks() -> tuple[bool, str]:
+    """Subset of doctor checks for post-update verify (spec §9.2 step 6).
+
+    Returns ``(ok, detail)`` where *detail* is empty on success.
+    """
+    from llm_cli.core.scaffold import scaffold_dir, scaffold_root
+    from llm_cli.core.settings import load_settings, resolve
+
+    try:
+        resolve(load_settings())
+    except Exception as exc:  # noqa: BLE001
+        return False, f"settings: {exc}"
+
+    managed = scaffold_dir()
+    if not managed.is_dir():
+        return False, f"scaffold directory missing: {managed}"
+
+    req_path = scaffold_root() / "requirements.yaml"
+    if not req_path.is_file():
+        return False, f"requirements.yaml not readable at {req_path}"
+    try:
+        load_requirements(req_path)
+    except Exception as exc:  # noqa: BLE001
+        return False, f"requirements.yaml: {exc}"
+
+    return True, ""
+
+
 def render_requirements_md_grouped(
     universal: list[Requirement], by_runtime: dict[str, list[Requirement]]
 ) -> str:

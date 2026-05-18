@@ -11,6 +11,7 @@ from llm_cli.core.doctor import (
     CheckStatus,
     check_all,
     load_requirements,
+    run_quick_checks,
     systemd_linger_advisory,
 )
 from llm_cli.core.repo import scaffold_root
@@ -50,10 +51,23 @@ def doctor(
     all_runtimes: bool = typer.Option(
         False, "--all", help="Include every runtime's deps (installed or not)."
     ),
+    quick: bool = typer.Option(
+        False,
+        "--quick",
+        help="Fast checks only (settings, scaffold dir, requirements.yaml).",
+    ),
 ) -> None:
     """Run requirement checks: universal + runtime-scoped extras."""
     if ctx.invoked_subcommand is not None:
         return
+
+    if quick:
+        ok, detail = run_quick_checks()
+        if ok:
+            console.print("[green]quick checks passed[/green]")
+            return
+        console.print(f"[red]error:[/red] {detail}")
+        raise typer.Exit(code=1)
 
     repo = scaffold_root()
     universal = load_requirements(_requirements_yaml(repo))
