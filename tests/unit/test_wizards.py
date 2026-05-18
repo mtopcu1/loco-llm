@@ -114,9 +114,10 @@ def test_walk_tier_yields_common_then_offers_advanced(monkeypatch):
         ),
     ]
     monkeypatch.setattr(wizards, "use_plain_prompts", lambda: True)
-    answers = iter(["8192", "y", "--foo"])
+    # Plain grid: edit row 1, toggle advanced (A), edit row 2, save (S).
+    answers = iter(["1", "8192", "a", "2", "--foo", "s"])
     with patch(
-        "llm_cli.core.wizards.Prompt.ask",
+        "llm_cli.core.param_grid_plain.Prompt.ask",
         side_effect=lambda *a, **k: next(answers),
     ):
         result = wizards.walk_tier(specs)
@@ -144,9 +145,9 @@ def test_walk_tier_skips_advanced_when_user_declines(monkeypatch):
         ),
     ]
     monkeypatch.setattr(wizards, "use_plain_prompts", lambda: True)
-    answers = iter(["8192", "n"])
+    answers = iter(["1", "8192", "s"])
     with patch(
-        "llm_cli.core.wizards.Prompt.ask",
+        "llm_cli.core.param_grid_plain.Prompt.ask",
         side_effect=lambda *a, **k: next(answers),
     ):
         result = wizards.walk_tier(specs)
@@ -154,32 +155,110 @@ def test_walk_tier_skips_advanced_when_user_declines(monkeypatch):
     assert result.advanced_revealed is False
 
 
+def test_walk_tier_delegates_to_grid(monkeypatch):
+    from llm_cli.core.param_grid_models import ParamGridResult
+    from llm_cli.core.params import ParamSpec, ParamType
+
+    specs = [
+        ParamSpec(key="only", type=ParamType.INT, default=1, tier="common"),
+    ]
+    captured: dict[str, object] = {}
+
+    def stub_edit_params(s: list[ParamSpec], **kwargs: object) -> ParamGridResult:
+        captured["specs"] = s
+        captured["kwargs"] = kwargs
+        return ParamGridResult(
+            values={"only": "2"},
+            meta={},
+            action="save",
+            advanced_revealed=False,
+        )
+
+    monkeypatch.setattr(wizards, "edit_params", stub_edit_params)
+    result = wizards.walk_tier(specs)
+    assert captured["specs"] is specs
+    assert captured["kwargs"]["title"] == "Parameters"
+    assert result.values == {"only": "2"}
+    assert result.advanced_revealed is False
+
+
+def test_walk_tier_abort_from_grid_returns_empty_values(monkeypatch):
+    from llm_cli.core.param_grid_models import ParamGridResult
+    from llm_cli.core.params import ParamSpec, ParamType
+
+    specs = [
+        ParamSpec(key="only", type=ParamType.INT, default=1, tier="common"),
+    ]
+
+    def stub_edit_params(_specs: list[ParamSpec], **kwargs: object) -> ParamGridResult:
+        return ParamGridResult(
+            values={"only": "9"},
+            meta={},
+            action="abort",
+            advanced_revealed=True,
+        )
+
+    monkeypatch.setattr(wizards, "edit_params", stub_edit_params)
+    result = wizards.walk_tier(specs)
+    assert result.values == {}
+    assert result.advanced_revealed is True
+
+
 def test_review_save_returns_save(monkeypatch):
-    monkeypatch.setattr(wizards, "use_plain_prompts", lambda: True)
+    from llm_cli.core.param_grid_models import ParamGridResult
+
     rows = [("runtime", "llamacpp"), ("port", "8080")]
-    with patch("llm_cli.core.wizards.Prompt.ask", return_value="1"):
-        action = wizards.review(rows, on_edit=lambda key: None)
+
+    monkeypatch.setattr(
+        wizards,
+        "edit_params",
+        lambda specs, **kwargs: ParamGridResult(
+            values={s.key: str(s.default or "") for s in specs},
+            meta={},
+            action="save",
+            advanced_revealed=False,
+        ),
+    )
+    action = wizards.review(rows, on_edit=lambda key: None)
     assert action == "save"
 
 
 def test_review_abort_returns_abort(monkeypatch):
-    monkeypatch.setattr(wizards, "use_plain_prompts", lambda: True)
+    from llm_cli.core.param_grid_models import ParamGridResult
+
     rows = [("runtime", "llamacpp")]
-    with patch("llm_cli.core.wizards.Prompt.ask", return_value="3"):
-        action = wizards.review(rows, on_edit=lambda key: None)
+
+    monkeypatch.setattr(
+        wizards,
+        "edit_params",
+        lambda specs, **kwargs: ParamGridResult(
+            values={s.key: str(s.default or "") for s in specs},
+            meta={},
+            action="abort",
+            advanced_revealed=False,
+        ),
+    )
+    action = wizards.review(rows, on_edit=lambda key: None)
     assert action == "abort"
 
 
 def test_review_edit_loops_until_save(monkeypatch):
-    monkeypatch.setattr(wizards, "use_plain_prompts", lambda: True)
+    from llm_cli.core.param_grid_models import ParamGridResult
+
     rows = [("runtime", "llamacpp"), ("port", "8080")]
     edited: list[str] = []
 
-    answers = iter(["2", "1"])
-    with patch(
-        "llm_cli.core.wizards.Prompt.ask",
-        side_effect=lambda *a, **k: next(answers),
-    ):
-        action = wizards.review(rows, on_edit=lambda key: edited.append(key))
+    def stub_edit_params(specs, **kwargs):
+        values = {s.key: str(s.default or "") for s in specs}
+        values["row_1"] = "9090"
+        return ParamGridResult(
+            values=values,
+            meta={},
+            action="save",
+            advanced_revealed=False,
+        )
+
+    monkeypatch.setattr(wizards, "edit_params", stub_edit_params)
+    action = wizards.review(rows, on_edit=lambda key: edited.append(key))
     assert action == "save"
-    assert edited == ["runtime"]
+    assert edited == ["port"]

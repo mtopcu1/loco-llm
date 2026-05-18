@@ -1,6 +1,8 @@
 """Orchestration for extended `llm setup` after settings are written."""
 from __future__ import annotations
 
+from typing import Any
+
 import typer
 from rich.console import Console
 
@@ -27,10 +29,95 @@ def _do_runtime_setup() -> str | None:
     return interactive_runtime_setup()
 
 
-def _do_model_pull(url: str) -> str:
+def _duplicate_model_menu(existing_id: str) -> str:
+    """Return keep | force | rename | skip."""
+    from llm_cli.core import wizards as wiz
+
+    choice = wiz.select(
+        f"Model `{existing_id}` is already registered for this URL.",
+        [
+            "Keep existing — skip download (use registered model)",
+            "Re-download weights and overwrite registry entry",
+            "Register under a different local model id",
+            "Skip — continue setup without this model",
+        ],
+    )
+    if choice.startswith("Keep existing"):
+        return "keep"
+    if choice.startswith("Re-download"):
+        return "force"
+    if choice.startswith("Register under"):
+        return "rename"
+    return "skip"
+
+
+def _pull_with_new_model_id(url: str) -> str | None:
+    """Prompt until unique id or user-visible failure; returns None on aborted pull."""
+    from llm_cli.commands.model_cmd import (
+        DuplicateModelRegistrationError,
+        PullModelError,
+    )
+    from llm_cli.core import wizards as wiz
+    from llm_cli.core.model_registry import get_entry
+    from llm_cli.core.settings import load_settings, resolve as resolve_settings
+
+    models_dir = resolve_settings(load_settings()).models_dir
+
+    def validate(v: str) -> str | None:
+        t = v.strip()
+        if not t:
+            return "id is required"
+        if len(t) > 128:
+            return "id too long"
+        for ch in t:
+            if not (ch.isalnum() or ch in "-_."):
+                return "use letters, digits, dashes, underscores, dots only"
+        return None
+
+    while True:
+        new_id = wiz.text(
+            "Local model id (must not already exist)",
+            validate=validate,
+        ).strip()
+        if get_entry(models_dir, new_id) is not None:
+            console.print(
+                f"[red]error:[/red] {new_id!r} is already registered — choose another id"
+            )
+            continue
+        try:
+            return _do_model_pull(url, id_override=new_id)
+        except DuplicateModelRegistrationError:
+            console.print(
+                "[red]error:[/red] that id still conflicts — try a different id"
+            )
+            continue
+        except PullModelError as exc:
+            console.print(f"[red]error:[/red] {exc}")
+            return None
+
+
+def _interactive_model_pull_for_setup(url: str) -> str | None:
+    """Pull HF URL or resolve duplicate registration interactively."""
+    from llm_cli.commands.model_cmd import DuplicateModelRegistrationError
+
+    try:
+        return _do_model_pull(url)
+    except DuplicateModelRegistrationError as dup:
+        decision = _duplicate_model_menu(dup.model_id)
+        if decision == "keep":
+            return dup.model_id
+        if decision == "skip":
+            console.print("[yellow]skipped[/yellow] model pull")
+            return None
+        if decision == "force":
+            return _do_model_pull(url, force=True)
+        return _pull_with_new_model_id(url)
+
+
+def _do_model_pull(url: str, **kwargs: Any) -> str:
     from llm_cli.commands.model_cmd import do_model_pull
 
-    return do_model_pull(url)
+    return do_model_pull(url, **kwargs)
 
 
 def _do_config_setup(
@@ -92,7 +179,7 @@ def run_setup_chain() -> int:
     ).strip()
     if url_raw:
         try:
-            model_id = _do_model_pull(url_raw)
+            model_id = _interactive_model_pull_for_setup(url_raw)
         except PullModelError as exc:
             console.print(f"[red]error:[/red] {exc}")
             append_history(
@@ -100,8 +187,9 @@ def run_setup_chain() -> int:
                 {"action": "setup-chain", "steps": steps, "outcome": "model-pull-failed"},
             )
             return 1
-        console.print(f"[green]model[/green] {model_id}")
-        steps.append("model-pull")
+        if model_id:
+            console.print(f"[green]model[/green] {model_id}")
+            steps.append("model-pull")
 
     if _confirm("Create a launch config now?", default=True):
         cid = _do_config_setup(

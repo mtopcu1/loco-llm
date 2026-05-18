@@ -151,6 +151,17 @@ class PullModelError(Exception):
     """Non-zero exit path for HF URL pulls without importing Typer."""
 
 
+class DuplicateModelRegistrationError(PullModelError):
+    """HF URL resolves to a model id that is already in the registry."""
+
+    def __init__(self, model_id: str) -> None:
+        self.model_id = model_id
+        super().__init__(
+            f"{model_id!r} already registered; use --force or "
+            f"`llm model uninstall {model_id}` first"
+        )
+
+
 def pull_hf_url_model_id(
     url: str,
     *,
@@ -192,9 +203,7 @@ def pull_hf_url_model_id(
     mid = id_override or derive_model_id(parsed)
     target_dir = models_dir / mid
     if get_entry(models_dir, mid) is not None and not force:
-        raise PullModelError(
-            f"{mid!r} already registered; use --force or `llm model uninstall {mid}` first"
-        )
+        raise DuplicateModelRegistrationError(mid)
 
     rc = hf_download(
         parsed.repo, parsed.revision, chosen_include, chosen_exclude, target_dir

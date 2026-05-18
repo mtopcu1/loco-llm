@@ -1,0 +1,623 @@
+"""Prompt-toolkit param grid with list/detail views and plain fallback."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Literal
+
+from llm_cli.core import wizards
+from llm_cli.core.param_grid_build import filter_visible_cells
+from llm_cli.core.param_grid_layout import (
+    format_row_triple,
+    key_column_width,
+    scroll_offset_for_focus,
+    value_column_width,
+    wrap_lines,
+)
+from llm_cli.core.param_grid_models import MetaField, ParamCell, ParamGridResult, cell_state
+from llm_cli.core.param_grid_plain import run_param_grid_plain
+from llm_cli.core.param_grid_theme import DEFAULT_THEME, ParamGridTheme
+from llm_cli.core.params import ParamType, ParamValidationError, coerce_value
+from llm_cli.core.wizard_shell import (
+    ShellFocus,
+    move_content,
+    move_content_down,
+    render_footer,
+    toggle_footer_button,
+)
+
+_PAGE_SIZE = 6
+_GRID_COLUMNS = 2
+
+
+def _spec_for_cell(cell: ParamCell):
+    from llm_cli.core.params import ParamSpec
+
+    return ParamSpec(key=cell.key, type=cell.param_type)
+
+
+def _coerce_and_format(cell: ParamCell, raw: str) -> str:
+    if cell.param_type is ParamType.ENUM:
+        return str(raw)
+    coerced = coerce_value(_spec_for_cell(cell), raw)
+    return str(coerced)
+
+
+def page_index_for_focus(focus_index: int, *, per_page: int = _PAGE_SIZE) -> int:
+    """Return page index for a visible-cell focus index."""
+    if per_page < 1:
+        raise ValueError("per_page must be >= 1")
+    if focus_index < 0:
+        return 0
+    return focus_index // per_page
+
+
+def clamp_focus_index(focus_index: int, *, total: int) -> int:
+    """Clamp focus index to visible-cell bounds."""
+    if total <= 0:
+        return 0
+    if focus_index < 0:
+        return 0
+    if focus_index >= total:
+        return total - 1
+    return focus_index
+
+
+def move_focus_linear(focus_index: int, *, total: int, delta: int) -> int:
+    """Move focus linearly with wraparound."""
+    if total <= 0:
+        return 0
+    return (focus_index + delta) % total
+
+
+def move_grid_focus(
+    local_index: int,
+    *,
+    direction: Literal["left", "right", "up", "down"],
+    page_len: int,
+    columns: int = _GRID_COLUMNS,
+) -> int:
+    """Move focus in a fixed-column page grid without leaving valid slots."""
+    if page_len <= 0:
+        return 0
+    if local_index < 0:
+        local_index = 0
+    if local_index >= page_len:
+        local_index = page_len - 1
+    if columns < 1:
+        raise ValueError("columns must be >= 1")
+
+    row = local_index // columns
+    col = local_index % columns
+
+    if direction == "left":
+        candidate = local_index - 1 if col > 0 else local_index
+    elif direction == "right":
+        candidate = local_index + 1 if col < columns - 1 else local_index
+    elif direction == "up":
+        candidate = local_index - columns if row > 0 else local_index
+    else:
+        candidate = local_index + columns
+
+    if candidate < 0 or candidate >= page_len:
+        return local_index
+    return candidate
+
+
+def run_param_grid(
+    cells: list[ParamCell],
+    meta: list[MetaField],
+    *,
+    title: str,
+    theme: ParamGridTheme = DEFAULT_THEME,
+) -> ParamGridResult:
+    """Run prompt-toolkit wizard when interactive, else Rich/plain fallback."""
+    if wizards.use_plain_prompts():
+        return run_param_grid_plain(cells, meta, title=title, theme=theme)
+    try:
+        return _run_param_grid_tui(cells, meta, title=title, theme=theme)
+    except ImportError:
+        return run_param_grid_plain(cells, meta, title=title, theme=theme)
+
+
+@dataclass
+class _WizardState:
+    phase: Literal["meta", "list", "detail"]
+    advanced_visible: bool = False
+    focus: ShellFocus = field(default_factory=ShellFocus)
+    detail_kind: Literal["meta", "cell"] = "cell"
+    editing: bool = False
+    edit_buffer: str = ""
+    error_message: str = ""
+
+
+def _run_param_grid_tui(
+    cells: list[ParamCell],
+    meta: list[MetaField],
+    *,
+    title: str,
+    theme: ParamGridTheme = DEFAULT_THEME,
+) -> ParamGridResult:
+    """Run list/detail param wizard with optional meta form step."""
+    try:
+        from prompt_toolkit.application import Application, get_app
+        from prompt_toolkit.formatted_text import StyleAndTextTuples
+        from prompt_toolkit.key_binding import KeyBindings
+        from prompt_toolkit.keys import Keys
+        from prompt_toolkit.layout import HSplit, Layout, Window
+        from prompt_toolkit.layout.controls import FormattedTextControl
+        from prompt_toolkit.layout.dimension import Dimension
+        from prompt_toolkit.styles import Style
+    except ImportError as exc:
+        raise ImportError("prompt_toolkit is unavailable") from exc
+
+    initial_phase: Literal["meta", "list"] = "meta" if meta else "list"
+    state = _WizardState(phase=initial_phase)
+
+    def _terminal_size() -> tuple[int, int]:
+        try:
+            size = get_app().output.get_size()
+            return max(40, size.columns), max(10, size.rows)
+        except Exception:
+            return 80, 24
+
+    def _visible_param_cells() -> list[ParamCell]:
+        return filter_visible_cells(
+            cells,
+            advanced_visible=state.advanced_visible,
+            hide_readonly=True,
+        )
+
+    def _content_row_count() -> int:
+        if state.phase == "meta":
+            return len(meta)
+        if state.phase == "list":
+            return len(_visible_param_cells())
+        return 1
+
+    def _ensure_focus_bounds() -> None:
+        total = _content_row_count()
+        if state.focus.content_index >= total and total > 0:
+            state.focus.content_index = total - 1
+        if total == 0 and state.focus.zone == "content":
+            state.focus.zone = "footer"
+
+    def _set_error(message: str) -> None:
+        state.error_message = message
+
+    def _clear_error() -> None:
+        state.error_message = ""
+
+    def _viewport_rows(*, reserved: int = 4) -> int:
+        _cols, rows = _terminal_size()
+        return max(1, rows - reserved)
+
+    def _update_scroll() -> None:
+        total = _content_row_count()
+        viewport = _viewport_rows()
+        state.focus.scroll_offset = scroll_offset_for_focus(
+            state.focus.content_index,
+            total_rows=total,
+            viewport_rows=viewport,
+            current_offset=state.focus.scroll_offset,
+        )
+
+    def _enter_detail(*, kind: Literal["meta", "cell"], index: int) -> None:
+        state.phase = "detail"
+        state.detail_kind = kind
+        state.focus.content_index = index
+        state.focus.zone = "content"
+        state.editing = True
+        if kind == "meta":
+            state.edit_buffer = meta[index].value
+        else:
+            state.edit_buffer = _visible_param_cells()[index].value
+        _clear_error()
+
+    def _cancel_detail() -> None:
+        state.editing = False
+        state.edit_buffer = ""
+        state.phase = "meta" if state.detail_kind == "meta" else "list"
+        _clear_error()
+
+    def _commit_detail() -> bool:
+        raw = state.edit_buffer
+        if state.detail_kind == "meta":
+            field = meta[state.focus.content_index]
+            if field.key == "port":
+                try:
+                    int(raw.strip())
+                except ValueError:
+                    _set_error("port must be an integer")
+                    return False
+            if not raw.strip() and field.key in ("host", "preset", "config_id"):
+                _set_error(f"{field.key} must not be empty")
+                return False
+            field.value = raw
+        else:
+            visible = _visible_param_cells()
+            cell = visible[state.focus.content_index]
+            try:
+                cell.value = _coerce_and_format(cell, raw)
+            except ParamValidationError as exc:
+                _set_error(str(exc))
+                return False
+        state.editing = False
+        state.edit_buffer = ""
+        state.phase = "meta" if state.detail_kind == "meta" else "list"
+        _clear_error()
+        return True
+
+    def _validate_meta() -> str | None:
+        for field in meta:
+            if field.key == "port":
+                try:
+                    int(field.value.strip())
+                except ValueError:
+                    return "port must be an integer"
+            if not field.value.strip() and field.key in ("host", "preset", "config_id"):
+                return f"{field.key} must not be empty"
+        return None
+
+    def _validate_all_params() -> str | None:
+        for cell in cells:
+            try:
+                _coerce_and_format(cell, cell.value)
+            except ParamValidationError as exc:
+                return f"{cell.key}: {exc}"
+        return None
+
+    def _exit_save() -> None:
+        err = _validate_all_params()
+        if err is not None:
+            _set_error(err)
+            return
+        app.exit(
+            result=ParamGridResult(
+                values={c.key: c.value for c in cells},
+                meta={m.key: m.value for m in meta},
+                action="save",
+                advanced_revealed=state.advanced_visible,
+            )
+        )
+
+    def _exit_abort() -> None:
+        app.exit(
+            result=ParamGridResult(
+                values={c.key: c.value for c in cells},
+                meta={m.key: m.value for m in meta},
+                action="abort",
+                advanced_revealed=state.advanced_visible,
+            )
+        )
+
+    def _wizard_back() -> None:
+        if state.phase == "detail":
+            _cancel_detail()
+            return
+        if state.phase == "meta":
+            _exit_abort()
+            return
+        if state.phase == "list":
+            if meta:
+                state.phase = "meta"
+                state.focus = ShellFocus()
+                _clear_error()
+            else:
+                _exit_abort()
+
+    def _wizard_next() -> None:
+        if state.phase == "detail":
+            _commit_detail()
+            return
+        if state.phase == "meta":
+            err = _validate_meta()
+            if err is not None:
+                _set_error(err)
+                return
+            state.phase = "list"
+            state.focus = ShellFocus()
+            _clear_error()
+            return
+        if state.phase == "list":
+            _exit_save()
+
+    def _activate_footer() -> None:
+        if state.focus.footer_button == "back":
+            _wizard_back()
+        else:
+            _wizard_next()
+
+    def _toggle_bool_at(index: int) -> None:
+        visible = _visible_param_cells()
+        if index < 0 or index >= len(visible):
+            return
+        cell = visible[index]
+        if cell.readonly or cell.param_type is not ParamType.BOOL:
+            return
+        try:
+            current = coerce_value(_spec_for_cell(cell), cell.value)
+        except ParamValidationError:
+            current = False
+        cell.value = "false" if bool(current) else "true"
+        _clear_error()
+
+    def _render_header() -> StyleAndTextTuples:
+        cols, _rows = _terminal_size()
+        advanced_state = "ON" if state.advanced_visible else "OFF"
+        if state.phase == "meta":
+            subtitle = "Configuration"
+        elif state.phase == "detail":
+            subtitle = "Edit"
+        else:
+            subtitle = "Parameters"
+        line = f"{title} — {subtitle}  ·  Advanced: {advanced_state}"
+        if len(line) > cols:
+            line = line[: cols - 1] + "\u2026"
+        return [("class:text", line)]
+
+    def _style_class(row_state: str) -> str:
+        if row_state == "modified":
+            return "class:cell-modified"
+        if row_state == "text":
+            return "class:text"
+        return "class:cell-default"
+
+    def _render_list_rows(
+        rows: list[tuple[str, str, str, str]],
+    ) -> StyleAndTextTuples:
+        cols, _rows = _terminal_size()
+        viewport = _viewport_rows()
+        keys = [r[0] for r in rows]
+        values = [r[1] for r in rows]
+        key_w = key_column_width(keys, cols)
+        val_w = value_column_width(values, cols, key_w)
+        out: StyleAndTextTuples = []
+        start = state.focus.scroll_offset
+        end = min(len(rows), start + viewport)
+        for idx in range(start, end):
+            key, value, description, row_state = rows[idx]
+            focused = state.focus.zone == "content" and state.focus.content_index == idx
+            row_cls = _style_class(row_state)
+            key_cls = "class:cell-focus" if focused else row_cls
+            val_cls = key_cls
+            key_txt, val_txt, desc_txt = format_row_triple(
+                key,
+                value,
+                description,
+                key_width=key_w,
+                val_width=val_w,
+                total_width=cols,
+            )
+            prefix = ">" if focused else " "
+            out.append(("class:text-dim", prefix))
+            out.append((key_cls, key_txt))
+            out.append(("class:text-dim", "  "))
+            out.append((val_cls, val_txt))
+            if desc_txt:
+                out.append(("class:text-dim", "  "))
+                desc_cls = "class:text-dim" if not focused else "class:hint"
+                out.append((desc_cls, desc_txt))
+            out.append(("", "\n"))
+        if not rows:
+            out.append(("class:text-dim", "(no editable parameters)\n"))
+        return out
+
+    def _render_meta_list() -> StyleAndTextTuples:
+        rows = [(m.label, m.value, m.description, "text") for m in meta]
+        return _render_list_rows(rows)
+
+    def _render_param_list() -> StyleAndTextTuples:
+        visible = _visible_param_cells()
+        rows = [
+            (c.key, c.value, c.description, cell_state(c))
+            for c in visible
+        ]
+        return _render_list_rows(rows)
+
+    def _render_detail() -> StyleAndTextTuples:
+        cols, _rows = _terminal_size()
+        wrap_w = max(20, cols - 4)
+        out: StyleAndTextTuples = []
+
+        if state.detail_kind == "meta":
+            field = meta[state.focus.content_index]
+            key = field.label
+            description = field.description
+            hint = None
+        else:
+            cell = _visible_param_cells()[state.focus.content_index]
+            key = cell.key
+            description = cell.description
+            hint = cell.hint
+
+        out.append(("class:text", f"{key}\n\n"))
+        for line in wrap_lines(description, wrap_w):
+            out.append(("class:text-dim", line + "\n"))
+        if hint:
+            out.append(("", "\n"))
+            for line in wrap_lines(f"Suggestion: {hint}", wrap_w):
+                out.append(("class:hint", line + "\n"))
+        out.append(("", "\n"))
+        out.append(("class:text", "Value: "))
+        out.append(("class:cell-focus", state.edit_buffer + ("█" if state.editing else "")))
+        out.append(("", "\n"))
+        return out
+
+    def _render_content() -> StyleAndTextTuples:
+        _update_scroll()
+        if state.phase == "detail":
+            return _render_detail()
+        if state.phase == "meta":
+            return _render_meta_list()
+        return _render_param_list()
+
+    def _render_chrome() -> StyleAndTextTuples:
+        in_footer = state.focus.zone == "footer"
+        return render_footer(
+            focused_button=state.focus.footer_button,
+            in_footer=in_footer,
+        )
+
+    kb = KeyBindings()
+
+    @kb.add("up")
+    def _up(_event) -> None:
+        if state.phase == "detail" and state.editing:
+            return
+        if state.focus.zone == "footer":
+            state.focus.zone = "content"
+            _ensure_focus_bounds()
+            return
+        total = _content_row_count()
+        if state.focus.content_index > 0:
+            state.focus.content_index -= 1
+        elif total > 0:
+            state.focus.content_index = 0
+
+    @kb.add("down")
+    def _down(_event) -> None:
+        if state.phase == "detail" and state.editing:
+            if state.focus.zone == "content":
+                state.focus.zone = "footer"
+                state.focus.footer_button = "next"
+            return
+        total = _content_row_count()
+        move_content_down(state.focus, total=total)
+
+    @kb.add("left")
+    def _left(_event) -> None:
+        if state.phase == "detail" and state.editing:
+            return
+        if state.focus.zone == "footer":
+            state.focus.footer_button = "back"
+            return
+        if state.phase in ("meta", "list") and state.focus.zone == "content":
+            _wizard_back()
+
+    @kb.add("right")
+    def _right(_event) -> None:
+        if state.phase == "detail" and state.editing:
+            return
+        if state.focus.zone == "footer":
+            state.focus.footer_button = "next"
+            return
+        if state.phase in ("meta", "list") and state.focus.zone == "content":
+            _wizard_next()
+
+    @kb.add("tab")
+    def _tab(_event) -> None:
+        if state.phase == "detail" and state.editing:
+            state.edit_buffer += "    "
+            return
+        if state.focus.zone == "footer":
+            toggle_footer_button(state.focus)
+        else:
+            total = _content_row_count()
+            move_content(state.focus, +1, total=total)
+
+    @kb.add("s-tab")
+    def _shift_tab(_event) -> None:
+        if state.focus.zone == "footer":
+            toggle_footer_button(state.focus)
+        else:
+            total = _content_row_count()
+            move_content(state.focus, -1, total=total)
+
+    @kb.add("enter")
+    def _enter(_event) -> None:
+        if state.focus.zone == "footer":
+            _activate_footer()
+            return
+        if state.phase == "detail":
+            _commit_detail()
+            return
+        if state.phase == "meta":
+            _enter_detail(kind="meta", index=state.focus.content_index)
+            return
+        visible = _visible_param_cells()
+        idx = state.focus.content_index
+        if idx < 0 or idx >= len(visible):
+            return
+        cell = visible[idx]
+        if cell.param_type is ParamType.BOOL:
+            _toggle_bool_at(idx)
+        else:
+            _enter_detail(kind="cell", index=idx)
+
+    @kb.add("escape")
+    def _escape(_event) -> None:
+        if state.phase == "detail":
+            _cancel_detail()
+            return
+        _wizard_back()
+
+    @kb.add("c-s")
+    def _ctrl_s(_event) -> None:
+        if state.phase == "detail":
+            _commit_detail()
+            return
+        _wizard_next()
+
+    @kb.add("c-x")
+    def _ctrl_x(_event) -> None:
+        _exit_abort()
+
+    @kb.add("c-a")
+    def _ctrl_a(_event) -> None:
+        if state.phase != "list":
+            return
+        state.advanced_visible = not state.advanced_visible
+        _ensure_focus_bounds()
+        _clear_error()
+
+    @kb.add(" ")
+    def _space(_event) -> None:
+        if state.phase == "detail" and state.editing:
+            state.edit_buffer += " "
+            return
+        if state.phase == "list" and state.focus.zone == "content":
+            _toggle_bool_at(state.focus.content_index)
+
+    @kb.add("backspace")
+    def _backspace(_event) -> None:
+        if state.phase == "detail" and state.editing:
+            state.edit_buffer = state.edit_buffer[:-1]
+
+    @kb.add(Keys.Any)
+    def _typed(event) -> None:
+        if state.phase == "detail" and state.editing and event.data:
+            state.edit_buffer += event.data
+
+    header = Window(FormattedTextControl(_render_header), height=1)
+    content = Window(FormattedTextControl(_render_content), height=Dimension(weight=1))
+    error_window = Window(
+        FormattedTextControl(
+            lambda: [("class:error", state.error_message)] if state.error_message else [("class:text-dim", "")]
+        ),
+        height=1,
+    )
+    footer = Window(FormattedTextControl(_render_chrome), height=1)
+    hint = Window(
+        FormattedTextControl(
+            lambda: [
+                (
+                    "class:text-dim",
+                    "↑↓ rows · ←→ step · Enter detail · Space bool · Esc Back · Ctrl+S Next/Save · Ctrl+A advanced",
+                )
+            ]
+        ),
+        height=1,
+    )
+
+    root = HSplit([header, content, error_window, footer, hint])
+    style = Style.from_dict(theme.to_prompt_toolkit_style())
+    app = Application(
+        layout=Layout(root),
+        key_bindings=kb,
+        style=style,
+        full_screen=True,
+        mouse_support=False,
+    )
+    _ensure_focus_bounds()
+    return app.run()

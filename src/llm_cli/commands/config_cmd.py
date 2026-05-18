@@ -14,8 +14,13 @@ from rich.console import Console
 from llm_cli.core import registry
 from llm_cli.core.config_resolve import resolve_config_for_display
 from llm_cli.core.lifecycle import append_history
+from llm_cli.core.model_bindings import (
+    apply_model_bindings,
+    bound_keys_to_skip,
+)
 from llm_cli.core.model_registry import get_entry, load_registry
-from llm_cli.core.params import ParamSpec, validate_params
+from llm_cli.core.param_grid_models import MetaField
+from llm_cli.core.params import validate_params
 from llm_cli.core.recommendations import recommend
 from llm_cli.core.repo import repo_root
 from llm_cli.core.settings import load_settings, resolve
@@ -77,7 +82,10 @@ def do_config_new(
             f"runtime {runtime_id!r} has empty accepts_formats; omit --model"
         )
 
-    coerced, errors = validate_params(rt.serve_schema, params or {})
+    merged = apply_model_bindings(
+        rt.serve_schema, dict(params or {}), model_id=model_id
+    )
+    coerced, errors = validate_params(rt.serve_schema, merged)
     if errors:
         for err in errors:
             console.print(f"[red]error:[/red] {err}")
@@ -102,7 +110,7 @@ def do_config_new(
     doc["serve"] = {
         "host": host,
         "port": port,
-        "params": dict(params or {}),
+        "params": dict(coerced),
     }
     doc["readiness"] = {"timeout_seconds": 600}
 
@@ -167,133 +175,94 @@ def do_config_setup(
         )
         return None
 
-    params_raw: dict[str, str] = {}
+    skip_keys = bound_keys_to_skip(mf.serve_schema, model_id=mid)
+    model_entry = get_entry(settings.models_dir, mid) if mid else None
+    hints: dict[str, str] = {}
+    for spec in mf.serve_schema:
+        rec = recommend(rid, spec.key, model=model_entry, specs=specs)
+        if rec is None:
+            continue
+        hints[spec.key] = f"suggested {rec.value} ({rec.reason})"
 
-    def walk_specs(specs_list: list[ParamSpec]) -> None:
-        model_entry = get_entry(settings.models_dir, mid) if mid else None
-        for spec in specs_list:
-            rec = recommend(rid, spec.key, model=model_entry, specs=specs)
-            default_str = (
-                rec.value
-                if rec is not None
-                else ("" if spec.default is None else str(spec.default))
-            )
-            if spec.description:
-                console.print(f"[bold cyan]{spec.key}[/bold cyan] — {spec.description}")
-                if rec is not None:
-                    console.print(
-                        f"  [green]suggested {rec.value}[/green] "
-                        f"[dim]({rec.reason})[/dim]"
-                    )
-            answer = wiz.text(spec.key, default=default_str or None)
-            params_raw[spec.key] = answer
-
-    common = [s for s in mf.serve_schema if s.tier == "common"]
-    advanced = [s for s in mf.serve_schema if s.tier == "advanced"]
-    walk_specs(common)
-    if advanced and wiz.confirm(
-        f"Reveal {len(advanced)} advanced parameter(s)?", default=False
-    ):
-        walk_specs(advanced)
-
-    host = wiz.text("serve.host", default="127.0.0.1")
-    port_s = wiz.text("serve.port", default="8080")
-    preset_val = wiz.text("preset", default=preset)
-    try:
-        port_i = int(port_s.strip())
-    except ValueError:
-        console.print("[red]error:[/red] port must be an integer")
-        return None
-
-    cid_guess = (
-        f"{rid}__{mid}__{preset_val}" if mid else f"{rid}__{preset_val}"
+    cid_guess = f"{rid}__{mid}__{preset}" if mid else f"{rid}__{preset}"
+    result = wiz.edit_params(
+        mf.serve_schema,
+        title="Config setup",
+        skip_keys=set(skip_keys),
+        readonly_keys=set(skip_keys),
+        hints=hints,
+        meta=[
+            MetaField(
+                key="host",
+                label="host",
+                value="127.0.0.1",
+                description="serve.host",
+            ),
+            MetaField(
+                key="port",
+                label="port",
+                value="8080",
+                description="serve.port",
+            ),
+            MetaField(
+                key="preset",
+                label="preset",
+                value=preset,
+            ),
+            MetaField(
+                key="config_id",
+                label="config_id",
+                value=cid_guess,
+            ),
+        ],
     )
-
-    holder: dict[str, str] = {
-        "runtime": rid,
-        "model": mid or "(none)",
-        "preset": preset_val,
-        "host": host,
-        "port": str(port_i),
-        "config_id": cid_guess,
-    }
-    for k, v in params_raw.items():
-        holder[f"param:{k}"] = v
-
-    def _on_edit(label: str) -> None:
-        if label == "runtime":
-            console.print("[yellow]hint:[/yellow] runtime is fixed in this pass.")
-            return
-        if label == "model":
-            console.print("[yellow]hint:[/yellow] model is fixed in this pass.")
-            return
-        if label == "preset":
-            holder["preset"] = wiz.text("preset", default=holder["preset"])
-        elif label == "host":
-            holder["host"] = wiz.text("serve.host", default=holder["host"])
-        elif label == "port":
-            holder["port"] = wiz.text("serve.port", default=holder["port"])
-        elif label == "config_id":
-            holder["config_id"] = wiz.text("config id", default=holder["config_id"])
-        elif label.startswith("param:"):
-            key = label[len("param:") :]
-            holder[label] = wiz.text(key, default=holder[label])
-
-    def _review_rows() -> list[tuple[str, str]]:
-        r = [
-            ("runtime", holder["runtime"]),
-            ("model", holder["model"]),
-            ("preset", holder["preset"]),
-            ("host", holder["host"]),
-            ("port", holder["port"]),
-            ("config_id", holder["config_id"]),
-        ]
-        for k, v in sorted(params_raw.items()):
-            r.append((f"param:{k}", holder[f"param:{k}"]))
-        return r
-
-    action = wiz.review(_review_rows, on_edit=_on_edit)
-    if action == wiz.ABORT_SENTINEL:
+    if result.action == "abort":
         console.print("[yellow]aborted[/yellow]")
         return None
-    if action != wiz.SAVE_SENTINEL:
-        return None
 
-    preset_final = holder["preset"]
-    host_final = holder["host"]
+    host_final = result.meta.get("host", "127.0.0.1").strip() or "127.0.0.1"
+    preset_final = result.meta.get("preset", preset).strip() or preset
+    config_id = result.meta.get("config_id", cid_guess).strip() or cid_guess
     try:
-        port_final = int(holder["port"].strip())
+        port_final = int(result.meta.get("port", "8080").strip())
     except ValueError:
         console.print("[red]error:[/red] port must be an integer")
         return None
 
-    params_final = {
-        k[len("param:") :]: holder[k]
-        for k in holder
-        if k.startswith("param:")
-    }
+    params_final = apply_model_bindings(
+        mf.serve_schema,
+        dict(result.values),
+        model_id=mid,
+    )
+    coerced, errors = validate_params(mf.serve_schema, params_final)
+    if errors:
+        for err in errors:
+            console.print(f"[red]error:[/red] {err}")
+        return None
 
-    override_id = holder["config_id"].strip()
     expected_id = (
         f"{rid}__{mid}__{preset_final}" if mid else f"{rid}__{preset_final}"
     )
-    if override_id != expected_id:
+    if config_id != expected_id:
         console.print(
-            f"[yellow]note:[/yellow] saving as `{override_id}` "
+            f"[yellow]note:[/yellow] saving as `{config_id}` "
             f"(differs from derived `{expected_id}`)"
         )
 
-    return do_config_new(
-        runtime_id=rid,
-        model_id=mid,
-        preset=preset_final,
-        port=port_final,
-        host=host_final,
-        params=params_final,
-        force=True,
-        via="setup",
-        config_id=override_id,
-    )
+    out_path = repo / "configs" / f"{config_id}.yaml"
+    doc: dict[str, Any] = {"id": config_id, "runtime": rid}
+    if mid:
+        doc["model"] = mid
+    doc["serve"] = {
+        "host": host_final,
+        "port": port_final,
+        "params": dict(coerced),
+    }
+    doc["readiness"] = {"timeout_seconds": 600}
+    _atomic_write_yaml(out_path, doc)
+    append_history(repo, {"action": "config-create", "id": config_id, "via": "setup"})
+    typer.echo(config_id)
+    return config_id
 
 
 @config_app.command("show")

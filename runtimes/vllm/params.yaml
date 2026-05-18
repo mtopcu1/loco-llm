@@ -1,0 +1,413 @@
+# vLLM serve params catalog.
+# Common tier aims for first-time setup; advanced mirrors extra vLLM knobs.
+
+model:
+  type: path
+  required: true
+  bind: model_path
+  env: LLM_VLLM_MODEL
+  tier: common
+  description: "Model directory path passed to `vllm serve`."
+
+dtype:
+  type: enum
+  values: [auto, half, float16, bfloat16, float, float32]
+  default: auto
+  env: LLM_VLLM_DTYPE
+  tier: common
+  description: "Compute dtype."
+
+max_model_len:
+  type: int
+  default: 32768
+  env: LLM_VLLM_MAX_MODEL_LEN
+  tier: common
+  description: "Maximum model context length."
+
+gpu_memory_utilization:
+  type: float
+  default: 0.9
+  env: LLM_VLLM_GPU_MEMORY_UTILIZATION
+  tier: common
+  description: "Fraction of GPU memory reserved by vLLM."
+
+tensor_parallel_size:
+  type: int
+  default: 1
+  env: LLM_VLLM_TENSOR_PARALLEL_SIZE
+  tier: common
+  description: "Tensor-parallel worker count."
+
+pipeline_parallel_size:
+  type: int
+  default: 1
+  env: LLM_VLLM_PIPELINE_PARALLEL_SIZE
+  tier: common
+  description: "Pipeline-parallel stage count."
+
+enforce_eager:
+  type: bool
+  default: false
+  env: LLM_VLLM_ENFORCE_EAGER
+  tier: common
+  description: "Disable CUDA graphs and force eager execution."
+
+swap_space:
+  type: float
+  default: 4
+  env: LLM_VLLM_SWAP_SPACE
+  tier: common
+  description: "CPU swap space per GPU in GiB."
+
+max_num_seqs:
+  type: int
+  default: 256
+  env: LLM_VLLM_MAX_NUM_SEQS
+  tier: common
+  description: "Max concurrent sequences."
+
+served_model_name:
+  type: string
+  default: ""
+  env: LLM_VLLM_SERVED_MODEL_NAME
+  tier: advanced
+  description: "Override model name exposed by API."
+
+tokenizer:
+  type: string
+  default: ""
+  env: LLM_VLLM_TOKENIZER
+  tier: advanced
+  description: "Tokenizer path or HF id."
+
+tokenizer_mode:
+  type: enum
+  values: [auto, slow]
+  default: auto
+  env: LLM_VLLM_TOKENIZER_MODE
+  tier: advanced
+  description: "Tokenizer implementation mode."
+
+trust_remote_code:
+  type: bool
+  default: false
+  env: LLM_VLLM_TRUST_REMOTE_CODE
+  tier: advanced
+  description: "Allow remote model/tokenizer code execution."
+
+revision:
+  type: string
+  default: ""
+  env: LLM_VLLM_REVISION
+  tier: advanced
+  description: "Model repository revision."
+
+code_revision:
+  type: string
+  default: ""
+  env: LLM_VLLM_CODE_REVISION
+  tier: advanced
+  description: "Revision for model code."
+
+tokenizer_revision:
+  type: string
+  default: ""
+  env: LLM_VLLM_TOKENIZER_REVISION
+  tier: advanced
+  description: "Tokenizer repository revision."
+
+download_dir:
+  type: path
+  default: ""
+  env: LLM_VLLM_DOWNLOAD_DIR
+  tier: advanced
+  description: "Download/cache directory for model files."
+
+load_format:
+  type: enum
+  values: [auto, pt, safetensors, npcache, dummy, bitsandbytes]
+  default: auto
+  env: LLM_VLLM_LOAD_FORMAT
+  tier: advanced
+  description: "Model weight loading format."
+
+quantization:
+  type: enum
+  values: [none, awq, gptq, fp8, bitsandbytes]
+  default: none
+  env: LLM_VLLM_QUANTIZATION
+  tier: advanced
+  description: "Quantization backend."
+
+kv_cache_dtype:
+  type: enum
+  values: [auto, fp8, fp8_e4m3, fp8_e5m2]
+  default: auto
+  env: LLM_VLLM_KV_CACHE_DTYPE
+  tier: advanced
+  description: "KV cache dtype."
+
+max_num_batched_tokens:
+  type: int
+  default: 0
+  env: LLM_VLLM_MAX_NUM_BATCHED_TOKENS
+  tier: advanced
+  description: "Scheduler token budget per step."
+
+max_num_partial_prefills:
+  type: int
+  default: 1
+  env: LLM_VLLM_MAX_NUM_PARTIAL_PREFILLS
+  tier: advanced
+  description: "Max partially-prefilled requests."
+
+max_long_partial_prefills:
+  type: int
+  default: 1
+  env: LLM_VLLM_MAX_LONG_PARTIAL_PREFILLS
+  tier: advanced
+  description: "Long-prefill concurrency limit."
+
+max_seq_len_to_capture:
+  type: int
+  default: 8192
+  env: LLM_VLLM_MAX_SEQ_LEN_TO_CAPTURE
+  tier: advanced
+  description: "Max length eligible for CUDA graph capture."
+
+block_size:
+  type: int
+  default: 16
+  env: LLM_VLLM_BLOCK_SIZE
+  tier: advanced
+  description: "Paged attention block size."
+
+seed:
+  type: int
+  default: 0
+  env: LLM_VLLM_SEED
+  tier: advanced
+  description: "Random seed (0 keeps runtime default behavior)."
+
+cpu_offload_gb:
+  type: float
+  default: 0
+  env: LLM_VLLM_CPU_OFFLOAD_GB
+  tier: advanced
+  description: "CPU offload budget in GiB."
+
+num_scheduler_steps:
+  type: int
+  default: 1
+  env: LLM_VLLM_NUM_SCHEDULER_STEPS
+  tier: advanced
+  description: "Scheduler iterations per engine step."
+
+scheduler_delay_factor:
+  type: float
+  default: 0.0
+  env: LLM_VLLM_SCHEDULER_DELAY_FACTOR
+  tier: advanced
+  description: "Delay factor for scheduler backpressure."
+
+enable_prefix_caching:
+  type: bool
+  default: false
+  env: LLM_VLLM_ENABLE_PREFIX_CACHING
+  tier: advanced
+  description: "Enable automatic prefix-cache reuse."
+
+disable_sliding_window:
+  type: bool
+  default: false
+  env: LLM_VLLM_DISABLE_SLIDING_WINDOW
+  tier: advanced
+  description: "Disable model-provided sliding-window attention."
+
+disable_custom_all_reduce:
+  type: bool
+  default: false
+  env: LLM_VLLM_DISABLE_CUSTOM_ALL_REDUCE
+  tier: advanced
+  description: "Disable custom all-reduce kernels."
+
+disable_frontend_multiprocessing:
+  type: bool
+  default: false
+  env: LLM_VLLM_DISABLE_FRONTEND_MULTIPROCESSING
+  tier: advanced
+  description: "Run frontend in-process."
+
+disable_log_stats:
+  type: bool
+  default: false
+  env: LLM_VLLM_DISABLE_LOG_STATS
+  tier: advanced
+  description: "Disable periodic throughput logs."
+
+disable_log_requests:
+  type: bool
+  default: false
+  env: LLM_VLLM_DISABLE_LOG_REQUESTS
+  tier: advanced
+  description: "Disable per-request logging."
+
+max_log_len:
+  type: int
+  default: 0
+  env: LLM_VLLM_MAX_LOG_LEN
+  tier: advanced
+  description: "Maximum prompt length included in logs."
+
+uvicorn_log_level:
+  type: enum
+  values: [critical, error, warning, info, debug, trace]
+  default: info
+  env: LLM_VLLM_UVICORN_LOG_LEVEL
+  tier: advanced
+  description: "Uvicorn log level."
+
+allow_credentials:
+  type: bool
+  default: false
+  env: LLM_VLLM_ALLOW_CREDENTIALS
+  tier: advanced
+  description: "Enable CORS allow-credentials."
+
+allowed_origins:
+  type: string
+  default: ""
+  env: LLM_VLLM_ALLOWED_ORIGINS
+  tier: advanced
+  description: "CORS allowed origins."
+
+allowed_methods:
+  type: string
+  default: ""
+  env: LLM_VLLM_ALLOWED_METHODS
+  tier: advanced
+  description: "CORS allowed methods."
+
+allowed_headers:
+  type: string
+  default: ""
+  env: LLM_VLLM_ALLOWED_HEADERS
+  tier: advanced
+  description: "CORS allowed headers."
+
+api_key:
+  type: string
+  default: ""
+  env: LLM_VLLM_API_KEY
+  tier: advanced
+  description: "Optional static API key."
+
+chat_template:
+  type: path
+  default: ""
+  env: LLM_VLLM_CHAT_TEMPLATE
+  tier: advanced
+  description: "Path to Jinja chat template."
+
+chat_template_content_format:
+  type: enum
+  values: [auto, string, openai]
+  default: auto
+  env: LLM_VLLM_CHAT_TEMPLATE_CONTENT_FORMAT
+  tier: advanced
+  description: "Chat template content format."
+
+response_role:
+  type: string
+  default: ""
+  env: LLM_VLLM_RESPONSE_ROLE
+  tier: advanced
+  description: "Response role for chat templating."
+
+guided_decoding_backend:
+  type: enum
+  values: [auto, outlines, lm-format-enforcer, xgrammar]
+  default: auto
+  env: LLM_VLLM_GUIDED_DECODING_BACKEND
+  tier: advanced
+  description: "Guided decoding backend."
+
+limit_mm_per_prompt:
+  type: string
+  default: ""
+  env: LLM_VLLM_LIMIT_MM_PER_PROMPT
+  tier: advanced
+  description: "Multimodal per-prompt limits (JSON string)."
+
+enable_auto_tool_choice:
+  type: bool
+  default: false
+  env: LLM_VLLM_ENABLE_AUTO_TOOL_CHOICE
+  tier: advanced
+  description: "Enable automatic tool-choice flow."
+
+tool_call_parser:
+  type: enum
+  values: [auto, hermes, mistral, llama3_json]
+  default: auto
+  env: LLM_VLLM_TOOL_CALL_PARSER
+  tier: advanced
+  description: "Tool call parser."
+
+reasoning_parser:
+  type: enum
+  values: [auto, deepseek_r1, qwen3]
+  default: auto
+  env: LLM_VLLM_REASONING_PARSER
+  tier: advanced
+  description: "Reasoning parser plugin."
+
+enable_prompt_tokens_details:
+  type: bool
+  default: false
+  env: LLM_VLLM_ENABLE_PROMPT_TOKENS_DETAILS
+  tier: advanced
+  description: "Expose prompt token details in responses."
+
+disable_async_output_proc:
+  type: bool
+  default: false
+  env: LLM_VLLM_DISABLE_ASYNC_OUTPUT_PROC
+  tier: advanced
+  description: "Disable async output processing."
+
+data_parallel_size:
+  type: int
+  default: 1
+  env: LLM_VLLM_DATA_PARALLEL_SIZE
+  tier: advanced
+  description: "Data parallel replica count."
+
+distributed_executor_backend:
+  type: enum
+  values: [mp, ray]
+  default: mp
+  env: LLM_VLLM_DISTRIBUTED_EXECUTOR_BACKEND
+  tier: advanced
+  description: "Distributed executor backend."
+
+max_parallel_loading_workers:
+  type: int
+  default: 0
+  env: LLM_VLLM_MAX_PARALLEL_LOADING_WORKERS
+  tier: advanced
+  description: "Parallel model-loading workers."
+
+use_tqdm_on_load:
+  type: bool
+  default: false
+  env: LLM_VLLM_USE_TQDM_ON_LOAD
+  tier: advanced
+  description: "Show tqdm progress when loading model weights."
+
+extra_args:
+  type: string
+  default: ""
+  env: LLM_VLLM_EXTRA_ARGS
+  tier: advanced
+  description: "Pass-through flags appended verbatim."

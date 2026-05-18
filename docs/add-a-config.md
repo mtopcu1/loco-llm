@@ -4,6 +4,8 @@ A **config** is a single file `configs/{config-id}.yaml` that names one runtime 
 
 As of **0.2**, use **`llm config setup`** for an interactive wizard (VRAM-aware hints from the same logic as **`llm advisor`**) or **`llm config new`** for non-interactive scaffolding (`--runtime`, optional **`--model`**, **`--param k=v`**).
 
+After you choose runtime and model, **`llm config setup`** edits **serve params** in the shared **param grid** (same component as interactive runtime **build** params and wizard **`review()`** — not separate per-field prompts). On a TTY that grid supports **Ctrl+S** save, **Ctrl+X** abort, **Ctrl+A** toggle advanced tier, **Ctrl+← / Ctrl+→** paging, and **arrow keys** to move focus; plain/CI mode uses **`S` / `X` / `A`** instead. Color meanings (default vs modified vs read-only, focus, advanced accents, hints/errors) are defined in **`src/llm_cli/core/param_grid_theme.py`**. See **[`wizards.md`](wizards.md)** for the full shortcut list and behavior.
+
 ## 1. Naming
 
 Prefer:
@@ -18,7 +20,7 @@ The optional `id:` field inside the file should match the filename stem (without
 
 ## 2. Minimal YAML
 
-Runtime-specific knobs belong under **`serve.params`** and must match the manifest **`serve:`** schema for that runtime.
+Runtime-specific knobs belong under **`serve.params`** and must match that runtime’s serve schema (**official** packages here define it in **`runtimes/<id>/params.yaml`**).
 
 ```yaml
 id: my-runtime__my-model__default
@@ -40,11 +42,17 @@ readiness:
   timeout_seconds: 180
 ```
 
-## 3. `${data_root}` in `serve.env`
+## 3. `${model_path}` and `bind: model_path`
+
+Values may be the literal **`"${model_path}"`**. At serve/display time the CLI expands that to the registered model’s on-disk path when **`model:`** is set; validation fails if the token appears without **`model:`** or for an unknown id.
+
+When the runtime’s **`params.yaml`** marks a serve key with **`bind: model_path`**, **`llm config new`** (with **`--model`**) and **`llm config setup`** default that key to **`"${model_path}"`** instead of asking for a path; in **`config setup`** those cells appear **read-only** in the param grid.
+
+## 4. `${data_root}` in `serve.env`
 
 `llm config show` expands `${data_root}` to the resolved **`data_root`** from `paths.yaml` so you can see the values WSL scripts will use after sourcing `.llm-env`.
 
-## 4. Validate
+## 5. Validate
 
 ```bash
 llm config validate
@@ -52,7 +60,7 @@ llm config validate
 
 This checks that the runtime and model exist, required scripts are present, `serve.host` / `serve.port` exist, and `paths.yaml` loads.
 
-## 5. Inspect
+## 6. Inspect
 
 ```bash
 llm config show my-runtime__my-model__default

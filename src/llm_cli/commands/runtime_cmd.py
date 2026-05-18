@@ -321,16 +321,13 @@ def _resolve_build_params(
         key, value = _parse_param_flag(token)
         raw[key] = value
 
-    for spec in schema:
-        if spec.key in raw:
-            continue
-        if yes:
-            continue
-        prompt = spec.prompt or spec.key
-        if spec.default is None:
-            raw[spec.key] = typer.prompt(prompt)
-        else:
-            raw[spec.key] = typer.prompt(prompt, default=str(spec.default))
+    if not yes:
+        missing = [spec for spec in schema if spec.key not in raw]
+        if missing:
+            from llm_cli.core import wizards as wiz
+
+            tier_result = wiz.walk_tier(missing)
+            raw.update(tier_result.values)
 
     coerced, errors = validate_params(schema, raw)
     if errors:

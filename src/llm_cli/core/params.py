@@ -32,10 +32,12 @@ class ParamSpec:
     env: str | None = None
     values: tuple[str, ...] = field(default_factory=tuple)  # only for enum
     tier: str = "common"
+    bind: str | None = None
     description: str = ""
 
 
 _VALID_TIERS = ("common", "advanced")
+_VALID_BINDS = ("model_path",)
 
 
 def _coerce_tier(raw: Any, key: str) -> str:
@@ -45,6 +47,17 @@ def _coerce_tier(raw: Any, key: str) -> str:
     if token not in _VALID_TIERS:
         raise ValueError(
             f"param {key!r}: tier must be one of {_VALID_TIERS}; got {token!r}"
+        )
+    return token
+
+
+def _coerce_bind(raw: Any, key: str) -> str | None:
+    if raw is None:
+        return None
+    token = str(raw)
+    if token not in _VALID_BINDS:
+        raise ValueError(
+            f"param {key!r}: bind must be one of {_VALID_BINDS}; got {token!r}"
         )
     return token
 
@@ -90,6 +103,7 @@ def parse_schema(raw: dict[str, Any]) -> list[ParamSpec]:
                 env=str(entry["env"]) if entry.get("env") is not None else None,
                 values=values,
                 tier=_coerce_tier(entry.get("tier", "common"), str(key)),
+                bind=_coerce_bind(entry.get("bind"), str(key)),
                 description=str(entry.get("description", "")),
             )
         )

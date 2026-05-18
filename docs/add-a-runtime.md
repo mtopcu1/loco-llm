@@ -117,8 +117,13 @@ Optional fields:
 - **`default`** — used when omitted.
 - **`prompt`** — interactive prompt during `llm runtime install` when not passed as `--param key=value`.
 - **`env`** — explicit environment variable name for **serve** params mapped into `serve.sh` / `healthcheck.sh`. If omitted, the CLI derives **`LLM_<RUNTIME_ID>_<PARAM>`** (uppercase; hyphens → underscores).
+- **`bind`** — optional; **`model_path`** ties this key to the selected registry model. Wizards and `llm config new` write **`"${model_path}"`** for that param when `model:` is set (see [`add-a-config.md`](add-a-config.md)).
 
 Build-time values use **`LLM_BUILD_<PARAM>`** with the same normalization; the runtime id is omitted so every `build.sh` sees a uniform contract.
+
+### Official serve catalogs (llamacpp, vLLM)
+
+Official **`kind: official`** packages here store **serve** params in **`runtimes/<id>/params.yaml`** (tiered **`common`** / **`advanced`**), not only the small inline stubs in older examples. **`llamacpp`** lists an exhaustive **`llama-server`** flag catalog (tracked to a pinned upstream git ref in **`build.git_ref`**). **`vllm`** lists the knobs surfaced for **`vllm serve`**, including a **`model`** entry with **`bind: model_path`**. See [`runtimes/llamacpp/params.yaml`](../runtimes/llamacpp/params.yaml) and [`runtimes/vllm/params.yaml`](../runtimes/vllm/params.yaml).
 
 ### `when:` on requirements
 

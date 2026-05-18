@@ -9,10 +9,50 @@ from typing import Any, Callable, Iterable
 from rich.console import Console
 from rich.prompt import Prompt
 
+from llm_cli.core.param_grid_build import cells_from_specs
+from llm_cli.core.param_grid_models import MetaField, ParamGridResult
+from llm_cli.core.param_grid_theme import DEFAULT_THEME, ParamGridTheme
+from llm_cli.core.params import ParamSpec, ParamType
+
 Choice = str
 
 _FORCE_PLAIN = False
 _console = Console()
+
+_MISSING_QUESTIONARY_WARNED = False
+
+
+def reset_optional_warnings() -> None:
+    """Clear process-global UX hints (for tests)."""
+    global _MISSING_QUESTIONARY_WARNED
+    _MISSING_QUESTIONARY_WARNED = False
+
+
+def _maybe_tip_missing_questionary() -> None:
+    """Suggest installing questionary when running interactively without it."""
+    global _MISSING_QUESTIONARY_WARNED
+    if _MISSING_QUESTIONARY_WARNED:
+        return
+    _MISSING_QUESTIONARY_WARNED = True
+    if (
+        sys.stdout.isatty()
+        and os.environ.get("TERM", "").strip().lower() not in ("", "dumb")
+    ):
+        _console.print(
+            "[dim]Tip: install optional dependency "
+            "`questionary` for arrow-key menus "
+            "(e.g. `pip install -e .` from this repo).[/dim]"
+        )
+
+
+def _get_questionary() -> Any | None:
+    """Return `questionary` if installed; avoids crashing when deps are stale."""
+    try:
+        import questionary
+
+        return questionary
+    except ImportError:
+        return None
 
 
 def force_plain(flag: bool) -> None:
@@ -47,21 +87,26 @@ def text(
         _console.print(f"[red]error:[/red] {err}")
 
 
-def confirm(prompt: str, *, default: bool = True) -> bool:
-    if use_plain_prompts():
-        suffix = "[Y/n]" if default else "[y/N]"
-        raw = Prompt.ask(f"{prompt} {suffix}", default="")
-        token = str(raw).strip().lower()
-        if token == "":
-            return default
-        if token in ("y", "yes"):
-            return True
-        if token in ("n", "no"):
-            return False
+def _confirm_plain(prompt: str, *, default: bool) -> bool:
+    suffix = "[Y/n]" if default else "[y/N]"
+    raw = Prompt.ask(f"{prompt} {suffix}", default="")
+    token = str(raw).strip().lower()
+    if token == "":
         return default
-    import questionary
+    if token in ("y", "yes"):
+        return True
+    if token in ("n", "no"):
+        return False
+    return default
 
-    result = questionary.confirm(prompt, default=default).ask()
+
+def confirm(prompt: str, *, default: bool = True) -> bool:
+    q = _get_questionary()
+    if use_plain_prompts() or q is None:
+        if q is None and not use_plain_prompts():
+            _maybe_tip_missing_questionary()
+        return _confirm_plain(prompt, default=default)
+    result = q.confirm(prompt, default=default).ask()
     return bool(result)
 
 
@@ -149,22 +194,35 @@ def review(
     *,
     on_edit: Callable[[str], None],
 ) -> str:
-    """Loop pick rows until save or abort. Returns SAVE_SENTINEL or ABORT_SENTINEL."""
-    save = "[Save and write file]"
-    abort = "[Abort without saving]"
-    while True:
-        row_list = rows() if callable(rows) else rows
-        choices: list[str] = [save]
-        for label, value in row_list:
-            choices.append(f"{label}    {value}")
-        choices.append(abort)
-        pick = select("Review — edit a row, save, or abort", choices)
-        if pick == save:
-            return SAVE_SENTINEL
-        if pick == abort:
-            return ABORT_SENTINEL
-        label = pick.split("    ", 1)[0].strip()
-        on_edit(label)
+    """Render rows in the param grid and return SAVE/ABORT sentinels."""
+    row_list = rows() if callable(rows) else rows
+    specs: list[ParamSpec] = []
+    values: dict[str, str] = {}
+    labels_by_key: dict[str, str] = {}
+
+    for idx, (label, value) in enumerate(row_list):
+        key = f"row_{idx}"
+        labels_by_key[key] = label
+        specs.append(
+            ParamSpec(
+                key=key,
+                type=ParamType.STRING,
+                default=str(value),
+                prompt=label,
+                description="",
+            )
+        )
+        values[key] = str(value)
+
+    result = edit_params(specs, title="Review", values=values)
+    if result.action == "abort":
+        return ABORT_SENTINEL
+
+    # Keep the callback contract for legacy callers that react to edited labels.
+    for key, label in labels_by_key.items():
+        if result.values.get(key, "") != values.get(key, ""):
+            on_edit(label)
+    return SAVE_SENTINEL
 
 
 @dataclass
@@ -173,25 +231,42 @@ class WalkTierResult:
     advanced_revealed: bool = False
 
 
+def edit_params(
+    specs: list[Any],
+    *,
+    title: str,
+    values: dict[str, str] | None = None,
+    skip_keys: set[str] | None = None,
+    readonly_keys: set[str] | None = None,
+    hints: dict[str, str] | None = None,
+    meta: list[MetaField] | None = None,
+    theme: ParamGridTheme | None = None,
+) -> ParamGridResult:
+    """Run the param grid over specs (defer import to avoid cycles with ``param_grid``)."""
+    from llm_cli.core.param_grid import run_param_grid
+
+    cells = cells_from_specs(
+        specs,
+        values=values,
+        skip_keys=skip_keys,
+        readonly_keys=readonly_keys,
+        hints=hints,
+    )
+    meta_fields = meta if meta is not None else []
+    theme_resolved = DEFAULT_THEME if theme is None else theme
+    return run_param_grid(cells, meta_fields, title=title, theme=theme_resolved)
+
+
 def walk_tier(specs: list[Any]) -> WalkTierResult:
-    """Prompt for common-tier ParamSpecs, optionally advanced."""
-    common = [s for s in specs if getattr(s, "tier", "common") == "common"]
-    advanced = [s for s in specs if getattr(s, "tier", "common") == "advanced"]
-    values: dict[str, str] = {}
-    for spec in common:
-        default_s = None if spec.default is None else str(spec.default)
-        if spec.description:
-            _console.print(f"[bold cyan]{spec.key}[/bold cyan] — {spec.description}")
-        values[spec.key] = text(spec.key, default=default_s)
-    revealed = False
-    if advanced:
-        revealed = confirm(f"Reveal {len(advanced)} advanced parameter(s)?", default=False)
-        if revealed:
-            for spec in advanced:
-                default_s = None if spec.default is None else str(spec.default)
-                if spec.description:
-                    _console.print(
-                        f"[bold cyan]{spec.key}[/bold cyan] — {spec.description}"
-                    )
-                values[spec.key] = text(spec.key, default=default_s)
-    return WalkTierResult(values=values, advanced_revealed=revealed)
+    """Prompt for common-tier ParamSpecs via the grid; advanced rows after toggle."""
+    result = edit_params(specs, title="Parameters")
+    if result.action == "abort":
+        return WalkTierResult(values={}, advanced_revealed=result.advanced_revealed)
+    values = dict(result.values)
+    # Match sequential behaviour: omit advanced-tier keys unless advanced was visible on save.
+    if not result.advanced_revealed:
+        skip = {
+            getattr(s, "key", "") for s in specs if getattr(s, "tier", "common") == "advanced"
+        }
+        values = {k: v for k, v in values.items() if k not in skip}
+    return WalkTierResult(values=values, advanced_revealed=result.advanced_revealed)

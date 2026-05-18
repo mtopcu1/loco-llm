@@ -84,6 +84,32 @@ def test_config_new_writes_valid_yaml(monkeypatch, tmp_path):
     assert "gguf_path: ${model_path}" in text
 
 
+def test_config_new_injects_model_path_without_gguf_param(monkeypatch, tmp_path):
+    repo = _seed_repo(tmp_path, monkeypatch)
+    result = runner.invoke(
+        app,
+        [
+            "config",
+            "new",
+            "--runtime",
+            "llamacpp",
+            "--model",
+            "qwen-7b",
+            "--preset",
+            "default",
+            "--param",
+            "n_gpu_layers=-1",
+            "--param",
+            "ctx=8192",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    out_path = repo / "configs" / "llamacpp__qwen-7b__default.yaml"
+    assert out_path.is_file()
+    text = out_path.read_text(encoding="utf-8")
+    assert "gguf_path: ${model_path}" in text
+
+
 def test_config_new_requires_runtime(monkeypatch, tmp_path):
     _seed_repo(tmp_path, monkeypatch)
     result = runner.invoke(app, ["config", "new"])
@@ -116,7 +142,7 @@ def test_config_new_requires_model_for_model_runtime(monkeypatch, tmp_path):
     assert "model" in result.output.lower()
 
 
-def test_config_new_errors_on_missing_required_param(monkeypatch, tmp_path):
+def test_config_new_errors_on_invalid_param(monkeypatch, tmp_path):
     _seed_repo(tmp_path, monkeypatch)
     result = runner.invoke(
         app,
@@ -127,10 +153,12 @@ def test_config_new_errors_on_missing_required_param(monkeypatch, tmp_path):
             "llamacpp",
             "--model",
             "qwen-7b",
+            "--param",
+            "n_gpu_layers=not_an_int",
         ],
     )
     assert result.exit_code != 0
-    assert "gguf_path" in result.output
+    assert "n_gpu_layers" in result.output
 
 
 def test_config_new_overwrite_requires_force(monkeypatch, tmp_path):

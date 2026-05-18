@@ -47,6 +47,31 @@ def test_parse_schema_enum_requires_values():
         parse_schema({"x": {"type": "enum"}})
 
 
+def test_parse_schema_reads_bind_model_path():
+    from llm_cli.core.params import parse_schema
+
+    specs = parse_schema(
+        {
+            "gguf_path": {
+                "type": "path",
+                "required": True,
+                "bind": "model_path",
+                "tier": "common",
+            }
+        }
+    )
+    assert len(specs) == 1
+    assert specs[0].bind == "model_path"
+
+
+def test_parse_schema_rejects_unknown_bind():
+    from llm_cli.core.params import parse_schema
+    import pytest
+
+    with pytest.raises(ValueError, match="bind"):
+        parse_schema({"x": {"type": "string", "bind": "other"}})
+
+
 def _spec(key: str, type_: str, **kw) -> ParamSpec:
     return parse_schema({key: {"type": type_, **kw}})[0]
 

@@ -7,6 +7,7 @@ from typer.testing import CliRunner
 
 from llm_cli.core.install_record import InstallRecord, read_record, write_record
 from llm_cli.core.settings import save_settings
+from llm_cli.core.wizards import WalkTierResult
 from llm_cli.main import app
 
 runner = CliRunner()
@@ -66,6 +67,30 @@ def _scaffold_llamacpp(repo: Path) -> None:
         "ctx:\n"
         "  type: int\n"
         "  default: 8192\n",
+        encoding="utf-8",
+    )
+    for script in ("build.sh", "serve.sh", "healthcheck.sh"):
+        (rt / script).write_text("#!/usr/bin/env bash\necho ok\n", encoding="utf-8")
+
+
+def _scaffold_tiered_build_runtime(repo: Path) -> None:
+    rt = repo / "runtimes" / "tier-rt"
+    rt.mkdir(parents=True)
+    (rt / "manifest.yaml").write_text(
+        "id: tier-rt\n"
+        "official: true\n"
+        "build:\n"
+        "  flavor:\n"
+        "    type: enum\n"
+        "    values: [cuda, cpu]\n"
+        "    default: cpu\n"
+        "    tier: common\n"
+        "    description: Build flavor\n"
+        "  extra_jobs:\n"
+        "    type: int\n"
+        "    default: 8\n"
+        "    tier: advanced\n"
+        "    description: Extra parallelism\n",
         encoding="utf-8",
     )
     for script in ("build.sh", "serve.sh", "healthcheck.sh"):
@@ -302,3 +327,42 @@ def test_runtime_rebuild_reset_reprompts_via_yes_defaults(
     assert rec.build_params["flavor"] == "cpu"
     mock_verify.assert_called()
     mock_build.assert_called()
+
+
+@patch("llm_cli.commands.runtime_cmd._run_build_script", return_value=0)
+@patch("llm_cli.commands.runtime_cmd._run_verify_script", return_value=0)
+@patch("llm_cli.core.wizards.walk_tier")
+def test_runtime_install_interactive_reveals_advanced_build_params(
+    mock_walk_tier, mock_verify, mock_build, tmp_path: Path
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _scaffold_tiered_build_runtime(repo)
+    save_settings({"data_root": str(tmp_path / "data"), "repo_root": str(repo)})
+    (tmp_path / "data" / "runtimes" / "tier-rt").mkdir(parents=True)
+
+    mock_walk_tier.return_value = WalkTierResult(
+        values={"flavor": "cuda", "extra_jobs": "16"},
+        advanced_revealed=True,
+    )
+
+    result = runner.invoke(
+        app,
+        ["runtime", "install", "tier-rt"],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 0
+    mock_walk_tier.assert_called_once()
+    missing_specs = mock_walk_tier.call_args.args[0]
+    assert {s.key for s in missing_specs} == {"flavor", "extra_jobs"}
+    tiers = sorted((s.key, getattr(s, "tier", "common")) for s in missing_specs)
+    assert tiers == [("extra_jobs", "advanced"), ("flavor", "common")]
+    mock_build.assert_called_once()
+    mock_verify.assert_called_once()
+    rec = read_record(tmp_path / "data" / "runtimes", "tier-rt")
+    assert rec is not None
+    assert rec.build_params == {"flavor": "cuda", "extra_jobs": 16}
+    env = mock_build.call_args.kwargs["env"]
+    assert env["LLM_BUILD_FLAVOR"] == "cuda"
+    assert env["LLM_BUILD_EXTRA_JOBS"] == "16"
