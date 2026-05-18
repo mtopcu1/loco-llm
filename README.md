@@ -12,17 +12,40 @@ filesystem under `~/llm/` (configurable via `llm setup` / `llm settings ...`).
 Inside WSL2:
 
 ```bash
-# 1. Verify external prerequisites
-cat requirements.md
-# (or after install:) llm doctor
-
-# 2. Install the CLI into a venv
-./install.sh
+# Public install (no git clone)
+curl -fsSL https://raw.githubusercontent.com/mtopcu1/local-llm-scaffold/main/scripts/install.sh | bash
 export PATH="$HOME/.local/bin:$PATH"   # if not already
 
-# 3. Run interactive setup (settings + optional Y/n chain into runtime / model / config / serve)
+# Or, if you already use pipx:
+pipx install localllm-cli
 llm setup
 ```
+
+`llm setup` runs on first use if you skipped it during install. Verify prerequisites with `llm doctor` (or read `requirements.md` before install).
+
+### Upgrading from 0.2.x
+
+If you installed via the old editable clone + `./install.sh`, migrate in place:
+
+```bash
+cd ~/local-llm-scaffold   # your existing clone
+git fetch && git checkout v0.3.0
+./scripts/migrate-from-v0.2.sh
+# review the plan, then:
+./scripts/migrate-from-v0.2.sh --apply
+```
+
+### Developer install (git clone)
+
+```bash
+git clone https://github.com/mtopcu1/local-llm-scaffold.git
+cd local-llm-scaffold
+./scripts/install-dev.sh
+export PATH="$HOME/.local/bin:$PATH"
+llm-dev setup    # if install-dev.sh did not run setup
+```
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for branch/PR workflow (`llm-dev` vs stable `llm`).
 
 For an existing setup, the granular commands still work as before:
 

@@ -52,4 +52,28 @@ Releases are fully automated:
 
 ## Dev workflow
 
-_(Coming in Plan B — the layered asset model + `llm update` lands first.)_
+Contributors install an **editable** `llm-dev` binary alongside the stable `llm` pipx install. The dev binary reads scaffold assets from your git checkout via `repo_root`.
+
+```bash
+git clone https://github.com/mtopcu1/local-llm-scaffold.git
+cd local-llm-scaffold
+./scripts/install-dev.sh
+export PATH="$HOME/.local/bin:$PATH"
+llm-dev doctor
+```
+
+`install-dev.sh` runs `pipx install --editable . --force --suffix=-dev`, sets `repo_root` to the checkout, and runs `llm-dev setup --default` when no settings file exists yet.
+
+### Try a PR branch
+
+```bash
+gh pr checkout 123
+./scripts/install-dev.sh
+llm-dev <whatever-you-want-to-test>
+# when done:
+pipx uninstall localllm-cli
+```
+
+(`pipx` names the venv `localllm-cli` even when the binary is `llm-dev`.)
+
+Do **not** use `git pull` in a production data directory for updates — end users run `llm update`. For unreleased code, use the dev install above; there is no per-branch PyPI channel.
