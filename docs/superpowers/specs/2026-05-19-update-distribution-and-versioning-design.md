@@ -40,6 +40,7 @@ This is acceptable for a personal tool but not for the "public CLI like hermes/o
 - No "compatibility mode" preserving the v0.2.0 layout. The migration script flips the user to the new layout in one shot.
 - No third asset layer (system-wide `/etc/...`) until someone asks for one.
 - Release tooling is a single-package monorepo config; no per-subpackage versioning.
+- **No `git` as a runtime dependency for end users.** The scaffold dir is a plain extracted tarball, not a git clone. Git is needed only by maintainers/contributors on their own checkout, and by v0.2.0 users running the migration script (which operates on their existing v0.2.0 clone).
 
 ## 5. Decisions (Q&A trail)
 
@@ -59,11 +60,12 @@ After this design lands, a normal user's machine looks like:
 ```
 ~/.local/bin/llm                            (pipx shim)
 ~/.local/pipx/venvs/localllm-cli/           (pipx-managed venv with the wheel)
-~/.local/share/localllm/scaffold/           (sparse git clone, read-only to the CLI)
+~/.local/share/localllm/scaffold/           (extracted release tarball, read-only to the CLI; no .git/ dir)
   ├── runtimes/{id}/                        (manifests + shell scripts)
   ├── configs/{id}.yaml
   ├── benchmarks/{id}/
-  └── requirements.yaml
+  ├── requirements.yaml
+  └── .scaffold-version                     (single-line tag, e.g. "v0.4.1")
 ~/llm/                                      ($LLM_DATA_ROOT)
   ├── runtimes/                             (per-install state — unchanged)
   ├── models/                               (model weights — unchanged)
@@ -94,10 +96,10 @@ curl -fsSL https://raw.githubusercontent.com/mtopcu1/local-llm-scaffold/main/scr
 
 `scripts/install.sh` is small and deterministic. It:
 
-1. Verifies prerequisites: `python3 >= 3.11`, `git`, `curl`.
+1. Verifies prerequisites: `python3 >= 3.11`, `curl`, `tar`. **No `git`.**
 2. Bootstraps `pipx` if missing: `python3 -m pip install --user pipx && python3 -m pipx ensurepath`.
 3. Runs `pipx install 'localllm-cli==X.Y.Z'`, where `X.Y.Z` is the release the script ships in (pinned at release time so the script and the tag are in lockstep).
-4. Runs `llm update --scaffold-only --yes` to initialize the sparse-checkout scaffold at the matching tag in `$LLM_SCAFFOLD_DIR`.
+4. Runs `llm update --scaffold-only --yes` to download and extract the matching scaffold tarball into `$LLM_SCAFFOLD_DIR`.
 5. Drops the user into `llm setup` for first-time machine config.
 
 ### 7.2 Alternative install for pipx-savvy users
@@ -129,10 +131,10 @@ This is documented in `CONTRIBUTING.md` (new) as the only supported way to "run 
 
 ### 8.1 Two roots, read in order
 
-| Layer | Path | Owned by | Writable by CLI? |
-|---|---|---|---|
-| `scaffold` | `$LLM_SCAFFOLD_DIR` (default `~/.local/share/localllm/scaffold/`) | `llm update` | **No.** Treated read-only. |
-| `user` | `$LLM_DATA_ROOT/user/` (default `~/llm/user/`) | the user / `llm runtime setup` / `llm config new` | Yes. |
+| Layer | Path | Owned by | Writable by CLI? | Backing storage |
+|---|---|---|---|---|
+| `scaffold` | `$LLM_SCAFFOLD_DIR` (default `~/.local/share/localllm/scaffold/`) | `llm update` | **No.** Treated read-only. | Plain directory, populated by extracting a GitHub release tarball. **Not** a git clone. |
+| `user` | `$LLM_DATA_ROOT/user/` (default `~/llm/user/`) | the user / `llm runtime setup` / `llm config new` | Yes. | Plain directory. |
 
 Each layer mirrors the same shape — `runtimes/{id}/`, `configs/{id}.yaml`, `benchmarks/{id}/`. Discovery walks both. **The user layer wins on id collision.**
 
@@ -152,7 +154,7 @@ A new accessor in `src/llm_cli/core/repo.py` (working name: `scaffold_root()`) r
 
 ### 8.4 Drift footgun retired
 
-In the v0.2.0 layout, `repo_root` is both the read source and the customization target. `git pull` can conflict with user customizations. The new layout makes the scaffold dir CLI-managed and treated as throwaway: `git fetch && git checkout <tag>` is always safe because nothing the user wrote lives there.
+In the v0.2.0 layout, `repo_root` is both the read source and the customization target. `git pull` can conflict with user customizations. The new layout makes the scaffold dir CLI-managed and treated as throwaway: it's a plain extracted tarball, atomically replaced on every update via directory-rename swap (see §9.2). Safe to wipe and re-extract because nothing the user wrote lives there.
 
 ## 9. Section 3 — The `llm update` command
 
@@ -174,13 +176,20 @@ Continue? [Y/n]
 
 ### 9.2 Steps, in order
 
-1. **Detect.** Query PyPI's JSON API (`https://pypi.org/pypi/localllm-cli/json`, field `info.version`). Query the scaffold remote with `git ls-remote --tags --sort=v:refname` for the highest `v*` tag. Compare both to currently-installed values. Exit early with `Already up to date.` if both match.
-2. **Show changelog.** Fetch the GitHub Release body for the new tag via `gh api repos/.../releases/tags/<tag>` if `gh` is available, else the unauthenticated GitHub REST API. Print a short summary + URL. Confirm interactively unless `--yes`.
+1. **Detect.** Query PyPI's JSON API (`https://pypi.org/pypi/localllm-cli/json`, field `info.version`) for the latest wheel. Query GitHub's Releases API (`https://api.github.com/repos/mtopcu1/local-llm-scaffold/releases/latest`) for the latest scaffold tag. Compare both to currently-installed values (CLI version from `llm_cli.__version__`, scaffold version from `$LLM_SCAFFOLD_DIR/.scaffold-version`). Exit early with `Already up to date.` if both match.
+2. **Show changelog.** Use the same GitHub Release payload from step 1 (its `body` field) and print a short summary + URL. Confirm interactively unless `--yes`.
 3. **Service-running guard.** If `llm status` reports a service in any mode (`foreground` / `background` / `systemd`), refuse with: `"Stop the running service first (llm stop), or pass --restart to have update stop+start it."`
 4. **Stage the wheel.** Run `pipx upgrade localllm-cli --pip-args='--upgrade-strategy=eager'`. If pipx is not present (e.g. editable dev install), fall back to `pip install --upgrade localllm-cli` in the same env, **unless** `repo_root` is set — in dev mode, refuse with "this is an editable install; `git pull` in your checkout instead."
-5. **Stage the scaffold.** Record current tag, then in `$LLM_SCAFFOLD_DIR`: `git fetch --tags --depth=1 origin` and `git checkout v0.4.1`. Sparse-checkout config is preserved.
-6. **Verify.** Re-exec `llm --version` (must match the new wheel version) and `llm doctor --quick` against the new scaffold. On failure, automatically roll back the scaffold to the recorded previous tag, leave the new wheel installed but warn the user, and print the one-liner to roll back the wheel (`pipx install 'localllm-cli==<prev>' --force`).
-7. **Persist.** Write `$LLM_SCAFFOLD_DIR/.scaffold-version` containing the new tag (used for the passive drift check; avoids touching `.git/` on every CLI invocation). Print `Updated to 0.4.1.` plus a single-line "breaking change" hint if the release notes flag any.
+5. **Stage the scaffold (atomic tarball swap).**
+   1. Resolve the tarball asset URL from the Release payload (asset name pattern: `scaffold-<tag>.tar.gz`).
+   2. Download to `$LLM_SCAFFOLD_DIR.new.tar.gz` (sibling of the live dir, same filesystem — required for atomic rename).
+   3. Download the matching `scaffold-<tag>.tar.gz.sha256` sidecar (published in §10.5 step 4) and verify the tarball's SHA-256 against it. Abort and clean up on mismatch.
+   4. Extract into `$LLM_SCAFFOLD_DIR.new/`.
+   5. Write `$LLM_SCAFFOLD_DIR.new/.scaffold-version` with the new tag.
+   6. Atomic swap: `mv $LLM_SCAFFOLD_DIR $LLM_SCAFFOLD_DIR.old && mv $LLM_SCAFFOLD_DIR.new $LLM_SCAFFOLD_DIR`. Both renames are on the same filesystem so each is atomic; the window between them is the only non-atomic moment and is sub-millisecond.
+   7. On success of subsequent verify (step 6), `rm -rf $LLM_SCAFFOLD_DIR.old`. On failure, rollback is `mv $LLM_SCAFFOLD_DIR $LLM_SCAFFOLD_DIR.failed && mv $LLM_SCAFFOLD_DIR.old $LLM_SCAFFOLD_DIR`.
+6. **Verify.** Re-exec `llm --version` (must match the new wheel version) and `llm doctor --quick` against the new scaffold. On failure, automatically roll back the scaffold per step 5.7, leave the new wheel installed but warn the user, and print the one-liner to roll back the wheel (`pipx install 'localllm-cli==<prev>' --force`).
+7. **Finalize.** Delete `$LLM_SCAFFOLD_DIR.old/`. Print `Updated to 0.4.1.` plus a single-line "breaking change" hint if the release notes flag any.
 
 ### 9.3 Flags
 
@@ -196,7 +205,7 @@ Not shipped at v0.3.0 (deferred until concrete demand): `--pin <version>`, `--ro
 
 ### 9.4 Passive drift detection (every invocation)
 
-Every CLI invocation reads `$LLM_SCAFFOLD_DIR/.scaffold-version` (cheap) and compares it to `llm_cli.__version__`.
+Every CLI invocation reads `$LLM_SCAFFOLD_DIR/.scaffold-version` (a single-line text file — cheap, no parsing) and compares it to `llm_cli.__version__`.
 
 - **Patch-level mismatch** (e.g. CLI 0.4.1, scaffold v0.4.0): single-line yellow warning printed at most once per CLI invocation (not persisted), command proceeds.
 - **Minor-or-major mismatch** (e.g. CLI 0.5.0, scaffold v0.4.1): destructive commands (`serve`, `runtime install`, `model pull`) **refuse** with "scaffold version drift — run `llm update --scaffold-only`". Non-destructive commands (`list`, `status`, `logs`, `--version`) warn but proceed.
@@ -264,7 +273,14 @@ Pre-1.0 quirk: under release-please defaults, `feat!:` bumps minor (0.x.y → 0.
 Two workflows, both new:
 
 1. **`.github/workflows/release-please.yml`** — runs on `push: main`. Opens/updates the release PR.
-2. **`.github/workflows/publish.yml`** — runs on `release: published` (fired by release-please when its PR is merged). Steps: checkout the tag → `python -m build` → `twine upload --skip-existing` via PyPI **OIDC trusted publisher** (no `PYPI_API_TOKEN` secret). Also attaches the wheel + sdist to the GitHub Release.
+2. **`.github/workflows/publish.yml`** — runs on `release: published` (fired by release-please when its PR is merged). Steps:
+   1. Checkout the tag.
+   2. `python -m build` → wheel + sdist.
+   3. `twine upload --skip-existing` via PyPI **OIDC trusted publisher** (no `PYPI_API_TOKEN` secret).
+   4. **Build the scaffold tarball**: `tar czf scaffold-${TAG}.tar.gz runtimes configs benchmarks requirements.yaml` and `sha256sum scaffold-${TAG}.tar.gz > scaffold-${TAG}.tar.gz.sha256`.
+   5. Attach all four artifacts (wheel, sdist, scaffold tarball, sha256) to the GitHub Release via `gh release upload`.
+
+The tarball-attach step (4–5) is the single concrete consequence of choosing tarball-over-git for scaffold transport. It's ~5 lines of YAML and runs in the same job as the PyPI upload.
 
 ### 10.6 Tag is the single source of truth
 
@@ -423,7 +439,7 @@ The migration script ships in v0.3.0 only. **Removed in v0.4.0.** Anyone still o
 
 Concrete cut order from current state to v0.3.0 released:
 
-1. **In v0.2.x land:** implement release-please + `ci.yml` + `publish.yml` first — no behavior change, just plumbing. Cut a `v0.2.1` patch release as a smoke test of the publish pipeline. PyPI gains `localllm-cli==0.2.1` even though no user is told to use it yet.
+1. **In v0.2.x land:** implement release-please + `ci.yml` + `publish.yml` (including the scaffold-tarball attach step from §10.5) first — no behavior change, just plumbing. Cut a `v0.2.1` patch release as a smoke test of the publish pipeline. After it runs, the GitHub Release for `v0.2.1` should have `localllm_cli-0.2.1-py3-none-any.whl`, sdist, `scaffold-v0.2.1.tar.gz`, and `scaffold-v0.2.1.tar.gz.sha256` all attached. PyPI gains `localllm-cli==0.2.1` even though no user is told to use it yet.
 2. **In a feature branch:** implement the layered asset model (§2), `llm update` command (§3), `migrate-from-v0.2.sh` (§6), and the docs sweep. This is the chunky PR.
 3. **Cut `v0.3.0`** as the first user-facing distributed release. README updates to the pipx-first story. Old root `install.sh` becomes `scripts/install-dev.sh`.
 
