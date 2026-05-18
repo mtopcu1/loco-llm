@@ -1,0 +1,27 @@
+gguf_path:
+  type: path
+  required: true
+  env: LLM_LLAMACPP_GGUF
+  tier: common
+  description: "Path to the GGUF weights file."
+
+n_gpu_layers:
+  type: int
+  default: -1
+  env: LLM_LLAMACPP_N_GPU_LAYERS
+  tier: common
+  description: "Layers to offload to GPU. -1 = all."
+
+ctx:
+  type: int
+  default: 8192
+  env: LLM_LLAMACPP_CTX
+  tier: common
+  description: "Context window in tokens."
+
+extra_args:
+  type: string
+  default: ""
+  env: LLM_LLAMACPP_EXTRA_ARGS
+  tier: advanced
+  description: "Pass-through flags appended to llama-server."

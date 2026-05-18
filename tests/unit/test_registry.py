@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
+import pytest
 
 from llm_cli.core import registry
 from llm_cli.core.settings import save_settings
@@ -31,7 +32,10 @@ def _write_runtime(
         # `model:` still validate.
         body += yaml.safe_dump({"accepts_formats": ["stub"]}, sort_keys=False)
     if serve_schema is not None:
-        body += yaml.safe_dump({"serve": serve_schema}, sort_keys=False)
+        (root / "params.yaml").write_text(
+            yaml.safe_dump(serve_schema, sort_keys=False),
+            encoding="utf-8",
+        )
     (root / "manifest.yaml").write_text(
         body,
         encoding="utf-8",
@@ -160,14 +164,16 @@ def test_runtime_manifest_typed(tmp_path: Path) -> None:
         "    type: enum\n"
         "    values: [cuda, cpu]\n"
         "    default: cuda\n"
-        "serve:\n"
-        "  ctx:\n"
-        "    type: int\n"
-        "    default: 8192\n"
         "requires:\n"
         "  - id: cmake\n"
         "    verify: { cmd: cmake --version, version_regex: 'v ([\\d.]+)', min: '3.16' }\n"
         "    install_hint: apt install cmake\n",
+        encoding="utf-8",
+    )
+    (repo / "runtimes" / "rt-a" / "params.yaml").write_text(
+        "ctx:\n"
+        "  type: int\n"
+        "  default: 8192\n",
         encoding="utf-8",
     )
     for s in ("build.sh", "serve.sh", "healthcheck.sh"):
@@ -179,6 +185,7 @@ def test_runtime_manifest_typed(tmp_path: Path) -> None:
     rt = mfs[0]
     assert rt.id == "rt-a"
     assert rt.official is True
+    assert rt.kind == "official"
     assert [s.key for s in rt.build_schema] == ["flavor"]
     assert rt.build_schema[0].values == ("cuda", "cpu")
     assert [s.key for s in rt.serve_schema] == ["ctx"]
@@ -233,9 +240,6 @@ def test_validate_config_warns_uninstalled_runtime(tmp_path: Path) -> None:
     errs, warnings = registry.validate_config_v2(repo, cfg)
     assert errs == []
     assert any("not installed" in w for w in warnings)
-
-
-import pytest
 
 
 def _write_runtime_manifest(repo: Path, rid: str, body: dict) -> None:
@@ -346,3 +350,117 @@ def test_validate_errors_on_format_mismatch(tmp_path: Path) -> None:
     cfg = next(c for c in registry.discover_configs(repo) if c.id == "c")
     errs, _ = registry.validate_config_v2(repo, cfg)
     assert any("format" in e and "gguf" in e for e in errs)
+
+
+def test_runtime_loads_params_yaml_with_tier_and_description(tmp_path: Path) -> None:
+    rt = tmp_path / "runtimes" / "demo"
+    rt.mkdir(parents=True)
+    (rt / "manifest.yaml").write_text(
+        "id: demo\n"
+        "display_name: Demo\n"
+        "accepts_formats: []\n",
+        encoding="utf-8",
+    )
+    (rt / "params.yaml").write_text(
+        "n_threads:\n"
+        "  type: int\n"
+        "  default: 4\n"
+        "  tier: common\n"
+        "  description: Number of worker threads.\n"
+        "extra:\n"
+        "  type: string\n"
+        "  default: ''\n"
+        "  tier: advanced\n"
+        "  description: Pass-through flags.\n",
+        encoding="utf-8",
+    )
+
+    mfs = registry.load_runtime_manifests(tmp_path)
+    assert len(mfs) == 1
+    schema = mfs[0].serve_schema
+    by_key = {s.key: s for s in schema}
+    assert by_key["n_threads"].tier == "common"
+    assert by_key["n_threads"].description == "Number of worker threads."
+    assert by_key["extra"].tier == "advanced"
+
+
+def test_runtime_missing_params_yaml_is_empty(tmp_path: Path) -> None:
+    rt = tmp_path / "runtimes" / "demo"
+    rt.mkdir(parents=True)
+    (rt / "manifest.yaml").write_text(
+        "id: demo\ndisplay_name: Demo\naccepts_formats: []\n", encoding="utf-8"
+    )
+    mfs = registry.load_runtime_manifests(tmp_path)
+    assert mfs[0].serve_schema == []
+
+
+def test_runtime_manifest_with_inline_serve_is_rejected(tmp_path: Path) -> None:
+    rt = tmp_path / "runtimes" / "demo"
+    rt.mkdir(parents=True)
+    (rt / "manifest.yaml").write_text(
+        "id: demo\ndisplay_name: Demo\naccepts_formats: []\n"
+        "serve:\n  n: { type: int, default: 1 }\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="serve: schema moved to params.yaml"):
+        registry.load_runtime_manifests(tmp_path)
+
+
+def test_runtime_manifest_kind_defaults_to_official(tmp_path: Path) -> None:
+    rt = tmp_path / "runtimes" / "demo"
+    rt.mkdir(parents=True)
+    (rt / "manifest.yaml").write_text(
+        "id: demo\ndisplay_name: Demo\naccepts_formats: []\n", encoding="utf-8"
+    )
+    mfs = registry.load_runtime_manifests(tmp_path)
+    assert mfs[0].kind == "official"
+    assert mfs[0].official is True
+
+
+def test_runtime_manifest_kind_custom_is_respected(tmp_path: Path) -> None:
+    rt = tmp_path / "runtimes" / "demo"
+    rt.mkdir(parents=True)
+    (rt / "manifest.yaml").write_text(
+        "id: demo\ndisplay_name: Demo\nkind: custom\naccepts_formats: [gguf]\n",
+        encoding="utf-8",
+    )
+    mfs = registry.load_runtime_manifests(tmp_path)
+    assert mfs[0].kind == "custom"
+    assert mfs[0].official is False
+
+
+def test_runtime_manifest_kind_takes_precedence_over_official_bool(tmp_path: Path) -> None:
+    rt = tmp_path / "runtimes" / "demo"
+    rt.mkdir(parents=True)
+    (rt / "manifest.yaml").write_text(
+        "id: demo\ndisplay_name: Demo\nkind: custom\nofficial: true\n"
+        "accepts_formats: []\n",
+        encoding="utf-8",
+    )
+    mfs = registry.load_runtime_manifests(tmp_path)
+    assert mfs[0].kind == "custom"
+    assert mfs[0].official is False
+
+
+def test_custom_kind_forbids_build_section(tmp_path: Path) -> None:
+    rt = tmp_path / "runtimes" / "demo"
+    rt.mkdir(parents=True)
+    (rt / "manifest.yaml").write_text(
+        "id: demo\ndisplay_name: Demo\nkind: custom\naccepts_formats: []\n"
+        "build:\n"
+        "  flavor: { type: enum, values: [a, b], default: a }\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="custom runtimes must not declare a build section"):
+        registry.load_runtime_manifests(tmp_path)
+
+
+def test_unknown_kind_value_is_rejected(tmp_path: Path) -> None:
+    rt = tmp_path / "runtimes" / "demo"
+    rt.mkdir(parents=True)
+    (rt / "manifest.yaml").write_text(
+        "id: demo\ndisplay_name: Demo\nkind: weird\naccepts_formats: []\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="kind must be one of"):
+        registry.load_runtime_manifests(tmp_path)

@@ -16,6 +16,7 @@ class InstallRecord:
     build_sh_sha256: str = ""
     verify_passed: bool | None = None
     schema_hash: str = ""
+    kind: str = "official"
 
 
 def record_path(runtimes_dir: Path, runtime_id: str) -> Path:
@@ -50,6 +51,7 @@ def read_record(runtimes_dir: Path, runtime_id: str) -> InstallRecord | None:
         build_sh_sha256=str(raw.get("build_sh_sha256", "")),
         verify_passed=raw.get("verify_passed"),
         schema_hash=str(raw.get("schema_hash", "")),
+        kind=str(raw.get("kind", "official")),
     )
 
 

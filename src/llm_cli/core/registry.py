@@ -30,6 +30,7 @@ class RuntimeManifest:
     display_name: str
     description: str
     official: bool
+    kind: str
     build_schema: list[ParamSpec]
     serve_schema: list[ParamSpec]
     requires: list[dict[str, Any]]
@@ -59,6 +60,22 @@ def _safe_load(path: Path) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError(f"{path}: expected a mapping at the top level")
     return raw
+
+
+_VALID_KINDS = ("official", "custom")
+
+
+def _resolve_kind(data: dict[str, Any], runtime_id: str) -> str:
+    if "kind" in data:
+        kind = str(data["kind"])
+        if kind not in _VALID_KINDS:
+            raise ValueError(
+                f"{runtime_id}: kind must be one of {_VALID_KINDS}; got {kind!r}"
+            )
+        return kind
+    if "official" in data:
+        return "official" if bool(data["official"]) else "custom"
+    return "official"
 
 
 def discover_runtimes(repo: Path) -> list[RuntimeRecord]:
@@ -116,6 +133,15 @@ def get_runtime(repo: Path, runtime_id: str) -> RuntimeRecord | None:
 
 def _to_manifest(rec: RuntimeRecord) -> RuntimeManifest:
     data = rec.manifest
+    if "serve" in data:
+        raise ValueError(
+            f"{rec.id}: serve: schema moved to params.yaml; "
+            f"move the keys to {rec.path / 'params.yaml'}"
+        )
+    kind = _resolve_kind(data, rec.id)
+    if kind == "custom" and "build" in data:
+        raise ValueError(f"{rec.id}: custom runtimes must not declare a build section")
+
     requires = data.get("requires") or []
     if not isinstance(requires, list):
         raise ValueError(f"{rec.id}: requires must be a list")
@@ -123,13 +149,25 @@ def _to_manifest(rec: RuntimeRecord) -> RuntimeManifest:
     if not isinstance(raw_formats, list):
         raise ValueError(f"{rec.id}: accepts_formats must be a list of strings")
     accepts_formats = tuple(str(f) for f in raw_formats)
+
+    params_path = rec.path / "params.yaml"
+    if params_path.is_file():
+        raw_params = yaml.safe_load(params_path.read_text(encoding="utf-8"))
+        params_raw: dict[str, Any] = {} if raw_params is None else raw_params
+        if not isinstance(params_raw, dict):
+            raise ValueError(f"{rec.id}: {params_path}: top-level must be a mapping")
+        serve_schema = parse_schema(params_raw)
+    else:
+        serve_schema = []
+
     return RuntimeManifest(
         id=rec.id,
         display_name=str(data.get("display_name", rec.id)),
         description=str(data.get("description", "")),
-        official=bool(data.get("official", False)),
+        official=(kind == "official"),
+        kind=kind,
         build_schema=parse_schema(data.get("build") or {}),
-        serve_schema=parse_schema(data.get("serve") or {}),
+        serve_schema=serve_schema,
         requires=[r for r in requires if isinstance(r, dict)],
         accepts_formats=accepts_formats,
         path=rec.path,

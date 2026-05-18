@@ -59,11 +59,13 @@ def _scaffold_llamacpp(repo: Path) -> None:
         "    default: cpu\n"
         "  jobs:\n"
         "    type: int\n"
-        "    default: 0\n"
-        "serve:\n"
-        "  ctx:\n"
-        "    type: int\n"
-        "    default: 8192\n",
+        "    default: 0\n",
+        encoding="utf-8",
+    )
+    (rt / "params.yaml").write_text(
+        "ctx:\n"
+        "  type: int\n"
+        "  default: 8192\n",
         encoding="utf-8",
     )
     for script in ("build.sh", "serve.sh", "healthcheck.sh"):

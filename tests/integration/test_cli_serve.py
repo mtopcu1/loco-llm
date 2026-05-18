@@ -26,12 +26,14 @@ def _make_repo(root: Path, port: int = 18080, *, installed: bool = True) -> Path
     rt.mkdir(parents=True)
     (rt / "manifest.yaml").write_text(
         "id: rt-a\n"
-        "accepts_formats: [stub]\n"
-        "serve:\n"
-        "  token:\n"
-        "    type: string\n"
-        "    default: default-token\n"
-        "    env: LLM_RT_A_TOKEN\n",
+        "accepts_formats: [stub]\n",
+        encoding="utf-8",
+    )
+    (rt / "params.yaml").write_text(
+        "token:\n"
+        "  type: string\n"
+        "  default: default-token\n"
+        "  env: LLM_RT_A_TOKEN\n",
         encoding="utf-8",
     )
     for name in ("build.sh", "serve.sh", "healthcheck.sh"):

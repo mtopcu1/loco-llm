@@ -26,11 +26,13 @@ def _make_repo(root: Path) -> Path:
         "display_name: A\n"
         "official: true\n"
         "accepts_formats: [stub]\n"
-        "build: {}\n"
-        "serve:\n"
-        "  weights:\n"
-        "    type: path\n"
-        "    env: LLM_RT_A_WEIGHTS\n",
+        "build: {}\n",
+        encoding="utf-8",
+    )
+    (rt / "params.yaml").write_text(
+        "weights:\n"
+        "  type: path\n"
+        "  env: LLM_RT_A_WEIGHTS\n",
         encoding="utf-8",
     )
     for name in ("build.sh", "serve.sh", "healthcheck.sh", "verify.sh"):

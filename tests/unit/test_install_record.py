@@ -86,3 +86,41 @@ def test_schema_hash_changes_on_value_change():
     a = {"jobs": {"type": "int", "default": 0}}
     b = {"jobs": {"type": "int", "default": 1}}
     assert schema_hash(a) != schema_hash(b)
+
+
+def test_install_record_custom_kind_round_trip(tmp_path: Path) -> None:
+    rec = InstallRecord(
+        runtime_id="vllm-custom",
+        installed_at="2026-05-18T10:00:00Z",
+        build_params={},
+        build_sh_sha256="",
+        verify_passed=None,
+        schema_hash="abc123",
+        kind="custom",
+    )
+    write_record(tmp_path / "runtimes", rec)
+    got = read_record(tmp_path / "runtimes", "vllm-custom")
+    assert got == rec
+    assert got.kind == "custom"
+    assert got.verify_passed is None
+
+
+def test_install_record_kind_defaults_to_official_when_absent(tmp_path: Path) -> None:
+    import json
+
+    p = record_path(tmp_path / "runtimes", "legacy")
+    p.parent.mkdir(parents=True)
+    p.write_text(
+        json.dumps({
+            "runtime_id": "legacy",
+            "installed_at": "2026-05-15T00:00:00Z",
+            "build_params": {"flavor": "cuda"},
+            "build_sh_sha256": "deadbeef",
+            "verify_passed": True,
+            "schema_hash": "cafe",
+        }),
+        encoding="utf-8",
+    )
+    rec = read_record(tmp_path / "runtimes", "legacy")
+    assert rec is not None
+    assert rec.kind == "official"
