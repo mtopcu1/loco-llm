@@ -1,0 +1,52 @@
+---
+description: Conventional Commits format required by release-please
+alwaysApply: true
+---
+
+# Conventional Commits (release-please)
+
+Every commit on `main` must follow [Conventional Commits](https://www.conventionalcommits.org/). `release-please` parses commit messages to decide version bumps, changelog entries, and when to open a release PR. Non-conventional messages (including default merge titles) are **silently ignored**.
+
+## Format
+
+```text
+<type>[optional scope][optional !]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+- **type** — lowercase, required (`feat`, `fix`, `docs`, `chore`, …)
+- **scope** — optional, in parentheses: `feat(serve): …`
+- **description** — imperative mood, lowercase start, no trailing period
+- **!** after type/scope — breaking change (also add `BREAKING CHANGE:` footer when needed)
+
+## Types and version impact (pre-1.0)
+
+| Type | Bump | Changelog |
+|------|------|-----------|
+| `feat:` | minor | Features |
+| `fix:`, `perf:` | patch | Bug Fixes / Performance |
+| `docs:` | none | Documentation |
+| `feat!:` / `fix!:` / `BREAKING CHANGE:` | minor (major post-1.0) | highlighted |
+| `chore:`, `refactor:`, `test:`, `ci:`, `style:` | none | hidden |
+
+## Examples
+
+```text
+feat(update): add --scaffold-only flag to llm update
+fix(tests): compare manifest version to pyproject.toml
+chore: rename PyPI distribution to loco-llm-cli
+docs: document branch protection for CI checks
+```
+
+## Avoid
+
+```text
+Rename PyPI distribution to loco-llm-cli          # no type — ignored
+Merge pull request #4 from mtopcu1/bugfix/...     # merge commit — ignored
+Fixed the tests.                                  # free-form — ignored
+```
+
+When creating commits or suggesting commit messages, always use conventional format. For PRs merged with squash, the **squash commit title** must be conventional too.
