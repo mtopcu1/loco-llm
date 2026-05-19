@@ -119,11 +119,15 @@ def run_param_grid(
     """Run prompt-toolkit wizard when interactive, else Rich/plain fallback."""
     try:
         if wizards.use_plain_prompts():
-            return run_param_grid_plain(cells, meta, title=title, theme=theme)
+            return run_param_grid_plain(
+                cells, meta, specs=specs, title=title, theme=theme
+            )
         try:
             return _run_param_grid_tui(cells, meta, specs=specs, title=title, theme=theme)
         except ImportError:
-            return run_param_grid_plain(cells, meta, title=title, theme=theme)
+            return run_param_grid_plain(
+                cells, meta, specs=specs, title=title, theme=theme
+            )
     except KeyboardInterrupt:
         return ParamGridResult(
             values={c.key: c.value for c in cells},
