@@ -1,6 +1,7 @@
 """Pexpect wrapper for driving `llm` in a PTY."""
 from __future__ import annotations
 
+import os
 import re
 import shlex
 import sys
@@ -31,8 +32,10 @@ class TuiSession:
         fixture: RepoFixture,
         args: list[str],
         *,
-        timeout: int = 60,
+        timeout: int | None = None,
     ) -> TuiSession:
+        if timeout is None:
+            timeout = 120 if os.environ.get("CI") else 60
         cmd = [sys.executable, "-m", "llm_cli", *args]
         cmd_str = " ".join(shlex.quote(part) for part in cmd)
         repo = shlex.quote(str(fixture.repo_root))
@@ -48,7 +51,9 @@ class TuiSession:
         child.setwinsize(30, 100)
         return cls(child, fixture)
 
-    def expect(self, *patterns: str, timeout: int = 15) -> int:
+    def expect(self, *patterns: str, timeout: int | None = None) -> int:
+        if timeout is None:
+            timeout = 30 if os.environ.get("CI") else 15
         try:
             return self.child.expect(list(patterns), timeout=timeout)
         except pexpect.TIMEOUT as exc:

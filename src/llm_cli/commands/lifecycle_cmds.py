@@ -185,4 +185,4 @@ def logs(
     text = log_file.read_text(encoding="utf-8", errors="replace")
     tail_lines = text.splitlines()[-lines:] if lines > 0 else []
     for line in tail_lines:
-        console.print(line)
+        typer.echo(line)
