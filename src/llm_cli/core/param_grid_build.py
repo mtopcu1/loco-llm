@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from llm_cli.core.model_bindings import MODEL_PATH_TOKEN
 from llm_cli.core.param_grid_models import ParamCell
-from llm_cli.core.params import ParamSpec
+from llm_cli.core.params import ParamSpec, ParamType, ParamValidationError
 
 
 def cells_from_specs(
@@ -97,3 +97,23 @@ def paginate_cells(
     for start in range(0, len(filtered), per_page):
         pages.append(filtered[start : start + per_page])
     return pages
+
+
+def enabled_values_from_cells(
+    cells: list[ParamCell],
+    specs: list[ParamSpec],
+) -> dict[str, str]:
+    """Return param map for YAML/env: enabled + locked rows only; validate non-empty."""
+    out: dict[str, str] = {}
+    for cell in cells:
+        if not (cell.enabled or cell.locked):
+            continue
+        if cell.param_type is not ParamType.BOOL and not str(cell.value).strip():
+            raise ParamValidationError(
+                f"param {cell.key!r}: enabled but empty; set a value or disable"
+            )
+        out[cell.key] = cell.value
+    for spec in specs:
+        if spec.required and spec.key not in out:
+            raise ParamValidationError(f"param {spec.key!r}: required")
+    return out
