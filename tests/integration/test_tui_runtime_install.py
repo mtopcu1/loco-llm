@@ -1,4 +1,4 @@
-"""PTY integration tests for `llm runtime install` walk_tier flows."""
+"""PTY integration tests for `llm runtime install` opt-in param grid."""
 from __future__ import annotations
 
 import sys
@@ -32,12 +32,22 @@ def _save_build_params_footer(session: TuiSession, *, visible_rows: int) -> None
     session.send(k.ENTER)
 
 
+def _enable_param_and_set(session: TuiSession, value: str) -> None:
+    """Enable focused optional param (Space), open detail, set value, commit."""
+    session.send(k.SPACE)
+    session.send(k.ENTER)
+    session.send(value)
+    session.send(k.ENTER)
+
+
 def test_tui_runtime_install_common_only_saves_opted_in_build_params(tui_repo) -> None:
     fixture = tui_repo
     add_tiered_build_runtime(fixture.repo_root)
     session = TuiSession.spawn(fixture, ["runtime", "install", "tier-rt"])
     try:
-        # No advanced toggle: only common flavor is visible.
+        # Opt in to common-tier flavor only (advanced extra_jobs stays disabled).
+        session.expect("Parameters", timeout=20)
+        _enable_param_and_set(session, "cpu")
         _save_build_params_footer(session, visible_rows=1)
         assert session.wait_exit(timeout=60) == 0
     finally:
