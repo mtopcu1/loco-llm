@@ -14,7 +14,8 @@ class ParamCell:
     label: str
     description: str
     value: str
-    default: str
+    enabled: bool = False
+    locked: bool = False
     readonly: bool = False
     tier: str = "common"
     hint: str | None = None
@@ -37,10 +38,12 @@ class ParamGridResult:
     advanced_revealed: bool = False
 
 
-def cell_state(cell: ParamCell) -> Literal["readonly", "modified", "default"]:
+def cell_state(cell: ParamCell) -> Literal["locked", "disabled", "enabled-empty", "enabled-set"]:
     """Semantic row state used for styling in grid and plain renderers."""
-    if cell.readonly:
-        return "readonly"
-    if cell.value != cell.default:
-        return "modified"
-    return "default"
+    if cell.locked or cell.readonly:
+        return "locked"
+    if not cell.enabled:
+        return "disabled"
+    if not str(cell.value).strip() and cell.param_type is not ParamType.BOOL:
+        return "enabled-empty"
+    return "enabled-set"

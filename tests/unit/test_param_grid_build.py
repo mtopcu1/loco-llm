@@ -10,40 +10,38 @@ from llm_cli.core.param_grid_models import MetaField, ParamCell, ParamGridResult
 from llm_cli.core.params import ParamSpec, ParamType
 
 
-def test_cell_state_readonly_first() -> None:
+def test_cell_state_disabled() -> None:
+    c = ParamCell(
+        key="k", label="l", description="", value="", enabled=False, locked=False
+    )
+    assert cell_state(c) == "disabled"
+
+
+def test_cell_state_enabled_empty() -> None:
+    c = ParamCell(
+        key="k", label="l", description="", value="", enabled=True, locked=False
+    )
+    assert cell_state(c) == "enabled-empty"
+
+
+def test_cell_state_enabled_set() -> None:
+    c = ParamCell(
+        key="k", label="l", description="", value="8192", enabled=True, locked=False
+    )
+    assert cell_state(c) == "enabled-set"
+
+
+def test_cell_state_locked() -> None:
     c = ParamCell(
         key="k",
         label="l",
         description="",
-        value="different",
-        default="x",
+        value="x",
+        enabled=True,
+        locked=True,
         readonly=True,
     )
-    assert cell_state(c) == "readonly"
-
-
-def test_cell_state_modified() -> None:
-    c = ParamCell(
-        key="k",
-        label="l",
-        description="",
-        value="2",
-        default="1",
-        readonly=False,
-    )
-    assert cell_state(c) == "modified"
-
-
-def test_cell_state_default() -> None:
-    c = ParamCell(
-        key="k",
-        label="l",
-        description="",
-        value="same",
-        default="same",
-        readonly=False,
-    )
-    assert cell_state(c) == "default"
+    assert cell_state(c) == "locked"
 
 
 def test_cells_from_specs_marks_readonly() -> None:
@@ -98,8 +96,8 @@ def test_cells_from_specs_skip_keys_respects_explicit_values() -> None:
 
 def test_paginate_hides_advanced_when_collapsed() -> None:
     cells = [
-        ParamCell("k1", "k1", "", "1", "1", tier="common"),
-        ParamCell("k2", "k2", "", "2", "2", tier="advanced"),
+        ParamCell("k1", "k1", "", "1", enabled=True, tier="common"),
+        ParamCell("k2", "k2", "", "2", enabled=True, tier="advanced"),
     ]
     collapsed = paginate_cells(cells, per_page=6, advanced_visible=False)
     assert len(collapsed) == 1 and len(collapsed[0]) == 1
@@ -108,8 +106,8 @@ def test_paginate_hides_advanced_when_collapsed() -> None:
 
 def test_paginate_includes_advanced_when_visible() -> None:
     cells = [
-        ParamCell("k1", "k1", "", "1", "1", tier="common"),
-        ParamCell("k2", "k2", "", "2", "2", tier="advanced"),
+        ParamCell("k1", "k1", "", "1", enabled=True, tier="common"),
+        ParamCell("k2", "k2", "", "2", enabled=True, tier="advanced"),
     ]
     pages = paginate_cells(cells, per_page=6, advanced_visible=True)
     ordered = [c.key for p in pages for c in p]
@@ -118,7 +116,7 @@ def test_paginate_includes_advanced_when_visible() -> None:
 
 def test_paginate_six_per_page() -> None:
     cells = [
-        ParamCell(f"k{i}", f"k{i}", "", str(i), str(i), tier="common")
+        ParamCell(f"k{i}", f"k{i}", "", str(i), enabled=True, tier="common")
         for i in range(13)
     ]
     pages = paginate_cells(cells, per_page=6, advanced_visible=True)
@@ -135,15 +133,15 @@ def test_paginate_cells_per_page_invalid() -> None:
 
 def test_filter_visible_cells_hides_readonly() -> None:
     cells = [
-        ParamCell("ro", "ro", "", "x", "x", readonly=True, tier="common"),
-        ParamCell("ed", "ed", "", "1", "1", readonly=False, tier="common"),
+        ParamCell("ro", "ro", "", "x", readonly=True, enabled=True, tier="common"),
+        ParamCell("ed", "ed", "", "1", readonly=False, enabled=True, tier="common"),
     ]
     visible = filter_visible_cells(cells, advanced_visible=True, hide_readonly=True)
     assert [c.key for c in visible] == ["ed"]
 
 
 def test_filter_visible_cells_keeps_readonly_when_requested() -> None:
-    cells = [ParamCell("ro", "ro", "", "x", "x", readonly=True, tier="common")]
+    cells = [ParamCell("ro", "ro", "", "x", readonly=True, enabled=True, tier="common")]
     visible = filter_visible_cells(cells, advanced_visible=True, hide_readonly=False)
     assert [c.key for c in visible] == ["ro"]
 
