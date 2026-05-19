@@ -56,6 +56,24 @@ class TestReleasePleaseWorkflow:
         perms = doc.get("permissions", {})
         assert perms.get("pull-requests") == "write"
         assert perms.get("contents") == "write"
+        assert perms.get("id-token") == "write"
+
+    def test_release_please_validates_release_branch(self):
+        doc = _load("release-please.yml")
+        job = doc["jobs"].get("release-pr-check")
+        assert job is not None, "expected a release-pr-check job"
+        run_steps = [s.get("run", "") for s in job["steps"] if "run" in s]
+        assert any("check_release_versions.py" in cmd for cmd in run_steps)
+        assert any("python -m build" in cmd for cmd in run_steps)
+
+    def test_release_please_publishes_when_release_created(self):
+        doc = _load("release-please.yml")
+        job = doc["jobs"].get("publish")
+        assert job is not None, "expected a publish job chained to release-please"
+        assert "releases_created" in job.get("if", "")
+        all_steps = job.get("steps", [])
+        uses = [s.get("uses", "") for s in all_steps]
+        assert any(u.startswith("pypa/gh-action-pypi-publish@") for u in uses)
 
 
 class TestCIWorkflow:
@@ -88,6 +106,14 @@ class TestCIWorkflow:
         assert any("python -m build" in cmd for cmd in run_steps)
         assert any("twine check" in cmd for cmd in run_steps)
 
+    def test_skips_full_ci_for_release_please_branches(self):
+        doc = _load("ci.yml")
+        for name in ("test", "build-check"):
+            job_if = doc["jobs"][name].get("if", "")
+            assert "release-please--" in job_if, (
+                f"expected {name} to skip release-please PRs and merges"
+            )
+
 
 class TestPublishWorkflow:
     def test_triggers_on_release_published(self):
@@ -96,6 +122,11 @@ class TestPublishWorkflow:
         assert "release" in on
         types = on["release"].get("types", [])
         assert "published" in types
+
+    def test_supports_manual_dispatch(self):
+        doc = _load("publish.yml")
+        on = _get_on(doc)
+        assert "workflow_dispatch" in on
 
     def test_has_id_token_write_permission_for_oidc(self):
         doc = _load("publish.yml")

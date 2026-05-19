@@ -1,8 +1,8 @@
 name: release-please
 
-# Opens/updates the long-lived release PR (version + CHANGELOG).
-# Requires repo setting: Actions may create/approve pull requests.
-# See docs/RELEASE_SETUP.md if this job fails at "create pull request".
+# Opens/updates the long-lived release PR (version + CHANGELOG), validates
+# release branches with a fast build check, and publishes when a release PR
+# merges. See docs/RELEASE_SETUP.md.
 on:
   push:
     branches: [main]
@@ -11,12 +11,104 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  id-token: write
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      prs_created: ${{ steps.release.outputs.prs_created }}
+      prs_updated: ${{ steps.release.outputs.prs_updated }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: actions/checkout@v4
+      - id: release
+        uses: googleapis/release-please-action@v4
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  release-pr-check:
+    needs: release-please
+    if: |
+      always() &&
+      needs.release-please.result == 'success' && (
+        needs.release-please.outputs.releases_created == 'true' ||
+        needs.release-please.outputs.prs_created != '[]' ||
+        needs.release-please.outputs.prs_updated != '[]'
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.releases_created == 'true' && github.sha || 'release-please--branches--main--components--loco-llm-cli' }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify version fields stay in sync
+        run: python scripts/check_release_versions.py
+
+      - name: Install build + twine
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      - name: twine check
+        run: twine check dist/*
+
+  publish:
+    needs: [release-please, release-pr-check]
+    if: needs.release-please.outputs.releases_created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolve release tag
+        id: tag
+        run: |
+          VERSION="$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")"
+          echo "name=v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      - name: Publish to PyPI via OIDC
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+
+      - name: Build scaffold tarball
+        env:
+          TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          tar czf "scaffold-${TAG}.tar.gz" \
+            runtimes configs benchmarks requirements.yaml
+          sha256sum "scaffold-${TAG}.tar.gz" > "scaffold-${TAG}.tar.gz.sha256"
+
+      - name: Attach assets to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          gh release upload "${TAG}" \
+            dist/*.whl \
+            dist/*.tar.gz \
+            "scaffold-${TAG}.tar.gz" \
+            "scaffold-${TAG}.tar.gz.sha256" \
+            --clobber
