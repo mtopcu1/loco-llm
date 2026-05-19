@@ -44,7 +44,7 @@ def test_key_registry_has_required_keys() -> None:
     assert keys == {"data_root", "repo_root", "runtimes_dir", "models_dir", "cache_dir"}
     assert KEY_REGISTRY["data_root"]["default"] == "~/llm"
     assert KEY_REGISTRY["repo_root"]["default"] is None
-    assert KEY_REGISTRY["repo_root"]["required"] is True
+    assert KEY_REGISTRY["repo_root"]["required"] is False
     assert KEY_REGISTRY["data_root"]["required"] is True
     for k in ("runtimes_dir", "models_dir", "cache_dir"):
         assert KEY_REGISTRY[k]["required"] is False
@@ -152,10 +152,9 @@ def test_resolve_uses_default_for_data_root_when_missing() -> None:
     assert out.data_root == Path("~/llm").expanduser()
 
 
-def test_resolve_raises_when_repo_root_missing() -> None:
-    with pytest.raises(MissingSettingError) as exc:
-        resolve({"data_root": "/dr"})
-    assert "repo_root" in str(exc.value)
+def test_resolve_allows_missing_repo_root() -> None:
+    out = resolve({"data_root": "/dr"})
+    assert out.repo_root is None
 
 
 def test_ensure_data_dirs_creates_all_resolved_dirs(tmp_path) -> None:
@@ -165,6 +164,9 @@ def test_ensure_data_dirs_creates_all_resolved_dirs(tmp_path) -> None:
     assert (tmp_path / "dr" / "runtimes").is_dir()
     assert (tmp_path / "dr" / "models").is_dir()
     assert (tmp_path / "dr" / "cache").is_dir()
+    assert (tmp_path / "dr" / "user" / "runtimes").is_dir()
+    assert (tmp_path / "dr" / "user" / "configs").is_dir()
+    assert (tmp_path / "dr" / "user" / "benchmarks").is_dir()
 
 
 def test_ensure_data_dirs_is_idempotent(tmp_path) -> None:

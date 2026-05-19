@@ -8,21 +8,25 @@ import typer
 from llm_cli.core import chain
 
 
+def _chain_settings(tmp_path: Path, monkeypatch) -> None:
+    from llm_cli.core.settings import save_settings
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    save_settings({"data_root": str(tmp_path / "data"), "repo_root": str(tmp_path)})
+
+
 def test_chain_skip_all_steps_returns_zero(monkeypatch, tmp_path):
+    _chain_settings(tmp_path, monkeypatch)
     monkeypatch.setattr(chain, "_confirm", lambda *a, **k: False)
     monkeypatch.setattr(chain, "_prompt_text", lambda *a, **k: "")
-    from llm_cli.core import repo as repo_mod
-
-    monkeypatch.setattr(repo_mod, "repo_root", lambda: Path(tmp_path))
     assert chain.run_setup_chain() == 0
 
 
 def test_chain_runtime_setup_failure_aborts(monkeypatch, tmp_path):
+    _chain_settings(tmp_path, monkeypatch)
     monkeypatch.setattr(chain, "_confirm", lambda *a, **k: True)
     monkeypatch.setattr(chain, "_prompt_text", lambda *a, **k: "")
-    from llm_cli.core import repo as repo_mod
-
-    monkeypatch.setattr(repo_mod, "repo_root", lambda: Path(tmp_path))
 
     def boom():
         raise typer.Exit(1)
@@ -32,6 +36,7 @@ def test_chain_runtime_setup_failure_aborts(monkeypatch, tmp_path):
 
 
 def test_chain_threads_ids_forward(monkeypatch, tmp_path):
+    _chain_settings(tmp_path, monkeypatch)
     calls: list[object] = []
 
     monkeypatch.setattr(chain, "_confirm", lambda *a, **k: True)
@@ -53,9 +58,6 @@ def test_chain_threads_ids_forward(monkeypatch, tmp_path):
 
     monkeypatch.setattr(chain, "_do_config_setup", fake_config)
     monkeypatch.setattr(chain, "_do_serve", fake_serve)
-    from llm_cli.core import repo as repo_mod
-
-    monkeypatch.setattr(repo_mod, "repo_root", lambda: Path(tmp_path))
 
     assert chain.run_setup_chain() == 0
     assert calls[0]["runtime_id"] == "rt-x"
@@ -66,6 +68,7 @@ def test_chain_threads_ids_forward(monkeypatch, tmp_path):
 def test_chain_duplicate_model_keep(monkeypatch, tmp_path):
     from llm_cli.commands.model_cmd import DuplicateModelRegistrationError
 
+    _chain_settings(tmp_path, monkeypatch)
     monkeypatch.setattr(chain, "_confirm", lambda *a, **k: False)
     monkeypatch.setattr(
         chain,
@@ -79,16 +82,13 @@ def test_chain_duplicate_model_keep(monkeypatch, tmp_path):
     monkeypatch.setattr(chain, "_do_model_pull", pull)
     monkeypatch.setattr(chain, "_duplicate_model_menu", lambda existing_id: "keep")
 
-    from llm_cli.core import repo as repo_mod
-
-    monkeypatch.setattr(repo_mod, "repo_root", lambda: Path(tmp_path))
-
     assert chain.run_setup_chain() == 0
 
 
 def test_chain_duplicate_model_force(monkeypatch, tmp_path):
     from llm_cli.commands.model_cmd import DuplicateModelRegistrationError
 
+    _chain_settings(tmp_path, monkeypatch)
     monkeypatch.setattr(chain, "_confirm", lambda *a, **k: False)
     monkeypatch.setattr(chain, "_prompt_text", lambda *a, **k: "https://hf.co/x/y/blob/main/z.gguf")
 
@@ -103,10 +103,6 @@ def test_chain_duplicate_model_force(monkeypatch, tmp_path):
     monkeypatch.setattr(chain, "_do_model_pull", pull)
     monkeypatch.setattr(chain, "_duplicate_model_menu", lambda existing_id: "force")
 
-    from llm_cli.core import repo as repo_mod
-
-    monkeypatch.setattr(repo_mod, "repo_root", lambda: Path(tmp_path))
-
     assert chain.run_setup_chain() == 0
     assert len(calls) == 2
     assert calls[1].get("force") is True
@@ -115,6 +111,7 @@ def test_chain_duplicate_model_force(monkeypatch, tmp_path):
 def test_chain_duplicate_model_skip(monkeypatch, tmp_path):
     from llm_cli.commands.model_cmd import DuplicateModelRegistrationError
 
+    _chain_settings(tmp_path, monkeypatch)
     monkeypatch.setattr(chain, "_confirm", lambda *a, **k: False)
     monkeypatch.setattr(chain, "_prompt_text", lambda *a, **k: "https://hf.co/x")
 
@@ -124,23 +121,14 @@ def test_chain_duplicate_model_skip(monkeypatch, tmp_path):
     monkeypatch.setattr(chain, "_do_model_pull", pull)
     monkeypatch.setattr(chain, "_duplicate_model_menu", lambda existing_id: "skip")
 
-    from llm_cli.core import repo as repo_mod
-
-    monkeypatch.setattr(repo_mod, "repo_root", lambda: Path(tmp_path))
-
     assert chain.run_setup_chain() == 0
 
 
 def test_chain_duplicate_model_rename(monkeypatch, tmp_path):
     from llm_cli.commands.model_cmd import DuplicateModelRegistrationError
     from llm_cli.core import wizards as wiz_mod
-    from llm_cli.core.settings import save_settings
 
-    monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    save_settings(
-        {"data_root": str(tmp_path / "data"), "repo_root": str(tmp_path)}
-    )
+    _chain_settings(tmp_path, monkeypatch)
     (tmp_path / "data" / "models").mkdir(parents=True)
 
     monkeypatch.setattr(chain, "_confirm", lambda *a, **k: False)
@@ -160,16 +148,13 @@ def test_chain_duplicate_model_rename(monkeypatch, tmp_path):
         lambda prompt, validate=None, default=None, **k: "my-alt",
     )
 
-    from llm_cli.core import repo as repo_mod
-
-    monkeypatch.setattr(repo_mod, "repo_root", lambda: tmp_path)
-
     assert chain.run_setup_chain() == 0
 
 
 def test_chain_duplicate_force_pull_error_aborts(monkeypatch, tmp_path):
     from llm_cli.commands.model_cmd import DuplicateModelRegistrationError, PullModelError
 
+    _chain_settings(tmp_path, monkeypatch)
     monkeypatch.setattr(chain, "_confirm", lambda *a, **k: False)
     monkeypatch.setattr(chain, "_prompt_text", lambda *a, **k: "https://hf.co/x")
 
@@ -180,9 +165,5 @@ def test_chain_duplicate_force_pull_error_aborts(monkeypatch, tmp_path):
 
     monkeypatch.setattr(chain, "_do_model_pull", pull)
     monkeypatch.setattr(chain, "_duplicate_model_menu", lambda existing_id: "force")
-
-    from llm_cli.core import repo as repo_mod
-
-    monkeypatch.setattr(repo_mod, "repo_root", lambda: Path(tmp_path))
 
     assert chain.run_setup_chain() == 1

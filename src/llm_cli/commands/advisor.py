@@ -8,10 +8,10 @@ import typer
 from rich.console import Console
 
 from llm_cli.core import registry
-from llm_cli.core.lifecycle import append_history
+from llm_cli.core.lifecycle import append_history, state_root
 from llm_cli.core.model_registry import get_entry as _get_model
 from llm_cli.core.recommendations import Recommendation, recommend
-from llm_cli.core.repo import repo_root
+from llm_cli.core.repo import scaffold_root
 from llm_cli.core.settings import load_settings, resolve
 from llm_cli.core.specs import detect_all
 
@@ -83,10 +83,9 @@ def do_advisor(
     history_from: str = "flags",
 ) -> int:
     """Render advice for (runtime_id, model_id). Returns exit code."""
-    repo = repo_root()
     settings = resolve(load_settings())
 
-    rt_manifest = registry.get_runtime_manifest(repo, runtime_id)
+    rt_manifest = registry.get_runtime_manifest_merged(runtime_id)
     if rt_manifest is None:
         console.print(f"[red]error:[/red] no runtime named {runtime_id!r}")
         return 1
@@ -97,7 +96,7 @@ def do_advisor(
         return 1
 
     specs = detect_all(
-        repo_root=settings.repo_root.as_posix(),
+        repo_root=scaffold_root().as_posix(),
         data_root=settings.data_root.as_posix(),
     )
     recs: dict[str, Recommendation] = {}
@@ -112,7 +111,7 @@ def do_advisor(
         _render_text(runtime_id, model_id, specs, recs)
 
     append_history(
-        repo,
+        state_root(settings),
         {
             "action": "advisor",
             "runtime": runtime_id,
@@ -126,10 +125,9 @@ def do_advisor(
 def _interactive_pick() -> tuple[str | None, str | None]:
     from llm_cli.core import wizards as wiz
 
-    repo = repo_root()
     settings = resolve(load_settings())
 
-    runtimes = registry.load_runtime_manifests(repo)
+    runtimes = registry.load_runtime_manifests_merged()
     if not runtimes:
         console.print("[red]error:[/red] no runtimes found in runtimes/")
         return (None, None)
@@ -189,8 +187,7 @@ def advisor(
 
     history_from = "flags"
     if config_id is not None:
-        repo = repo_root()
-        cfg = registry.get_config(repo, config_id)
+        cfg = registry.get_config_merged(config_id)
         if cfg is None:
             console.print(f"[red]error:[/red] no config named {config_id!r}")
             raise typer.Exit(code=1)

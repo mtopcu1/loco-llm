@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 
@@ -17,11 +17,15 @@ from llm_cli.core.settings import (
 )
 
 
+AssetSource = Literal["scaffold", "user"]
+
+
 @dataclass(frozen=True)
 class RuntimeRecord:
     id: str
     path: Path
     manifest: dict[str, Any]
+    source: AssetSource = "scaffold"
 
 
 @dataclass(frozen=True)
@@ -44,6 +48,7 @@ class BenchmarkRecord:
     id: str
     path: Path
     bench: dict[str, Any]
+    source: AssetSource = "scaffold"
 
 
 @dataclass(frozen=True)
@@ -51,6 +56,7 @@ class ConfigRecord:
     id: str
     path: Path
     data: dict[str, Any]
+    source: AssetSource = "scaffold"
 
 
 def _safe_load(path: Path) -> dict[str, Any]:
@@ -78,7 +84,7 @@ def _resolve_kind(data: dict[str, Any], runtime_id: str) -> str:
     return "official"
 
 
-def discover_runtimes(repo: Path) -> list[RuntimeRecord]:
+def discover_runtimes(repo: Path, *, source: AssetSource = "scaffold") -> list[RuntimeRecord]:
     root = repo / "runtimes"
     if not root.is_dir():
         return []
@@ -91,11 +97,11 @@ def discover_runtimes(repo: Path) -> list[RuntimeRecord]:
             continue
         data = _safe_load(mf)
         rid = str(data.get("id", child.name))
-        out.append(RuntimeRecord(id=rid, path=child, manifest=data))
+        out.append(RuntimeRecord(id=rid, path=child, manifest=data, source=source))
     return out
 
 
-def discover_benchmarks(repo: Path) -> list[BenchmarkRecord]:
+def discover_benchmarks(repo: Path, *, source: AssetSource = "scaffold") -> list[BenchmarkRecord]:
     root = repo / "benchmarks"
     if not root.is_dir():
         return []
@@ -108,11 +114,11 @@ def discover_benchmarks(repo: Path) -> list[BenchmarkRecord]:
             continue
         data = _safe_load(bf)
         bid = str(data.get("id", child.name))
-        out.append(BenchmarkRecord(id=bid, path=child, bench=data))
+        out.append(BenchmarkRecord(id=bid, path=child, bench=data, source=source))
     return out
 
 
-def discover_configs(repo: Path) -> list[ConfigRecord]:
+def discover_configs(repo: Path, *, source: AssetSource = "scaffold") -> list[ConfigRecord]:
     root = repo / "configs"
     if not root.is_dir():
         return []
@@ -120,12 +126,73 @@ def discover_configs(repo: Path) -> list[ConfigRecord]:
     for path in sorted(root.glob("*.yaml"), key=lambda p: p.name):
         data = _safe_load(path)
         cid = str(data.get("id", path.stem))
-        out.append(ConfigRecord(id=cid, path=path, data=data))
+        out.append(ConfigRecord(id=cid, path=path, data=data, source=source))
     return out
+
+
+def discover_runtimes_merged() -> list[RuntimeRecord]:
+    from llm_cli.core.scaffold import scaffold_root, user_assets_root
+
+    settings = resolve(load_settings())
+    scaffold = scaffold_root()
+    user = user_assets_root(settings)
+    by_id: dict[str, RuntimeRecord] = {}
+    scaffold_ids: set[str] = set()
+    for rec in discover_runtimes(scaffold, source="scaffold"):
+        by_id[rec.id] = rec
+        scaffold_ids.add(rec.id)
+    for rec in discover_runtimes(user, source="user"):
+        by_id[rec.id] = rec
+    return [by_id[k] for k in sorted(by_id)]
+
+
+def discover_configs_merged() -> list[ConfigRecord]:
+    from llm_cli.core.scaffold import scaffold_root, user_assets_root
+
+    settings = resolve(load_settings())
+    scaffold = scaffold_root()
+    user = user_assets_root(settings)
+    by_id: dict[str, ConfigRecord] = {}
+    for rec in discover_configs(scaffold, source="scaffold"):
+        by_id[rec.id] = rec
+    for rec in discover_configs(user, source="user"):
+        by_id[rec.id] = rec
+    return [by_id[k] for k in sorted(by_id)]
+
+
+def discover_benchmarks_merged() -> list[BenchmarkRecord]:
+    from llm_cli.core.scaffold import scaffold_root, user_assets_root
+
+    settings = resolve(load_settings())
+    scaffold = scaffold_root()
+    user = user_assets_root(settings)
+    by_id: dict[str, BenchmarkRecord] = {}
+    for rec in discover_benchmarks(scaffold, source="scaffold"):
+        by_id[rec.id] = rec
+    for rec in discover_benchmarks(user, source="user"):
+        by_id[rec.id] = rec
+    return [by_id[k] for k in sorted(by_id)]
+
+
+def runtime_overrides_scaffold(runtime_id: str) -> bool:
+    """True when a user-layer runtime shadows a scaffold id."""
+    from llm_cli.core.scaffold import scaffold_root, user_assets_root
+
+    settings = resolve(load_settings())
+    user = user_assets_root(settings) / "runtimes" / runtime_id
+    scaffold = scaffold_root() / "runtimes" / runtime_id
+    return user.is_dir() and scaffold.is_dir()
 
 
 def get_runtime(repo: Path, runtime_id: str) -> RuntimeRecord | None:
     for r in discover_runtimes(repo):
+        if r.id == runtime_id:
+            return r
+    return None
+
+
+def get_runtime_merged(runtime_id: str) -> RuntimeRecord | None:
+    for r in discover_runtimes_merged():
         if r.id == runtime_id:
             return r
     return None
@@ -179,13 +246,29 @@ def load_runtime_manifests(repo: Path) -> list[RuntimeManifest]:
     return [_to_manifest(r) for r in discover_runtimes(repo)]
 
 
+def load_runtime_manifests_merged() -> list[RuntimeManifest]:
+    return [_to_manifest(r) for r in discover_runtimes_merged()]
+
+
 def get_runtime_manifest(repo: Path, runtime_id: str) -> RuntimeManifest | None:
     rec = get_runtime(repo, runtime_id)
     return _to_manifest(rec) if rec is not None else None
 
 
+def get_runtime_manifest_merged(runtime_id: str) -> RuntimeManifest | None:
+    rec = get_runtime_merged(runtime_id)
+    return _to_manifest(rec) if rec is not None else None
+
+
 def get_config(repo: Path, config_id: str) -> ConfigRecord | None:
     for c in discover_configs(repo):
+        if c.id == config_id:
+            return c
+    return None
+
+
+def get_config_merged(config_id: str) -> ConfigRecord | None:
+    for c in discover_configs_merged():
         if c.id == config_id:
             return c
     return None
@@ -213,7 +296,7 @@ def validate_config_v2(repo: Path, cfg: ConfigRecord) -> tuple[list[str], list[s
         errs.append(f"{cfg.id}: runtime must be a string")
         return errs, warnings
 
-    rt = get_runtime(repo, rt_id)
+    rt = get_runtime_merged(rt_id)
     rt_manifest = _to_manifest(rt) if rt is not None else None
     if rt is None:
         errs.append(f"{cfg.id}: unknown runtime {rt_id!r}")

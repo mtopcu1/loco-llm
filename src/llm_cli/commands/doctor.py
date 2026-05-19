@@ -11,9 +11,10 @@ from llm_cli.core.doctor import (
     CheckStatus,
     check_all,
     load_requirements,
+    run_quick_checks,
     systemd_linger_advisory,
 )
-from llm_cli.core.repo import repo_root
+from llm_cli.core.repo import scaffold_root
 
 console = Console()
 doctor_app = typer.Typer(
@@ -50,12 +51,25 @@ def doctor(
     all_runtimes: bool = typer.Option(
         False, "--all", help="Include every runtime's deps (installed or not)."
     ),
+    quick: bool = typer.Option(
+        False,
+        "--quick",
+        help="Fast checks only (settings, scaffold dir, requirements.yaml).",
+    ),
 ) -> None:
     """Run requirement checks: universal + runtime-scoped extras."""
     if ctx.invoked_subcommand is not None:
         return
 
-    repo = repo_root()
+    if quick:
+        ok, detail = run_quick_checks()
+        if ok:
+            console.print("[green]quick checks passed[/green]")
+            return
+        console.print(f"[red]error:[/red] {detail}")
+        raise typer.Exit(code=1)
+
+    repo = scaffold_root()
     universal = load_requirements(_requirements_yaml(repo))
 
     from llm_cli.core.doctor import (
@@ -75,7 +89,7 @@ def doctor(
         from llm_cli.core import registry as _registry
         from llm_cli.core.install_record import read_record
 
-        mf = _registry.get_runtime_manifest(repo, runtime)
+        mf = _registry.get_runtime_manifest_merged(runtime)
         if mf is None:
             console.print(f"[red]error:[/red] unknown runtime {runtime!r}")
             raise typer.Exit(code=1)
@@ -151,10 +165,10 @@ def render_requirements() -> None:
         requirements_for_runtime,
     )
 
-    repo = repo_root()
+    repo = scaffold_root()
     universal = load_requirements(_requirements_yaml(repo))
     by_runtime: dict[str, list] = {}
-    for mf in _registry.load_runtime_manifests(repo):
+    for mf in _registry.load_runtime_manifests_merged():
         defaults = {spec.key: spec.default for spec in mf.build_schema if spec.default is not None}
         reqs = requirements_for_runtime(repo, mf.id, build_params=defaults)
         if reqs:

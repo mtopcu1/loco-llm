@@ -29,10 +29,11 @@ def test_setup_default_writes_settings_and_creates_dirs(
     cfg = settings_path()
     assert cfg.is_file()
     stored = yaml.safe_load(cfg.read_text(encoding="utf-8"))
-    assert stored["repo_root"] == str(repo)
     assert stored["data_root"] == str(data)
+    assert "repo_root" not in stored
     assert data.is_dir()
     assert (data / "runtimes").is_dir()
+    assert (data / "user" / "configs").is_dir()
 
 
 def test_setup_interactive_default_layout(tmp_path, monkeypatch) -> None:
@@ -52,7 +53,7 @@ def test_setup_interactive_default_layout(tmp_path, monkeypatch) -> None:
 
     cfg = settings_path()
     stored = yaml.safe_load(cfg.read_text(encoding="utf-8"))
-    assert stored == {"data_root": str(data), "repo_root": str(repo)}
+    assert stored == {"data_root": str(data)}
     assert (data / "runtimes").is_dir()
 
 
@@ -80,8 +81,8 @@ def test_setup_interactive_granular_layout(tmp_path, monkeypatch) -> None:
 
     cfg = settings_path()
     stored = yaml.safe_load(cfg.read_text(encoding="utf-8"))
-    assert stored["repo_root"] == str(repo)
     assert stored["data_root"] == str(data)
+    assert "repo_root" not in stored
     assert stored["runtimes_dir"] == str(rt_override)
     assert "models_dir" not in stored
     assert "cache_dir" not in stored

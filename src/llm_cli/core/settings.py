@@ -12,7 +12,7 @@ import yaml
 @dataclass(frozen=True)
 class Settings:
     data_root: Path
-    repo_root: Path
+    repo_root: Path | None
     runtimes_dir: Path
     models_dir: Path
     cache_dir: Path
@@ -27,8 +27,8 @@ KEY_REGISTRY: dict[str, dict[str, Any]] = {
     },
     "repo_root": {
         "default": None,
-        "required": True,
-        "prompt": "Path to the LocalLLM repo clone",
+        "required": False,
+        "prompt": "Path to the LocalLLM repo clone (dev/editable installs only)",
         "kind": "path",
     },
     "runtimes_dir": {
@@ -125,11 +125,7 @@ def resolve(values: dict[str, str]) -> Settings:
     data_root = _expand(data_root_raw)
 
     repo_root_raw = values.get("repo_root")
-    if not repo_root_raw:
-        raise MissingSettingError(
-            "repo_root is not configured; run `llm setup` from inside the repo"
-        )
-    repo_root = _expand(repo_root_raw)
+    repo_root = _expand(repo_root_raw) if repo_root_raw else None
 
     def _dir(key: str, suffix: str) -> Path:
         override = values.get(key)
@@ -145,7 +141,7 @@ def resolve(values: dict[str, str]) -> Settings:
 
 
 def ensure_data_dirs(settings: Settings) -> None:
-    """Create data_root + the three resolved data subdirectories if absent."""
+    """Create data_root + resolved data subdirectories and user asset dirs."""
     for target in (
         settings.data_root,
         settings.runtimes_dir,
@@ -153,3 +149,6 @@ def ensure_data_dirs(settings: Settings) -> None:
         settings.cache_dir,
     ):
         target.mkdir(parents=True, exist_ok=True)
+    user_root = settings.data_root / "user"
+    for sub in ("runtimes", "configs", "benchmarks"):
+        (user_root / sub).mkdir(parents=True, exist_ok=True)

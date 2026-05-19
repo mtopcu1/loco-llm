@@ -27,11 +27,12 @@ from llm_cli.core.install_record import (
     schema_hash,
     write_record,
 )
-from llm_cli.core.lifecycle import append_history
+from llm_cli.core.lifecycle import append_history, state_root
 from llm_cli.core.params import derive_env_name, validate_params
-from llm_cli.core.repo import repo_root
+from llm_cli.core.repo import scaffold_root
+from llm_cli.core.scaffold import user_runtimes_dir
 from llm_cli.core.settings import Settings, load_settings, resolve
-from llm_cli.core.wsl import run_repo_bash
+from llm_cli.core.wsl import run_runtime_bash
 
 console = Console()
 runtime_app = typer.Typer(
@@ -100,10 +101,8 @@ def _run_install_for_id(
     param: list[str] | None = None,
     yes: bool = False,
 ) -> None:
-    repo = repo_root()
     settings = _settings()
     _install_impl(
-        repo=repo,
         settings=settings,
         runtime_id=runtime_id,
         param=list(param or []),
@@ -114,9 +113,10 @@ def _run_install_for_id(
 def _runtime_setup_preset() -> str:
     from llm_cli.core import wizards as wiz
 
-    repo = repo_root()
     settings = _settings()
-    manifests = [m for m in registry.load_runtime_manifests(repo) if m.kind == "official"]
+    manifests = [
+        m for m in registry.load_runtime_manifests_merged() if m.kind == "official"
+    ]
     if not manifests:
         console.print("[red]error:[/red] no official runtimes found in runtimes/")
         raise typer.Exit(code=1)
@@ -130,7 +130,6 @@ def _runtime_setup_custom() -> str:
 
     from llm_cli.core import wizards as wiz
 
-    repo = repo_root()
     settings = _settings()
 
     def _slug_ok(v: str) -> str | None:
@@ -143,7 +142,14 @@ def _runtime_setup_custom() -> str:
         return None
 
     rt_id = wiz.text("Runtime id (slug, e.g. 'vllm-custom')", validate=_slug_ok).strip()
-    rt_dir = repo / "runtimes" / rt_id
+    rt_dir = user_runtimes_dir(settings) / rt_id
+    if registry.get_runtime_merged(rt_id) is not None:
+        console.print(
+            f"[red]error:[/red] runtime {rt_id!r} already exists. "
+            f"Pick a different id, or use `llm runtime uninstall {rt_id} --purge` "
+            f"if you own a user-layer copy."
+        )
+        raise typer.Exit(code=1)
     if rt_dir.exists():
         console.print(
             f"[red]error:[/red] runtime {rt_id!r} already exists at {rt_dir}. "
@@ -231,7 +237,7 @@ def _runtime_setup_custom() -> str:
     _atomic_write_runtime(rt_dir / "serve.sh", serve_sh, executable=True)
     _atomic_write_runtime(rt_dir / "healthcheck.sh", _DEFAULT_HEALTHCHECK_SH, executable=True)
 
-    rec_disc = registry.get_runtime(repo, rt_id)
+    rec_disc = registry.get_runtime_merged(rt_id)
     if rec_disc is None:
         console.print("[red]error:[/red] failed to load new runtime record")
         raise typer.Exit(code=1)
@@ -253,13 +259,13 @@ def _runtime_setup_custom() -> str:
     )
     write_record(settings.runtimes_dir, record)
     append_history(
-        repo,
+        state_root(settings),
         {"action": "runtime-setup", "id": rt_id, "kind": "custom"},
     )
-    console.print(f"[green]wrote[/green] runtimes/{rt_id}/manifest.yaml")
-    console.print(f"[green]wrote[/green] runtimes/{rt_id}/params.yaml")
-    console.print(f"[green]wrote[/green] runtimes/{rt_id}/serve.sh")
-    console.print(f"[green]wrote[/green] runtimes/{rt_id}/healthcheck.sh")
+    console.print(f"[green]wrote[/green] user/runtimes/{rt_id}/manifest.yaml")
+    console.print(f"[green]wrote[/green] user/runtimes/{rt_id}/params.yaml")
+    console.print(f"[green]wrote[/green] user/runtimes/{rt_id}/serve.sh")
+    console.print(f"[green]wrote[/green] user/runtimes/{rt_id}/healthcheck.sh")
     console.print(f"[green]wrote[/green] {settings.runtimes_dir / rt_id / '.installed'}")
     console.print(f"\nNext: llm config setup --runtime {rt_id}")
     typer.echo(rt_id)
@@ -355,37 +361,28 @@ def _build_env(
 def _run_build_script(
     *,
     settings: Settings,
-    repo: Path,
-    runtime_id: str,
+    runtime_path: Path,
     env: dict[str, str],
 ) -> int:
-    """Run runtimes/<id>/build.sh via repo bash; patch point for tests."""
-    return run_repo_bash(
-        settings,
-        f"runtimes/{runtime_id}/build.sh",
-        extra_env=env,
-    )
+    """Run build.sh in the runtime asset directory; patch point for tests."""
+    return run_runtime_bash(settings, runtime_path, "build.sh", extra_env=env)
 
 
 def _run_verify_script(
     *,
     settings: Settings,
-    repo: Path,
-    runtime_id: str,
+    runtime_path: Path,
     env: dict[str, str],
 ) -> int | None:
-    """Run runtimes/<id>/verify.sh if present; patch point for tests."""
-    if not (repo / "runtimes" / runtime_id / "verify.sh").is_file():
+    """Run verify.sh if present; patch point for tests."""
+    if not (runtime_path / "verify.sh").is_file():
         return None
-    return run_repo_bash(
-        settings,
-        f"runtimes/{runtime_id}/verify.sh",
-        extra_env=env,
-    )
+    return run_runtime_bash(settings, runtime_path, "verify.sh", extra_env=env)
 
 
-def _pre_flight(repo: Path, runtime_id: str, build_params: dict[str, Any]) -> None:
-    requirements = requirements_for_runtime(repo, runtime_id, build_params=build_params)
+def _pre_flight(runtime_id: str, build_params: dict[str, Any]) -> None:
+    scaffold = scaffold_root()
+    requirements = requirements_for_runtime(scaffold, runtime_id, build_params=build_params)
     if not requirements:
         return
 
@@ -403,8 +400,8 @@ def _pre_flight(repo: Path, runtime_id: str, build_params: dict[str, Any]) -> No
     raise typer.Exit(code=1)
 
 
-def _get_runtime_manifest(repo: Path, runtime_id: str) -> registry.RuntimeManifest:
-    manifest = registry.get_runtime_manifest(repo, runtime_id)
+def _get_runtime_manifest(runtime_id: str) -> registry.RuntimeManifest:
+    manifest = registry.get_runtime_manifest_merged(runtime_id)
     if manifest is None:
         console.print(f"[red]error:[/red] unknown runtime {runtime_id!r}")
         raise typer.Exit(code=1)
@@ -413,13 +410,16 @@ def _get_runtime_manifest(repo: Path, runtime_id: str) -> registry.RuntimeManife
 
 def _install_impl(
     *,
-    repo: Path,
     settings: Settings,
     runtime_id: str,
     param: list[str],
     yes: bool,
 ) -> InstallRecord:
-    manifest = _get_runtime_manifest(repo, runtime_id)
+    manifest = _get_runtime_manifest(runtime_id)
+    runtime_rec = registry.get_runtime_merged(runtime_id)
+    if runtime_rec is None:
+        console.print(f"[red]error:[/red] unknown runtime {runtime_id!r}")
+        raise typer.Exit(code=1)
     if manifest.kind == "custom":
         console.print(
             f"[red]error:[/red] runtime {runtime_id!r} is kind: custom — it has no "
@@ -428,18 +428,18 @@ def _install_impl(
         )
         raise typer.Exit(code=1)
     build_params = _resolve_build_params(manifest.build_schema, flags=param, yes=yes)
-    _pre_flight(repo, runtime_id, build_params)
+    _pre_flight(runtime_id, build_params)
 
     build_env = _build_env(runtime_id, manifest.build_schema, build_params)
     build_rc = _run_build_script(
-        settings=settings, repo=repo, runtime_id=runtime_id, env=build_env
+        settings=settings, runtime_path=runtime_rec.path, env=build_env
     )
     if build_rc != 0:
         console.print(f"[red]build failed[/red] (exit {build_rc})")
         raise typer.Exit(code=build_rc)
 
     verify_rc = _run_verify_script(
-        settings=settings, repo=repo, runtime_id=runtime_id, env=build_env
+        settings=settings, runtime_path=runtime_rec.path, env=build_env
     )
     if verify_rc not in (None, 0):
         console.print(f"[red]verify failed[/red] (exit {verify_rc})")
@@ -456,7 +456,7 @@ def _install_impl(
     )
     write_record(settings.runtimes_dir, record)
     append_history(
-        repo,
+        state_root(settings),
         {
             "action": "runtime-install",
             "id": runtime_id,
@@ -482,9 +482,8 @@ def runtime_setup_command() -> None:
 def runtime_list(
     as_json: bool = typer.Option(False, "--json", help="Emit JSON."),
 ) -> None:
-    repo = repo_root()
     settings = _settings()
-    manifests = registry.load_runtime_manifests(repo)
+    manifests = registry.load_runtime_manifests_merged()
 
     rows: list[dict[str, Any]] = []
     for manifest in manifests:
@@ -529,11 +528,13 @@ def runtime_list(
 
 @runtime_app.command("info", help="Show manifest, install record, and drift.")
 def runtime_info(runtime_id: str = typer.Argument(...)) -> None:
-    repo = repo_root()
     settings = _settings()
-    manifest = _get_runtime_manifest(repo, runtime_id)
+    manifest = _get_runtime_manifest(runtime_id)
+    rec = registry.get_runtime_merged(runtime_id)
 
     console.print(f"[bold]{manifest.id}[/bold] - {manifest.display_name}")
+    if rec is not None:
+        console.print(f"source: {rec.source}")
     console.print(f"official: {'yes' if manifest.official else 'no'}")
     if manifest.description:
         console.print(f"description: {manifest.description}")
@@ -594,10 +595,9 @@ def runtime_install(
     ),
     yes: bool = typer.Option(False, "--yes", help="Accept defaults; skip prompts."),
 ) -> None:
-    repo = repo_root()
     settings = _settings()
     record = _install_impl(
-        repo=repo, settings=settings, runtime_id=runtime_id, param=list(param), yes=yes
+        settings=settings, runtime_id=runtime_id, param=list(param), yes=yes
     )
     summary = ", ".join(f"{k}={v}" for k, v in record.build_params.items())
     console.print(f"[green]installed[/green] {runtime_id} ({summary or 'no params'})")
@@ -611,7 +611,6 @@ def runtime_uninstall(
     purge: bool = typer.Option(False, "--purge", help="Also delete the install directory."),
     yes: bool = typer.Option(False, "--yes", help="Skip confirmation prompts."),
 ) -> None:
-    repo = repo_root()
     settings = _settings()
     runtime_dir = settings.runtimes_dir / runtime_id
 
@@ -636,7 +635,8 @@ def runtime_uninstall(
     if purge and runtime_dir.exists():
         shutil.rmtree(runtime_dir)
     append_history(
-        repo, {"action": "runtime-uninstall", "id": runtime_id, "purge": purge}
+        state_root(settings),
+        {"action": "runtime-uninstall", "id": runtime_id, "purge": purge},
     )
     console.print(
         f"[green]uninstalled[/green] {runtime_id}" + (" (purged)" if purge else "")
@@ -654,9 +654,8 @@ def runtime_rebuild(
     ),
     yes: bool = typer.Option(False, "--yes", help="Accept defaults; skip prompts."),
 ) -> None:
-    repo = repo_root()
     settings = _settings()
-    mf = registry.get_runtime_manifest(repo, runtime_id)
+    mf = registry.get_runtime_manifest_merged(runtime_id)
     if mf is None:
         console.print(f"[red]error:[/red] unknown runtime {runtime_id!r}")
         raise typer.Exit(code=1)
@@ -676,10 +675,10 @@ def runtime_rebuild(
 
     clear_record(settings.runtimes_dir, runtime_id)
     new_record = _install_impl(
-        repo=repo, settings=settings, runtime_id=runtime_id, param=flags, yes=yes
+        settings=settings, runtime_id=runtime_id, param=flags, yes=yes
     )
     append_history(
-        repo, {"action": "runtime-rebuild", "id": runtime_id, "reset": reset}
+        state_root(settings), {"action": "runtime-rebuild", "id": runtime_id, "reset": reset}
     )
     summary = ", ".join(f"{k}={v}" for k, v in new_record.build_params.items())
     console.print(f"[green]rebuilt[/green] {runtime_id} ({summary or 'no params'})")

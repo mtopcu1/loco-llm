@@ -54,6 +54,10 @@ def _seed_repo(tmp_path: Path, monkeypatch) -> Path:
     return tmp_path
 
 
+def _user_config_path(tmp_path: Path, name: str) -> Path:
+    return tmp_path / "data" / "user" / "configs" / name
+
+
 def _valid_value_for_spec(spec) -> str:
     from llm_cli.core.params import ParamType
 
@@ -108,7 +112,7 @@ def test_config_setup_writes_valid_yaml(monkeypatch, tmp_path):
         ],
     )
     assert result.exit_code == 0, result.output
-    out_path = repo / "configs" / "llamacpp__qwen-7b__default.yaml"
+    out_path = _user_config_path(tmp_path, "llamacpp__qwen-7b__default.yaml")
     assert out_path.is_file()
     text = out_path.read_text(encoding="utf-8")
     assert "gguf_path: ${model_path}" in text
@@ -158,7 +162,7 @@ def test_config_setup_skips_bound_path_when_model_set(monkeypatch, tmp_path):
     assert result.exit_code == 0, result.output
     assert "gguf_path" in captured["skip_keys"]
     assert "gguf_path" in captured["readonly_keys"]
-    out_path = repo / "configs" / "llamacpp__qwen-7b__default.yaml"
+    out_path = _user_config_path(tmp_path, "llamacpp__qwen-7b__default.yaml")
     text_out = out_path.read_text(encoding="utf-8")
     assert "gguf_path: ${model_path}" in text_out
 
@@ -190,7 +194,7 @@ def test_config_setup_abort_writes_nothing(monkeypatch, tmp_path):
         ],
     )
     assert result.exit_code != 0
-    assert not (repo / "configs" / "llamacpp__qwen-7b__default.yaml").exists()
+    assert not _user_config_path(tmp_path, "llamacpp__qwen-7b__default.yaml").exists()
 
 
 def test_config_setup_no_compatible_models(monkeypatch, tmp_path):

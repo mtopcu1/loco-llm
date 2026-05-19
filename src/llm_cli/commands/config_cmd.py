@@ -13,7 +13,7 @@ from rich.console import Console
 
 from llm_cli.core import registry
 from llm_cli.core.config_resolve import resolve_config_for_display
-from llm_cli.core.lifecycle import append_history
+from llm_cli.core.lifecycle import append_history, state_root
 from llm_cli.core.model_bindings import (
     apply_model_bindings,
     bound_keys_to_skip,
@@ -22,7 +22,8 @@ from llm_cli.core.model_registry import get_entry, load_registry
 from llm_cli.core.param_grid_models import MetaField
 from llm_cli.core.params import validate_params
 from llm_cli.core.recommendations import recommend
-from llm_cli.core.repo import repo_root
+from llm_cli.core.repo import scaffold_root
+from llm_cli.core.scaffold import user_configs_dir
 from llm_cli.core.settings import load_settings, resolve
 from llm_cli.core.specs import detect_all
 
@@ -66,9 +67,9 @@ def do_config_new(
     via: str = "new",
     config_id: Optional[str] = None,
 ) -> str:
-    """Write configs/<id>.yaml and return the config id."""
-    repo = repo_root()
-    rt = registry.get_runtime_manifest(repo, runtime_id)
+    """Write user/configs/<id>.yaml and return the config id."""
+    settings = resolve(load_settings())
+    rt = registry.get_runtime_manifest_merged(runtime_id)
     if rt is None:
         raise typer.BadParameter(f"no runtime named {runtime_id!r}")
 
@@ -97,7 +98,8 @@ def do_config_new(
         else f"{runtime_id}__{preset}"
     )
     cid = (config_id.strip() if config_id else derived)
-    out_path = repo / "configs" / f"{cid}.yaml"
+    configs_dir = user_configs_dir(settings)
+    out_path = configs_dir / f"{cid}.yaml"
     if out_path.exists() and not force:
         console.print(
             f"[red]error:[/red] {out_path} exists; pass --force to overwrite"
@@ -115,7 +117,7 @@ def do_config_new(
     doc["readiness"] = {"timeout_seconds": 600}
 
     _atomic_write_yaml(out_path, doc)
-    append_history(repo, {"action": "config-create", "id": cid, "via": via})
+    append_history(state_root(settings), {"action": "config-create", "id": cid, "via": via})
     typer.echo(cid)
     return cid
 
@@ -129,14 +131,13 @@ def do_config_setup(
     """Interactive config authoring; returns config id or None on abort."""
     from llm_cli.core import wizards as wiz
 
-    repo = repo_root()
     settings = resolve(load_settings())
     specs = detect_all(
-        repo_root=settings.repo_root.as_posix(),
+        repo_root=scaffold_root().as_posix(),
         data_root=settings.data_root.as_posix(),
     )
 
-    manifests = registry.load_runtime_manifests(repo)
+    manifests = registry.load_runtime_manifests_merged()
     if not manifests:
         console.print("[red]error:[/red] no runtimes found under runtimes/")
         return None
@@ -146,7 +147,7 @@ def do_config_setup(
     else:
         rid = runtime_id
 
-    mf = registry.get_runtime_manifest(repo, rid)
+    mf = registry.get_runtime_manifest_merged(rid)
     if mf is None:
         console.print(f"[red]error:[/red] unknown runtime {rid!r}")
         return None
@@ -249,7 +250,7 @@ def do_config_setup(
             f"(differs from derived `{expected_id}`)"
         )
 
-    out_path = repo / "configs" / f"{config_id}.yaml"
+    out_path = user_configs_dir(settings) / f"{config_id}.yaml"
     doc: dict[str, Any] = {"id": config_id, "runtime": rid}
     if mid:
         doc["model"] = mid
@@ -260,7 +261,10 @@ def do_config_setup(
     }
     doc["readiness"] = {"timeout_seconds": 600}
     _atomic_write_yaml(out_path, doc)
-    append_history(repo, {"action": "config-create", "id": config_id, "via": "setup"})
+    append_history(
+        state_root(settings),
+        {"action": "config-create", "id": config_id, "via": "setup"},
+    )
     typer.echo(config_id)
     return config_id
 
@@ -271,11 +275,11 @@ def config_show(
     as_json: bool = typer.Option(False, "--json", help="Print JSON instead of YAML."),
 ) -> None:
     """Print a single resolved config (expands ${data_root} in serve.env)."""
-    repo = repo_root()
-    cfg = registry.get_config(repo, config_id)
+    cfg = registry.get_config_merged(config_id)
     if cfg is None:
         console.print(f"[red]error:[/red] unknown config {config_id!r}")
         raise typer.Exit(code=1)
+    console.print(f"[dim]source:[/dim] {cfg.source}")
     resolved = resolve_config_for_display(cfg, resolve(load_settings()))
     if as_json:
         typer.echo(json.dumps(resolved, indent=2))
@@ -286,15 +290,15 @@ def config_show(
 @config_app.command("validate")
 def config_validate() -> None:
     """Validate every configs/*.yaml against repo manifests and script layout."""
-    repo = repo_root()
-    configs = registry.discover_configs(repo)
+    configs = registry.discover_configs_merged()
     if not configs:
         console.print("[yellow]warning:[/yellow] no configs/*.yaml found")
         raise typer.Exit(code=0)
 
     bad = 0
+    scaffold = scaffold_root()
     for cfg in configs:
-        errors, warnings = registry.validate_config_v2(repo, cfg)
+        errors, warnings = registry.validate_config_v2(scaffold, cfg)
         if errors:
             bad += 1
             console.print(f"[red]{cfg.id}[/red]")
@@ -319,7 +323,7 @@ def config_new(
     param: list[str] = typer.Option([], "--param", help="key=value (repeatable)."),
     force: bool = typer.Option(False, "--force"),
 ) -> None:
-    """Write configs/<id>.yaml without prompts."""
+    """Write user/configs/<id>.yaml without prompts."""
     raw_params: dict[str, str] = {}
     for token in param:
         k, v = _parse_param(token)
@@ -342,7 +346,7 @@ def config_setup(
     model: Optional[str] = typer.Option(None, "--model"),
     preset: str = typer.Option("default", "--preset"),
 ) -> None:
-    """Interactive wizard for configs/*.yaml."""
+    """Interactive wizard for user/configs/*.yaml."""
     cid = do_config_setup(runtime_id=runtime, model_id=model, preset=preset)
     if cid is None:
         raise typer.Exit(code=1)

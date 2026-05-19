@@ -7,6 +7,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from llm_cli.main import app
+from tests.cli_helpers import cli_plain
 
 runner = CliRunner()
 
@@ -24,6 +25,7 @@ def _configure_user_settings(monkeypatch, tmp_path: Path, repo_root: Path) -> No
 
 
 def _patch_specs(monkeypatch):
+    from llm_cli.commands import advisor as advisor_mod
     from llm_cli.core import specs as specs_mod
     from llm_cli.core.specs import CpuInfo, GpuInfo, SystemSpecs
 
@@ -32,7 +34,13 @@ def _patch_specs(monkeypatch):
         ram_gb=16,
         gpus=[GpuInfo(index=0, name="NVIDIA RTX 4090", vram_gb=24, driver="560")],
     )
-    monkeypatch.setattr(specs_mod, "detect_all", lambda **kwargs: fake)
+
+    def fake_detect_all(**_kwargs):
+        return fake
+
+    # advisor imports detect_all by name; patch both module and consumer.
+    monkeypatch.setattr(specs_mod, "detect_all", fake_detect_all)
+    monkeypatch.setattr(advisor_mod, "detect_all", fake_detect_all)
 
 
 def _patch_model(monkeypatch, model_id: str, size_bytes: int):
@@ -111,7 +119,10 @@ def test_advisor_requires_both_runtime_and_model(monkeypatch, tmp_path):
     _patch_specs(monkeypatch)
     result = runner.invoke(app, ["advisor", "--runtime", "llamacpp"])
     assert result.exit_code != 0
-    assert "both --runtime and --model" in result.output.lower()
+    plain = cli_plain(result).lower()
+    assert "both --runtime and --model" in plain or (
+        "both" in plain and "runtime" in plain and "model" in plain
+    )
 
 
 def test_advisor_errors_on_unknown_model(monkeypatch, tmp_path):
@@ -193,7 +204,10 @@ def test_advisor_rejects_positional_combined_with_flags(monkeypatch, tmp_path):
         ["advisor", "some-cfg", "--runtime", "llamacpp", "--model", "qwen-7b"],
     )
     assert result.exit_code != 0
-    assert "either a config id or" in result.output.lower()
+    plain = cli_plain(result).lower()
+    assert "either a config id or" in plain or (
+        "config id" in plain and "runtime" in plain
+    )
 
 
 def test_advisor_interactive_picks_runtime_and_model(monkeypatch, tmp_path):

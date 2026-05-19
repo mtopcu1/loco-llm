@@ -7,7 +7,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from llm_cli.core.repo import repo_root
+from llm_cli.core.repo import scaffold_root
 from llm_cli.core.settings import MissingSettingError, load_settings, resolve
 from llm_cli.core.specs import (
     MarkersMissingError,
@@ -45,7 +45,7 @@ def specs_command(
     ),
 ) -> None:
     """Regenerate the auto block in specs.md."""
-    repo = repo_root()
+    repo = scaffold_root()
     new_block = _gather_block(repo)
 
     if print_only:

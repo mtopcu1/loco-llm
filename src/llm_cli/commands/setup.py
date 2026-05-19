@@ -7,6 +7,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from llm_cli.core.scaffold import scaffold_dir
 from llm_cli.core.settings import (
     KEY_REGISTRY,
     ensure_data_dirs,
@@ -24,14 +25,44 @@ def _default_data_root() -> str:
     )
 
 
+def _detect_dev_repo_root() -> Path | None:
+    """When cwd is a git checkout, offer repo_root for editable dev installs."""
+    cwd = Path.cwd().resolve()
+    if (cwd / ".git").is_dir():
+        return cwd
+    return None
+
+
+def _maybe_bootstrap_scaffold_message() -> None:
+    root = scaffold_dir()
+    if not root.is_dir():
+        console.print(
+            "[yellow]note:[/yellow] scaffold assets are not installed yet; "
+            "run `llm update --scaffold-only` after setup."
+        )
+        return
+    try:
+        has_assets = any(root.iterdir())
+    except OSError:
+        has_assets = False
+    if not has_assets:
+        console.print(
+            "[yellow]note:[/yellow] scaffold directory is empty; "
+            "run `llm update --scaffold-only` to fetch official assets."
+        )
+
+
 def setup(
     default: bool = typer.Option(
         False, "--default", help="Non-interactive: use defaults for every key."
     ),
 ) -> None:
     """Configure machine-local settings (~/.config/llm/config.yaml)."""
-    repo_root = Path.cwd().resolve()
-    stored: dict[str, str] = {"repo_root": str(repo_root)}
+    stored: dict[str, str] = {}
+
+    dev_repo = _detect_dev_repo_root()
+    if dev_repo is not None:
+        stored["repo_root"] = str(dev_repo)
 
     if default:
         stored["data_root"] = _default_data_root()
@@ -46,16 +77,27 @@ def setup(
         )
         if not granular:
             stored.update(_prompt_dir_overrides(stored["data_root"]))
+        if dev_repo is not None and typer.confirm(
+            f"Use this checkout as repo_root for development ({dev_repo})?",
+            default=True,
+        ):
+            stored["repo_root"] = str(dev_repo)
+        elif "repo_root" in stored:
+            del stored["repo_root"]
 
     path = save_settings(stored)
     resolved = resolve(load_settings())
     ensure_data_dirs(resolved)
+    _maybe_bootstrap_scaffold_message()
     console.print(f"[green]wrote[/green] {path}")
     console.print(f"[green]data_root[/green]: {resolved.data_root}")
     console.print(f"[green]runtimes_dir[/green]: {resolved.runtimes_dir}")
     console.print(f"[green]models_dir[/green]: {resolved.models_dir}")
     console.print(f"[green]cache_dir[/green]: {resolved.cache_dir}")
-    console.print(f"[green]repo_root[/green]: {resolved.repo_root}")
+    if resolved.repo_root is not None:
+        console.print(f"[green]repo_root[/green]: {resolved.repo_root}")
+    else:
+        console.print("[dim]repo_root[/dim]: (not set — using managed scaffold)")
 
     if default:
         console.print()

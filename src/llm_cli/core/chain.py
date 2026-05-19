@@ -146,9 +146,11 @@ def _do_serve(config_id: str) -> int:
 def run_setup_chain() -> int:
     """Interactive post-settings chain (runtime → model URL → config → serve)."""
     from llm_cli.commands.model_cmd import PullModelError
-    from llm_cli.core.repo import repo_root as _repo_root
+    from llm_cli.core.lifecycle import append_history, state_root
+    from llm_cli.core.settings import load_settings, resolve
 
-    repo = _repo_root()
+    settings = resolve(load_settings())
+    state_base = state_root(settings)
     steps: list[str] = []
     runtime_id: str | None = None
     model_id: str | None = None
@@ -159,7 +161,7 @@ def run_setup_chain() -> int:
             picked = _do_runtime_setup()
         except typer.Exit as exc:
             append_history(
-                repo,
+                state_base,
                 {
                     "action": "setup-chain",
                     "steps": steps,
@@ -183,7 +185,7 @@ def run_setup_chain() -> int:
         except PullModelError as exc:
             console.print(f"[red]error:[/red] {exc}")
             append_history(
-                repo,
+                state_base,
                 {"action": "setup-chain", "steps": steps, "outcome": "model-pull-failed"},
             )
             return 1
@@ -200,7 +202,7 @@ def run_setup_chain() -> int:
         if cid is None:
             console.print("[red]error:[/red] config setup aborted")
             append_history(
-                repo,
+                state_base,
                 {"action": "setup-chain", "steps": steps, "outcome": "aborted"},
             )
             return 1
@@ -214,13 +216,13 @@ def run_setup_chain() -> int:
         code = _do_serve(config_id)
         if code != 0:
             append_history(
-                repo,
+                state_base,
                 {"action": "setup-chain", "steps": steps, "outcome": "serve-failed"},
             )
             return code
         steps.append("serve")
 
-    append_history(repo, {"action": "setup-chain", "steps": steps, "outcome": "ok"})
+    append_history(state_base, {"action": "setup-chain", "steps": steps, "outcome": "ok"})
 
     if config_id and "serve" in steps:
         console.print("\n[green]Tip:[/green] run `llm status` to inspect the server.")

@@ -14,6 +14,8 @@ from llm_cli.commands import serve as serve_cmd
 from llm_cli.commands.advisor import advisor as advisor_cmd
 from llm_cli.commands.doctor import doctor_app
 from llm_cli.commands.settings_cmd import settings_app
+from llm_cli.commands.update_cmd import update as update_cmd
+from llm_cli.core.scaffold_drift import check_scaffold_drift
 
 app = typer.Typer(
     name="llm",
@@ -39,9 +41,11 @@ def root(
     ),
 ) -> None:
     """LocalLLM CLI — manage runtimes, models, configs, and benchmarks."""
+    check_scaffold_drift()
 
 
 app.command("setup", help="Configure machine-local settings.")(setup_cmd.setup)
+app.command("update", help="Upgrade CLI and scaffold assets.")(update_cmd)
 app.command("specs", help="Regenerate the auto block in specs.md.")(specs_cmd.specs_command)
 app.add_typer(doctor_app, name="doctor")
 app.add_typer(settings_app, name="settings")

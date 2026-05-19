@@ -136,10 +136,10 @@ def test_validate_runtime_missing_script(tmp_path: Path) -> None:
     assert any("missing build.sh" in e for e in errs)
 
 
-def test_validate_includes_settings_errors(tmp_path: Path) -> None:
+def test_validate_includes_settings_errors(tmp_path: Path, monkeypatch) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
-    # Runtime with empty accepts_formats so the config doesn't need `model:`.
+    _settings(tmp_path, repo)
     _write_runtime(repo, "rt-a", accepts_formats=[])
     (repo / "configs").mkdir()
     (repo / "configs" / "cfg1.yaml").write_text(
@@ -147,8 +147,16 @@ def test_validate_includes_settings_errors(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     cfg = registry.discover_configs(repo)[0]
-    errs = registry.validate_config(repo, cfg)
-    assert any("settings:" in e for e in errs)
+    rt = registry.get_runtime(repo, "rt-a")
+    assert rt is not None
+    monkeypatch.setattr(registry, "get_runtime_merged", lambda _rid: rt)
+
+    def _bad_resolve(_values):
+        raise ValueError("bad settings")
+
+    monkeypatch.setattr(registry, "resolve", _bad_resolve)
+    errors, _warnings = registry.validate_config_v2(repo, cfg)
+    assert any("settings:" in e for e in errors)
 
 
 def test_runtime_manifest_typed(tmp_path: Path) -> None:
