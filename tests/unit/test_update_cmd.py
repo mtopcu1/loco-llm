@@ -154,6 +154,40 @@ def test_update_check_flag_exits_zero_when_up_to_date(fake_clone):
     assert result.exit_code == 0
 
 
+def test_sync_deps_targets_managed_venv_python(tmp_path, monkeypatch):
+    root = tmp_path / "loco"
+    venv_python = root / ".venv" / "bin" / "python"
+    venv_python.parent.mkdir(parents=True)
+    venv_python.write_text("", encoding="utf-8")
+
+    captured: list[list[str]] = []
+
+    def fake_run(cmd, **kwargs):
+        captured.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(
+        "llm_cli.commands.update_cmd.shutil.which", lambda name: "/usr/bin/uv"
+    )
+    monkeypatch.setattr("llm_cli.commands.update_cmd.subprocess.run", fake_run)
+
+    from llm_cli.commands.update_cmd import _sync_deps
+
+    _sync_deps(root)
+
+    assert captured == [
+        [
+            "/usr/bin/uv",
+            "pip",
+            "install",
+            "--python",
+            str(venv_python),
+            "-e",
+            str(root),
+        ]
+    ]
+
+
 def test_update_refuses_unmanaged_directory(tmp_path, monkeypatch):
     empty = tmp_path / "not-a-clone"
     empty.mkdir()
