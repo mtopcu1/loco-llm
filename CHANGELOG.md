@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.2](https://github.com/mtopcu1/loco-llm/compare/v0.3.1...v0.3.2) (2026-05-19)
+
+
+### Bug Fixes
+
+* **ci:** inline version sync check in release-pr-check ([59ab3c8](https://github.com/mtopcu1/loco-llm/commit/59ab3c83d7552ceb4de3ef20a202af58ca46aaaa))
+* **ci:** inline version sync check in release-pr-check ([4ff2a88](https://github.com/mtopcu1/loco-llm/commit/4ff2a884243572595808f7a04516bc491fe6e35f))
+
+## [0.3.1](https://github.com/mtopcu1/loco-llm/compare/v0.3.0...v0.3.1) (2026-05-19)
+
+
+### Bug Fixes
+
+* **tests:** drop static version assertion and sync manifest check ([#5](https://github.com/mtopcu1/loco-llm/issues/5)) ([136745d](https://github.com/mtopcu1/loco-llm/commit/136745d12f88aa789ee0b1c56935b0f0c085aa17))
+
 ## [0.3.0](https://github.com/mtopcu1/local-llm-scaffold/compare/v0.2.0...v0.3.0) (2026-05-19)
 
 
