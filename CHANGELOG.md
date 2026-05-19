@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.1](https://github.com/mtopcu1/loco-llm/compare/v1.0.0...v1.0.1) (2026-05-19)
+
+
+### Bug Fixes
+
+* **update:** pass managed venv python to uv pip during dep sync ([f25cea4](https://github.com/mtopcu1/loco-llm/commit/f25cea4caeb5e5a709a9fb69af23aaec214f904c))
+* **update:** pass managed venv python to uv pip during dep sync ([de9f64d](https://github.com/mtopcu1/loco-llm/commit/de9f64dec33b71aff829137d35d5c518948aa446))
+
 ## [1.0.0](https://github.com/mtopcu1/loco-llm/compare/v0.3.2...v1.0.0) (2026-05-19)
 
 
