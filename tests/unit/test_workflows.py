@@ -63,7 +63,7 @@ class TestReleasePleaseWorkflow:
         job = doc["jobs"].get("release-pr-check")
         assert job is not None, "expected a release-pr-check job"
         run_steps = [s.get("run", "") for s in job["steps"] if "run" in s]
-        assert any("check_release_versions.py" in cmd for cmd in run_steps)
+        assert any("version sync ok" in cmd or "release-please-manifest" in cmd for cmd in run_steps)
         assert any("python -m build" in cmd for cmd in run_steps)
 
     def test_release_please_publishes_when_release_created(self):

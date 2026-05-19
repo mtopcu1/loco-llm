@@ -48,7 +48,29 @@ jobs:
           python-version: "3.12"
 
       - name: Verify version fields stay in sync
-        run: python scripts/check_release_versions.py
+        run: |
+          python <<'PY'
+          import json, re, sys
+          from pathlib import Path
+          root = Path(".")
+          manifest = json.loads(root.joinpath(".release-please-manifest.json").read_text())["."]
+          pyproject = re.search(
+              r'^version = "([^"]+)"',
+              root.joinpath("pyproject.toml").read_text(),
+              re.MULTILINE,
+          ).group(1)
+          init = re.search(
+              r'__version__ = "([^"]+)"',
+              root.joinpath("src/llm_cli/__init__.py").read_text(),
+          ).group(1)
+          if manifest != pyproject or pyproject != init:
+              print(
+                  f"version mismatch: manifest={manifest} pyproject={pyproject} init={init}",
+                  file=sys.stderr,
+              )
+              raise SystemExit(1)
+          print(f"version sync ok: {pyproject}")
+          PY
 
       - name: Install build + twine
         run: |
