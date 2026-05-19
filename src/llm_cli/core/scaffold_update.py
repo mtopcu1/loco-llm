@@ -95,9 +95,9 @@ def install_scaffold_release(
     """
     del yes
     if scaffold_base is None:
-        from llm_cli.core.scaffold import scaffold_dir
+        from llm_cli.core.scaffold import scaffold_root
 
-        live = scaffold_dir()
+        live = scaffold_root()
     else:
         live = scaffold_base
     parent = live.parent
@@ -149,9 +149,9 @@ def install_scaffold_release(
 def remove_scaffold_backup(scaffold_base: Path | None = None) -> None:
     """Delete ``.old`` scaffold backup after successful verify."""
     if scaffold_base is None:
-        from llm_cli.core.scaffold import scaffold_dir
+        from llm_cli.core.scaffold import scaffold_root
 
-        live = scaffold_dir()
+        live = scaffold_root()
     else:
         live = scaffold_base
     old_dir = live.parent / f"{live.name}.old"
@@ -162,9 +162,9 @@ def remove_scaffold_backup(scaffold_base: Path | None = None) -> None:
 def rollback_scaffold(scaffold_base: Path | None = None) -> None:
     """Restore scaffold from ``.old`` after a failed verify (spec §9.2 step 5.7)."""
     if scaffold_base is None:
-        from llm_cli.core.scaffold import scaffold_dir
+        from llm_cli.core.scaffold import scaffold_root
 
-        live = scaffold_dir()
+        live = scaffold_root()
     else:
         live = scaffold_base
     parent = live.parent

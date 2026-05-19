@@ -7,7 +7,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from llm_cli.core.scaffold import scaffold_dir
+from llm_cli.core.scaffold import scaffold_root
 from llm_cli.core.settings import (
     KEY_REGISTRY,
     ensure_data_dirs,
@@ -34,7 +34,7 @@ def _detect_dev_repo_root() -> Path | None:
 
 
 def _maybe_bootstrap_scaffold_message() -> None:
-    root = scaffold_dir()
+    root = scaffold_root()
     if not root.is_dir():
         console.print(
             "[yellow]note:[/yellow] scaffold assets are not installed yet; "
