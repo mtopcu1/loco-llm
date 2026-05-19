@@ -9,7 +9,9 @@ from llm_cli.core.param_grid import (
     page_index_for_focus,
     run_param_grid,
 )
-from llm_cli.core.param_grid_models import ParamGridResult
+from llm_cli.core.param_grid_layout import cell_indicator
+from llm_cli.core.param_grid_models import ParamCell, ParamGridResult
+from llm_cli.core.params import ParamSpec, ParamType
 
 
 def test_page_index_for_focus() -> None:
@@ -49,28 +51,26 @@ def test_run_param_grid_uses_plain_when_requested(monkeypatch) -> None:
     monkeypatch.setattr("llm_cli.core.param_grid.wizards.use_plain_prompts", lambda: True)
     monkeypatch.setattr(
         "llm_cli.core.param_grid.run_param_grid_plain",
-        lambda cells, meta, *, title, theme: expected,
+        lambda cells, meta, *, specs, title, theme: expected,
     )
 
-    got = run_param_grid([], [], title="T")
+    got = run_param_grid([], [], specs=[], title="T")
     assert got is expected
 
 
 def test_run_param_grid_tui_builds_keybindings(monkeypatch) -> None:
     """Regression: invalid kb.add('any') crashed before Application.run()."""
-    from llm_cli.core.param_grid_models import ParamCell
-    from llm_cli.core.params import ParamType
-
     cells = [
         ParamCell(
             key="ctx",
             label="ctx",
             description="Context",
             value="8192",
-            default="8192",
+            enabled=True,
             param_type=ParamType.INT,
         )
     ]
+    specs = [ParamSpec("ctx", ParamType.INT)]
     expected = ParamGridResult(
         values={"ctx": "8192"},
         meta={},
@@ -89,8 +89,36 @@ def test_run_param_grid_tui_builds_keybindings(monkeypatch) -> None:
     import prompt_toolkit.application as app_mod
 
     monkeypatch.setattr(app_mod, "Application", FakeApp)
-    got = run_param_grid(cells, [], title="Test")
+    got = run_param_grid(cells, [], specs=specs, title="Test")
     assert got is expected
+
+
+def test_toggle_enable_clears_value_when_disabled() -> None:
+    cell = ParamCell(
+        key="ctx",
+        label="ctx",
+        description="",
+        value="8192",
+        enabled=True,
+        param_type=ParamType.INT,
+    )
+    cell.enabled = False
+    cell.value = ""
+    assert cell.enabled is False
+    assert cell.value == ""
+    assert cell_indicator(cell) == "[ ]"
+
+
+def test_toggle_enable_shows_enabled_indicator() -> None:
+    cell = ParamCell(
+        key="flag",
+        label="flag",
+        description="",
+        value="false",
+        enabled=True,
+        param_type=ParamType.BOOL,
+    )
+    assert cell_indicator(cell) == "[x]"
 
 
 def test_run_param_grid_keyboard_interrupt_returns_abort(monkeypatch) -> None:
@@ -100,7 +128,7 @@ def test_run_param_grid_keyboard_interrupt_returns_abort(monkeypatch) -> None:
         raise KeyboardInterrupt
 
     monkeypatch.setattr("llm_cli.core.param_grid._run_param_grid_tui", _raise)
-    got = run_param_grid([], [], title="T")
+    got = run_param_grid([], [], specs=[], title="T")
     assert got.action == "abort"
 
 
@@ -114,7 +142,7 @@ def test_run_param_grid_falls_back_on_import_error(monkeypatch) -> None:
     monkeypatch.setattr("llm_cli.core.param_grid._run_param_grid_tui", _boom)
     monkeypatch.setattr(
         "llm_cli.core.param_grid.run_param_grid_plain",
-        lambda cells, meta, *, title, theme: expected,
+        lambda cells, meta, *, specs, title, theme: expected,
     )
-    got = run_param_grid([], [], title="T")
+    got = run_param_grid([], [], specs=[], title="T")
     assert got is expected

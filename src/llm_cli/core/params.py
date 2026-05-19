@@ -26,7 +26,6 @@ class ParamSpec:
 
     key: str
     type: ParamType
-    default: Any = None
     required: bool = False
     prompt: str | None = None
     env: str | None = None
@@ -82,6 +81,11 @@ def parse_schema(raw: dict[str, Any]) -> list[ParamSpec]:
     for key, entry in raw.items():
         if not isinstance(entry, dict):
             raise ValueError(f"param {key!r}: entry must be a mapping")
+        if "default" in entry:
+            raise ValueError(
+                f"param {key!r}: `default` was removed from params.yaml; "
+                "use llm advisor for suggestions"
+            )
         ptype = _coerce_type(entry.get("type"))
         values: tuple[str, ...] = ()
         if ptype is ParamType.ENUM:
@@ -95,7 +99,6 @@ def parse_schema(raw: dict[str, Any]) -> list[ParamSpec]:
             ParamSpec(
                 key=str(key),
                 type=ptype,
-                default=entry.get("default"),
                 required=bool(entry.get("required", False)),
                 prompt=(
                     str(entry["prompt"]) if entry.get("prompt") is not None else None
@@ -286,8 +289,6 @@ def validate_params(
                 errors.append(str(exc))
         elif spec.required:
             errors.append(f"param {spec.key!r}: required")
-        elif spec.default is not None:
-            coerced[spec.key] = spec.default
 
     if errors:
         return {}, errors

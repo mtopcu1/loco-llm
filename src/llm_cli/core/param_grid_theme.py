@@ -1,6 +1,22 @@
 """Semantic color tokens for ParamGrid TUI and plain Rich fallback."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import Literal
+
+
+CellState = Literal["locked", "disabled", "enabled-empty", "enabled-set"]
+
+
+def style_for_cell_state(state: CellState) -> str:
+    """Return prompt_toolkit style class name for a param row state."""
+    return {
+        "locked": "cell-locked",
+        "disabled": "cell-disabled",
+        "enabled-empty": "cell-enabled-empty",
+        "enabled-set": "cell-enabled-set",
+    }[state]
 
 
 @dataclass(frozen=True)
@@ -12,6 +28,10 @@ class ParamGridTheme:
     default_fg: str = "#E5A045"
     modified_fg: str = "#6BCB77"
     readonly_fg: str = "#56B6C2"
+    disabled_fg: str = "#5C6370"
+    enabled_empty_fg: str = "#E5A045"
+    enabled_set_fg: str = "#6BCB77"
+    locked_fg: str = "#56B6C2"
     advanced_accent: str = "#C678DD"
     hint_fg: str = "#98C379"
     error_fg: str = "#E06C75"
@@ -28,6 +48,10 @@ class ParamGridTheme:
             "cell-default": fg(self.default_fg),
             "cell-modified": fg(self.modified_fg),
             "cell-readonly": fg(self.readonly_fg),
+            "cell-disabled": fg(self.disabled_fg),
+            "cell-enabled-empty": fg(self.enabled_empty_fg),
+            "cell-enabled-set": fg(self.enabled_set_fg),
+            "cell-locked": fg(self.locked_fg),
             "cell-focus": f"bold bg:{self.focus_bg} fg:{self.focus_fg}",
             "header-common": f"bold {fg(self.border_common)}",
             "header-advanced": f"bold {fg(self.advanced_accent)}",
@@ -47,6 +71,10 @@ class ParamGridTheme:
             "default": self.default_fg,
             "modified": self.modified_fg,
             "readonly": self.readonly_fg,
+            "disabled": self.disabled_fg,
+            "enabled-empty": self.enabled_empty_fg,
+            "enabled-set": self.enabled_set_fg,
+            "locked": self.locked_fg,
             "hint": self.hint_fg,
             "error": self.error_fg,
             "meta_label": self.meta_label,

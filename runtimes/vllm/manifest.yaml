@@ -10,22 +10,18 @@ accepts_formats: [safetensors-dir]
 build:
   vllm_version:
     type: string
-    default: "0.8.5"
     tier: common
     prompt: "vLLM version to install"
   pip_extra:
     type: enum
     values: [cuda, cpu, none]
-    default: none
     tier: common
     prompt: "PyTorch wheel channel (cuda/cpu/none)"
   extra_pip_packages:
     type: string
-    default: ""
     tier: advanced
     prompt: "Additional pip packages (space-separated)"
   force_reinstall:
     type: bool
-    default: false
     tier: advanced
     prompt: "Force reinstall packages"

@@ -4,6 +4,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+import yaml
 from typer.testing import CliRunner
 
 from llm_cli.main import app
@@ -58,22 +59,6 @@ def _user_config_path(tmp_path: Path, name: str) -> Path:
     return tmp_path / "data" / "user" / "configs" / name
 
 
-def _valid_value_for_spec(spec) -> str:
-    from llm_cli.core.params import ParamType
-
-    if spec.default is not None:
-        return str(spec.default)
-    if spec.type is ParamType.BOOL:
-        return "false"
-    if spec.type is ParamType.INT:
-        return "0"
-    if spec.type is ParamType.FLOAT:
-        return "0.0"
-    if spec.type is ParamType.ENUM:
-        return str(spec.values[0]) if spec.values else ""
-    return ""
-
-
 def test_config_setup_writes_valid_yaml(monkeypatch, tmp_path):
     repo = _seed_repo(tmp_path, monkeypatch)
 
@@ -81,13 +66,8 @@ def test_config_setup_writes_valid_yaml(monkeypatch, tmp_path):
     from llm_cli.core.param_grid_models import ParamGridResult
 
     def stub_edit_params(specs, **kwargs):
-        skip_keys = set(kwargs.get("skip_keys", set()))
-        values = {s.key: _valid_value_for_spec(s) for s in specs}
-        for s in specs:
-            if s.key in skip_keys and getattr(s, "bind", None) == "model_path":
-                values[s.key] = "${model_path}"
         return ParamGridResult(
-            values=values,
+            values={"ctx": "8192", "n_gpu_layers": "-1"},
             meta={
                 "host": "127.0.0.1",
                 "port": "8080",
@@ -116,6 +96,8 @@ def test_config_setup_writes_valid_yaml(monkeypatch, tmp_path):
     assert out_path.is_file()
     text = out_path.read_text(encoding="utf-8")
     assert "gguf_path: ${model_path}" in text
+    assert "ctx: 8192" in text
+    assert "n_gpu_layers: -1" in text
 
 
 def test_config_setup_skips_bound_path_when_model_set(monkeypatch, tmp_path):
@@ -127,15 +109,10 @@ def test_config_setup_skips_bound_path_when_model_set(monkeypatch, tmp_path):
     captured: dict[str, object] = {}
 
     def stub_edit_params(specs, **kwargs):
-        skip_keys = set(kwargs.get("skip_keys", set()))
-        captured["skip_keys"] = skip_keys
+        captured["skip_keys"] = set(kwargs.get("skip_keys", set()))
         captured["readonly_keys"] = kwargs.get("readonly_keys")
-        values = {s.key: _valid_value_for_spec(s) for s in specs}
-        for s in specs:
-            if s.key in skip_keys and getattr(s, "bind", None) == "model_path":
-                values[s.key] = "${model_path}"
         return ParamGridResult(
-            values=values,
+            values={"ctx": "8192"},
             meta={
                 "host": "127.0.0.1",
                 "port": "8080",
@@ -165,6 +142,47 @@ def test_config_setup_skips_bound_path_when_model_set(monkeypatch, tmp_path):
     out_path = _user_config_path(tmp_path, "llamacpp__qwen-7b__default.yaml")
     text_out = out_path.read_text(encoding="utf-8")
     assert "gguf_path: ${model_path}" in text_out
+
+
+def test_config_setup_saves_only_enabled_params(monkeypatch, tmp_path):
+    _seed_repo(tmp_path, monkeypatch)
+
+    from llm_cli.core import wizards
+    from llm_cli.core.param_grid_models import ParamGridResult
+
+    def stub_edit_params(_specs, **kwargs):
+        return ParamGridResult(
+            values={"ctx": "8192"},
+            meta={
+                "host": "127.0.0.1",
+                "port": "8080",
+                "preset": "default",
+                "config_id": "llamacpp__qwen-7b__default",
+            },
+            action="save",
+            advanced_revealed=False,
+        )
+
+    monkeypatch.setattr(wizards, "edit_params", stub_edit_params)
+
+    result = runner.invoke(
+        app,
+        [
+            "config",
+            "setup",
+            "--runtime",
+            "llamacpp",
+            "--model",
+            "qwen-7b",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    out_path = _user_config_path(tmp_path, "llamacpp__qwen-7b__default.yaml")
+    doc = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    params = doc["serve"]["params"]
+    assert params == {"gguf_path": "${model_path}", "ctx": 8192}
+    assert "n_gpu_layers" not in params
+    assert "batch_size" not in params
 
 
 def test_config_setup_abort_writes_nothing(monkeypatch, tmp_path):

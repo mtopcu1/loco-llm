@@ -21,16 +21,15 @@ def test_parse_schema_empty():
 
 def test_parse_schema_basic_types():
     raw = {
-        "flavor": {"type": "enum", "values": ["cuda", "cpu"], "default": "cuda"},
-        "jobs": {"type": "int", "default": 0, "prompt": "Parallel jobs"},
-        "ctx": {"type": "int", "default": 8192, "required": False},
+        "flavor": {"type": "enum", "values": ["cuda", "cpu"]},
+        "jobs": {"type": "int", "prompt": "Parallel jobs"},
+        "ctx": {"type": "int", "required": False},
         "name": {"type": "string", "required": True},
     }
     specs = parse_schema(raw)
     by_key = {s.key: s for s in specs}
     assert by_key["flavor"].type is ParamType.ENUM
     assert by_key["flavor"].values == ("cuda", "cpu")
-    assert by_key["flavor"].default == "cuda"
     assert by_key["jobs"].type is ParamType.INT
     assert by_key["jobs"].prompt == "Parallel jobs"
     assert by_key["name"].required is True
@@ -206,16 +205,23 @@ def test_evaluate_when_rejects_non_build_prefix():
         evaluate_when({"serve.host": "x"}, build_params={})
 
 
-def test_validate_params_fills_defaults():
-    specs = parse_schema(
-        {
-            "ctx": {"type": "int", "default": 8192},
-            "host": {"type": "string", "default": "127.0.0.1"},
-        }
-    )
+def test_parse_schema_rejects_default_key():
+    with pytest.raises(ValueError, match="default.*removed"):
+        parse_schema({"ctx": {"type": "int", "default": 8192}})
+
+
+def test_validate_params_does_not_fill_missing_optional():
+    specs = parse_schema({"ctx": {"type": "int"}, "host": {"type": "string"}})
     out, errors = validate_params(specs, {})
     assert errors == []
-    assert out == {"ctx": 8192, "host": "127.0.0.1"}
+    assert out == {}
+
+
+def test_validate_params_required_still_errors_when_missing():
+    specs = parse_schema({"name": {"type": "string", "required": True}})
+    out, errors = validate_params(specs, {})
+    assert out == {}
+    assert any("required" in e for e in errors)
 
 
 def test_validate_params_required_missing_errors():
@@ -226,21 +232,21 @@ def test_validate_params_required_missing_errors():
 
 
 def test_validate_params_unknown_key_errors():
-    specs = parse_schema({"ctx": {"type": "int", "default": 8}})
+    specs = parse_schema({"ctx": {"type": "int"}})
     out, errors = validate_params(specs, {"ctxx": 16})
     assert out == {}
     assert any("unknown" in e and "ctxx" in e for e in errors)
 
 
 def test_validate_params_type_mismatch_errors():
-    specs = parse_schema({"ctx": {"type": "int", "default": 8}})
+    specs = parse_schema({"ctx": {"type": "int"}})
     out, errors = validate_params(specs, {"ctx": "huge"})
     assert out == {}
     assert any("ctx" in e for e in errors)
 
 
 def test_validate_params_returns_coerced():
-    specs = parse_schema({"jobs": {"type": "int", "default": 0}})
+    specs = parse_schema({"jobs": {"type": "int"}})
     out, errors = validate_params(specs, {"jobs": "4"})
     assert errors == []
     assert out == {"jobs": 4}

@@ -130,15 +130,7 @@ def doctor(
             raise typer.Exit(code=1)
 
         rec = read_record(settings.runtimes_dir, runtime)
-        build_params = (
-            dict(rec.build_params)
-            if rec is not None
-            else {
-                spec.key: spec.default
-                for spec in mf.build_schema
-                if spec.default is not None
-            }
-        )
+        build_params = dict(rec.build_params) if rec is not None else {}
         extras = requirements_for_runtime(repo, runtime, build_params=build_params)
     elif all_runtimes:
         extras = requirements_for_all_runtimes(repo, settings.runtimes_dir, installed_only=False)
@@ -205,8 +197,7 @@ def render_requirements() -> None:
     universal = load_requirements(_requirements_yaml(repo))
     by_runtime: dict[str, list] = {}
     for mf in _registry.load_runtime_manifests_merged():
-        defaults = {spec.key: spec.default for spec in mf.build_schema if spec.default is not None}
-        reqs = requirements_for_runtime(repo, mf.id, build_params=defaults)
+        reqs = requirements_for_runtime(repo, mf.id, build_params={})
         if reqs:
             by_runtime[mf.id] = reqs
     md = render_requirements_md_grouped(universal, by_runtime)

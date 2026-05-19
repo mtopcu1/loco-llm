@@ -55,7 +55,6 @@ curl -fsS -o /dev/null "http://${HOST}:${LLM_SERVE_PORT}/v1/models"
 
 _CUSTOM_PARAMS_YAML = """extra_args:
   type: string
-  default: ""
   env: LLM_EXTRA_ARGS
   tier: common
   description: "Pass-through flags appended to your serve command."
@@ -320,23 +319,30 @@ def _parse_param_flag(token: str) -> tuple[str, str]:
 
 
 def _resolve_build_params(
-    schema: list[Any], *, flags: list[str], yes: bool
+    runtime_id: str,
+    schema: list[Any],
+    *,
+    flags: list[str],
+    yes: bool,
 ) -> dict[str, Any]:
     raw: dict[str, Any] = {}
     for token in flags:
         key, value = _parse_param_flag(token)
         raw[key] = value
 
-    if not yes:
-        missing = [spec for spec in schema if spec.key not in raw]
-        if missing:
-            from llm_cli.core import wizards as wiz
+    if not yes and schema:
+        from llm_cli.core import wizards as wiz
 
-            tier_result = wiz.walk_tier(missing)
-            if tier_result.aborted:
-                console.print("[yellow]aborted[/yellow]")
-                raise typer.Exit(code=1)
-            raw.update(tier_result.values)
+        pre_values = {k: str(v) for k, v in raw.items()}
+        result = wiz.edit_params(
+            schema,
+            title=f"Build params: {runtime_id}",
+            values=pre_values,
+        )
+        if result.action == "abort":
+            console.print("[yellow]aborted[/yellow]")
+            raise typer.Exit(code=1)
+        raw.update(result.values)
 
     coerced, errors = validate_params(schema, raw)
     if errors:
@@ -427,7 +433,9 @@ def _install_impl(
             f"{manifest.path}."
         )
         raise typer.Exit(code=1)
-    build_params = _resolve_build_params(manifest.build_schema, flags=param, yes=yes)
+    build_params = _resolve_build_params(
+        runtime_id, manifest.build_schema, flags=param, yes=yes
+    )
     _pre_flight(runtime_id, build_params)
 
     build_env = _build_env(runtime_id, manifest.build_schema, build_params)
@@ -543,8 +551,6 @@ def runtime_info(runtime_id: str = typer.Argument(...)) -> None:
         console.print("\n[bold]build params:[/bold]")
         for spec in manifest.build_schema:
             line = f"  - {spec.key} ({spec.type.value})"
-            if spec.default is not None:
-                line += f" default={spec.default!r}"
             if spec.required:
                 line += " required"
             console.print(line)
@@ -553,8 +559,6 @@ def runtime_info(runtime_id: str = typer.Argument(...)) -> None:
         console.print("\n[bold]serve params:[/bold]")
         for spec in manifest.serve_schema:
             line = f"  - {spec.key} ({spec.type.value})"
-            if spec.default is not None:
-                line += f" default={spec.default!r}"
             if spec.required:
                 line += " required"
             console.print(line)

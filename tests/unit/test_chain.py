@@ -23,6 +23,27 @@ def test_chain_skip_all_steps_returns_zero(monkeypatch, tmp_path):
     assert chain.run_setup_chain() == 0
 
 
+def test_chain_empty_hf_url_skips_model_pull(monkeypatch, tmp_path):
+    from unittest.mock import patch
+
+    from llm_cli.core import wizards as wiz_mod
+
+    _chain_settings(tmp_path, monkeypatch)
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    monkeypatch.setenv("TERM", "xterm-256color")
+    monkeypatch.setattr(chain, "_confirm", lambda *a, **k: False)
+    pull_called: list[str] = []
+
+    def pull(url, **kw):
+        pull_called.append(url)
+        return "model-x"
+
+    monkeypatch.setattr(chain, "_do_model_pull", pull)
+    with patch.object(wiz_mod.Prompt, "ask", return_value=None):
+        assert chain.run_setup_chain() == 0
+    assert pull_called == []
+
+
 def test_chain_runtime_setup_failure_aborts(monkeypatch, tmp_path):
     _chain_settings(tmp_path, monkeypatch)
     monkeypatch.setattr(chain, "_confirm", lambda *a, **k: True)

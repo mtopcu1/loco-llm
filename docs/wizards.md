@@ -20,14 +20,14 @@ Writes machine settings, then offers a Y/n chain: runtime → HF URL → config 
 - **Preset** — pick an official runtime (`kind: official`); delegates to the same install flow as `llm runtime install`.
 - **Custom** — generate `runtimes/<id>/` with `kind: custom`, `params.yaml`, wrapped `serve.sh`, template `healthcheck.sh`, and `.installed` (no build).
 
-Interactive **runtime install / rebuild** steps that collect **build** parameters use the same **param grid** as config setup (not a one-field-at-a-time loop).
+Interactive **runtime install / rebuild** steps that collect **build** parameters use the same **param grid** as config setup (not a one-field-at-a-time loop). Saving stores only **enabled** keys in `.installed` **`build_params`** (same opt-in rules as `serve.params`).
 
 ## `llm config setup`
 
 Runtime and model picks stay **questionary** selects. Editing is a **two-step wizard**:
 
 1. **Configuration** — host, port, preset, and config id in a compact list (all fields visible). **Enter** opens a detail view for the focused field; **Ctrl+S** or **Next** continues to parameters.
-2. **Parameters** — serve params as a compact **key + value + description** list (description truncated; suggestions only in detail). Read-only bound fields (e.g. `bind: model_path` on presets) are **hidden** from the list but still saved. **Enter** opens detail (full description + advisor suggestion + value editor). **Space** toggles booleans in the list. **Ctrl+A** reveals advanced tier.
+2. **Parameters** — serve params as a compact **enable + key + value + suggestion** list (description truncated; full text in detail). Optional rows start **disabled** (`[ ]`); **Space** enables or disables the focused row (clears value when disabled). Locked required / bound fields (`[•]`) are always saved. Read-only bound fields (e.g. `bind: model_path`) are **hidden** from the list but still saved. **Enter** opens detail (full description + advisor suggestion + value editor). **Ctrl+A** reveals advanced tier. Saving writes only **enabled** keys to `serve.params`.
 
 **Back** (Esc or footer) returns from parameters to configuration, or aborts from the first step. **Next** / **Ctrl+S** on the parameter step validates and writes YAML.
 
@@ -52,7 +52,7 @@ Three forms: interactive (pick runtime + model), `llm advisor <config-id>`, or `
 | Abort entire wizard | **Ctrl+C**, **Ctrl+X** |
 | Open field detail | **Enter** (on list row) |
 | Toggle advanced tier | **Ctrl+A** (parameter list only) |
-| Toggle boolean | **Space** (parameter list) |
+| Enable / disable optional param | **Space** (parameter list) |
 | Move focus | **↑** / **↓** (last row **↓** → footer buttons) |
 | Previous / next wizard page | **←** / **→** (between configuration and parameters only) |
 
@@ -60,15 +60,16 @@ Also: **Tab** / **Shift+Tab** cycle rows or footer buttons; in detail view type 
 
 ### Param grid fallback (plain / CI)
 
-Two steps when meta is present: configuration table (**N** = next), then parameters (**S** = save, **X** = abort, **B** = back to configuration). Row number opens a detail prompt with description and suggestion. **A** toggles advanced tier.
+Two steps when meta is present: configuration table (**N** = next), then parameters (**S** = save, **X** = abort, **B** = back to configuration). Row number opens a detail prompt with description and suggestion; enabling a row may prompt for a value. **A** toggles advanced tier.
 
 ### Param grid colors
 
 Colors encode **meaning**, not decoration:
 
-- **Default** — value still matches the schema default.
-- **Modified** — value differs from the default.
-- **Read-only** — bound or fixed fields (e.g. `bind: model_path`).
+- **Disabled** — optional param not enabled (`[ ]`).
+- **Enabled, empty** — enabled but no value yet (save will error until set).
+- **Enabled, set** — enabled with a committed value.
+- **Locked** — required or bound fields always included on save (`[•]`).
 - **Focus** — keyboard/mouse focus highlight.
 - **Advanced** accents — headers/borders when the advanced tier is visible.
 - **Hint / meta / error** — advisor lines, meta labels, and validation messages.

@@ -16,7 +16,7 @@ def _write_runtime(repo: Path, rid: str, requires: list[dict]) -> None:
         "id": rid,
         "display_name": rid,
         "official": True,
-        "build": {"flavor": {"type": "enum", "values": ["cuda", "cpu"], "default": "cuda"}},
+        "build": {"flavor": {"type": "enum", "values": ["cuda", "cpu"]}},
         "requires": requires,
     }
     (root / "manifest.yaml").write_text(_y.safe_dump(body, sort_keys=False), encoding="utf-8")

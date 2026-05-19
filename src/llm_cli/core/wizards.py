@@ -79,6 +79,8 @@ def text(
     """Single-line text entry."""
     while True:
         answer = Prompt.ask(prompt, default=default)
+        if answer is None:
+            answer = ""
         if validate is None:
             return answer
         err = validate(answer)
@@ -211,7 +213,6 @@ def review(
             ParamSpec(
                 key=key,
                 type=ParamType.STRING,
-                default=str(value),
                 prompt=label,
                 description="",
             )
@@ -259,7 +260,13 @@ def edit_params(
     )
     meta_fields = meta if meta is not None else []
     theme_resolved = DEFAULT_THEME if theme is None else theme
-    return run_param_grid(cells, meta_fields, title=title, theme=theme_resolved)
+    return run_param_grid(
+        cells,
+        meta_fields,
+        specs=specs,
+        title=title,
+        theme=theme_resolved,
+    )
 
 
 def walk_tier(specs: list[Any]) -> WalkTierResult:

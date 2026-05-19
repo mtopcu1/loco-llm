@@ -4,13 +4,7 @@ from __future__ import annotations
 
 from llm_cli.core.model_bindings import MODEL_PATH_TOKEN
 from llm_cli.core.param_grid_models import ParamCell
-from llm_cli.core.params import ParamSpec
-
-
-def _default_str(spec: ParamSpec) -> str:
-    if spec.default is None:
-        return ""
-    return str(spec.default)
+from llm_cli.core.params import ParamSpec, ParamType, ParamValidationError
 
 
 def cells_from_specs(
@@ -30,23 +24,22 @@ def cells_from_specs(
     for spec in specs:
         if spec.key not in skip:
             continue
-        if spec.key in merged:
-            continue
-        if spec.bind == "model_path":
+        if spec.key not in merged and spec.bind == "model_path":
             merged[spec.key] = MODEL_PATH_TOKEN
-            continue
-        dv = _default_str(spec)
-        merged[spec.key] = dv
 
     out: list[ParamCell] = []
     for spec in specs:
-        default_s = _default_str(spec)
+        locked = spec.required or spec.key in readonly_keys or spec.key in skip
         if spec.key in merged:
             value_s = merged[spec.key]
-        elif spec.default is not None:
-            value_s = default_s
+            enabled = True
+        elif locked:
+            value_s = merged.get(spec.key, "")
+            enabled = True
         else:
             value_s = ""
+            enabled = False
+
         label = (spec.prompt or spec.key).strip() or spec.key
         out.append(
             ParamCell(
@@ -54,14 +47,14 @@ def cells_from_specs(
                 label=label,
                 description=spec.description or "",
                 value=value_s,
-                default=default_s,
-                readonly=spec.key in readonly_keys,
+                enabled=enabled,
+                locked=locked,
+                readonly=spec.key in readonly_keys or spec.key in skip,
                 tier=spec.tier,
                 hint=hints.get(spec.key),
                 param_type=spec.type,
             )
         )
-
     return out
 
 
@@ -79,6 +72,23 @@ def filter_visible_cells(
         if hide_readonly and cell.readonly:
             continue
         out.append(cell)
+    return out
+
+
+def filter_cells_by_query(cells: list[ParamCell], query: str) -> list[ParamCell]:
+    """Return cells whose key, label, description, or hint contains query (case-insensitive)."""
+    token = query.strip().casefold()
+    if not token:
+        return cells
+    out: list[ParamCell] = []
+    for cell in cells:
+        haystack = " ".join(
+            part
+            for part in (cell.key, cell.label, cell.description, cell.hint or "")
+            if part
+        ).casefold()
+        if token in haystack:
+            out.append(cell)
     return out
 
 
@@ -104,3 +114,23 @@ def paginate_cells(
     for start in range(0, len(filtered), per_page):
         pages.append(filtered[start : start + per_page])
     return pages
+
+
+def enabled_values_from_cells(
+    cells: list[ParamCell],
+    specs: list[ParamSpec],
+) -> dict[str, str]:
+    """Return param map for YAML/env: enabled + locked rows only; validate non-empty."""
+    out: dict[str, str] = {}
+    for cell in cells:
+        if not (cell.enabled or cell.locked):
+            continue
+        if cell.param_type is not ParamType.BOOL and not str(cell.value).strip():
+            raise ParamValidationError(
+                f"param {cell.key!r}: enabled but empty; set a value or disable"
+            )
+        out[cell.key] = cell.value
+    for spec in specs:
+        if spec.required and spec.key not in out:
+            raise ParamValidationError(f"param {spec.key!r}: required")
+    return out

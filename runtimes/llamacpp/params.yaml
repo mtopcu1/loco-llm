@@ -11,56 +11,48 @@ gguf_path:
 
 n_gpu_layers:
   type: int
-  default: -1
   env: LLM_LLAMACPP_N_GPU_LAYERS
   tier: common
   description: "Layers to offload to GPU. -1 means auto."
 
 ctx:
   type: int
-  default: 8192
   env: LLM_LLAMACPP_CTX
   tier: common
   description: "Context size in tokens."
 
 batch_size:
   type: int
-  default: 2048
   env: LLM_LLAMACPP_BATCH_SIZE
   tier: common
   description: "Logical batch size."
 
 ubatch_size:
   type: int
-  default: 512
   env: LLM_LLAMACPP_UBATCH_SIZE
   tier: common
   description: "Physical micro-batch size."
 
 threads:
   type: int
-  default: -1
   env: LLM_LLAMACPP_THREADS
   tier: common
   description: "Generation threads. -1 means auto."
 
 threads_batch:
   type: int
-  default: -1
   env: LLM_LLAMACPP_THREADS_BATCH
   tier: common
   description: "Prompt/batch threads. -1 means auto."
 
 parallel:
   type: int
-  default: 1
   env: LLM_LLAMACPP_PARALLEL
   tier: common
   description: "Server slots for concurrent sequences."
 
 flash_attn:
   type: bool
-  default: false
   env: LLM_LLAMACPP_FLASH_ATTN
   tier: common
   description: "Enable Flash Attention."
@@ -68,189 +60,162 @@ flash_attn:
 split_mode:
   type: enum
   values: [none, layer, row, tensor]
-  default: layer
   env: LLM_LLAMACPP_SPLIT_MODE
   tier: common
   description: "How to split tensors across GPUs."
 
 tensor_split:
   type: string
-  default: ""
   env: LLM_LLAMACPP_TENSOR_SPLIT
   tier: common
   description: "GPU split fractions (comma-separated)."
 
 rope_freq_base:
   type: float
-  default: 0.0
   env: LLM_LLAMACPP_ROPE_FREQ_BASE
   tier: common
   description: "RoPE base frequency. 0 uses model default."
 
 rope_freq_scale:
   type: float
-  default: 0.0
   env: LLM_LLAMACPP_ROPE_FREQ_SCALE
   tier: common
   description: "RoPE frequency scale. 0 uses model default."
 
 cont_batching:
   type: bool
-  default: true
   env: LLM_LLAMACPP_CONT_BATCHING
   tier: common
   description: "Enable continuous batching."
 
 keep:
   type: int
-  default: 0
   env: LLM_LLAMACPP_KEEP
   tier: advanced
   description: "Tokens to keep from prompt when context overflows."
 
 predict:
   type: int
-  default: -1
   env: LLM_LLAMACPP_PREDICT
   tier: advanced
   description: "Max tokens to predict."
 
 swa_full:
   type: bool
-  default: false
   env: LLM_LLAMACPP_SWA_FULL
   tier: advanced
   description: "Use full-size SWA cache."
 
 ctx_checkpoints:
   type: int
-  default: 0
   env: LLM_LLAMACPP_CTX_CHECKPOINTS
   tier: advanced
   description: "Number of context checkpoints."
 
 checkpoint_every_n_tokens:
   type: int
-  default: -1
   env: LLM_LLAMACPP_CHECKPOINT_EVERY_N_TOKENS
   tier: advanced
   description: "Create a prefill checkpoint every N tokens."
 
 cache_ram:
   type: int
-  default: 0
   env: LLM_LLAMACPP_CACHE_RAM
   tier: advanced
   description: "KV cache RAM budget in MiB."
 
 kv_unified:
   type: bool
-  default: false
   env: LLM_LLAMACPP_KV_UNIFIED
   tier: advanced
   description: "Use a unified KV buffer."
 
 cache_idle_slots:
   type: bool
-  default: false
   env: LLM_LLAMACPP_CACHE_IDLE_SLOTS
   tier: advanced
   description: "Persist and clear idle slots."
 
 context_shift:
   type: bool
-  default: true
   env: LLM_LLAMACPP_CONTEXT_SHIFT
   tier: advanced
   description: "Enable context shifting."
 
 chunks:
   type: int
-  default: 0
   env: LLM_LLAMACPP_CHUNKS
   tier: advanced
   description: "Prompt chunk size."
 
 cpu_mask:
   type: string
-  default: ""
   env: LLM_LLAMACPP_CPU_MASK
   tier: advanced
   description: "CPU affinity bitmask."
 
 cpu_range:
   type: string
-  default: ""
   env: LLM_LLAMACPP_CPU_RANGE
   tier: advanced
   description: "CPU affinity range."
 
 cpu_strict:
   type: bool
-  default: false
   env: LLM_LLAMACPP_CPU_STRICT
   tier: advanced
   description: "Use strict CPU placement."
 
 prio:
   type: int
-  default: 0
   env: LLM_LLAMACPP_PRIO
   tier: advanced
   description: "Scheduling priority."
 
 poll:
   type: int
-  default: 0
   env: LLM_LLAMACPP_POLL
   tier: advanced
   description: "Polling level for worker wait."
 
 cpu_mask_batch:
   type: string
-  default: ""
   env: LLM_LLAMACPP_CPU_MASK_BATCH
   tier: advanced
   description: "Batch CPU affinity bitmask."
 
 cpu_range_batch:
   type: string
-  default: ""
   env: LLM_LLAMACPP_CPU_RANGE_BATCH
   tier: advanced
   description: "Batch CPU affinity range."
 
 cpu_strict_batch:
   type: bool
-  default: false
   env: LLM_LLAMACPP_CPU_STRICT_BATCH
   tier: advanced
   description: "Use strict CPU placement for batch threads."
 
 prio_batch:
   type: int
-  default: 0
   env: LLM_LLAMACPP_PRIO_BATCH
   tier: advanced
   description: "Batch scheduling priority."
 
 poll_batch:
   type: int
-  default: 0
   env: LLM_LLAMACPP_POLL_BATCH
   tier: advanced
   description: "Batch polling level."
 
 mlock:
   type: bool
-  default: false
   env: LLM_LLAMACPP_MLOCK
   tier: advanced
   description: "Lock model pages in RAM."
 
 no_mmap:
   type: bool
-  default: false
   env: LLM_LLAMACPP_NO_MMAP
   tier: advanced
   description: "Disable mmap for model files."
@@ -258,28 +223,24 @@ no_mmap:
 numa:
   type: enum
   values: [distribute, isolate, numactl]
-  default: distribute
   env: LLM_LLAMACPP_NUMA
   tier: advanced
   description: "NUMA strategy."
 
 device:
   type: string
-  default: ""
   env: LLM_LLAMACPP_DEVICE
   tier: advanced
   description: "Device list for offload."
 
 override_tensor:
   type: string
-  default: ""
   env: LLM_LLAMACPP_OVERRIDE_TENSOR
   tier: advanced
   description: "Tensor buffer overrides."
 
 main_gpu:
   type: int
-  default: 0
   env: LLM_LLAMACPP_MAIN_GPU
   tier: advanced
   description: "Main GPU index."
@@ -287,7 +248,6 @@ main_gpu:
 fit:
   type: enum
   values: [on, off]
-  default: off
   env: LLM_LLAMACPP_FIT
   tier: advanced
   description: "Auto-fit unset memory arguments."
@@ -295,70 +255,60 @@ fit:
 fit_print:
   type: enum
   values: [on, off]
-  default: off
   env: LLM_LLAMACPP_FIT_PRINT
   tier: advanced
   description: "Print fit memory estimates."
 
 fit_target:
   type: string
-  default: ""
   env: LLM_LLAMACPP_FIT_TARGET
   tier: advanced
   description: "Per-device fit target in MiB."
 
 fit_ctx:
   type: int
-  default: 0
   env: LLM_LLAMACPP_FIT_CTX
   tier: advanced
   description: "Minimum context allowed by fit."
 
 check_tensors:
   type: bool
-  default: false
   env: LLM_LLAMACPP_CHECK_TENSORS
   tier: advanced
   description: "Validate tensor contents on load."
 
 override_kv:
   type: string
-  default: ""
   env: LLM_LLAMACPP_OVERRIDE_KV
   tier: advanced
   description: "Override model metadata key-values."
 
 no_op_offload:
   type: bool
-  default: false
   env: LLM_LLAMACPP_NO_OP_OFFLOAD
   tier: advanced
   description: "Disable host op offload."
 
 no_kv_offload:
   type: bool
-  default: false
   env: LLM_LLAMACPP_NO_KV_OFFLOAD
   tier: advanced
   description: "Disable KV offload."
 
 cache_type_k:
   type: string
-  default: ""
   env: LLM_LLAMACPP_CACHE_TYPE_K
   tier: advanced
   description: "KV cache data type for K."
 
 cache_type_v:
   type: string
-  default: ""
   env: LLM_LLAMACPP_CACHE_TYPE_V
   tier: advanced
   description: "KV cache data type for V."
 
 defrag_threshold:
   type: float
-  default: 0.0
   env: LLM_LLAMACPP_DEFRAG_THRESHOLD
   tier: advanced
   description: "KV defragmentation threshold."
@@ -366,7 +316,6 @@ defrag_threshold:
 pooling:
   type: enum
   values: [none, mean, cls, last, rank]
-  default: none
   env: LLM_LLAMACPP_POOLING
   tier: advanced
   description: "Pooling mode for embeddings."
@@ -374,7 +323,6 @@ pooling:
 attention:
   type: enum
   values: [causal, non-causal]
-  default: causal
   env: LLM_LLAMACPP_ATTENTION
   tier: advanced
   description: "Attention mode for embeddings."
@@ -382,196 +330,168 @@ attention:
 rope_scaling:
   type: enum
   values: [none, linear, yarn]
-  default: linear
   env: LLM_LLAMACPP_ROPE_SCALING
   tier: advanced
   description: "RoPE scaling algorithm."
 
 yarn_orig_ctx:
   type: int
-  default: 0
   env: LLM_LLAMACPP_YARN_ORIG_CTX
   tier: advanced
   description: "Original context for YaRN."
 
 yarn_ext_factor:
   type: float
-  default: -1.0
   env: LLM_LLAMACPP_YARN_EXT_FACTOR
   tier: advanced
   description: "YaRN extrapolation factor."
 
 yarn_attn_factor:
   type: float
-  default: -1.0
   env: LLM_LLAMACPP_YARN_ATTN_FACTOR
   tier: advanced
   description: "YaRN attention factor."
 
 yarn_beta_slow:
   type: float
-  default: -1.0
   env: LLM_LLAMACPP_YARN_BETA_SLOW
   tier: advanced
   description: "YaRN slow beta."
 
 yarn_beta_fast:
   type: float
-  default: -1.0
   env: LLM_LLAMACPP_YARN_BETA_FAST
   tier: advanced
   description: "YaRN fast beta."
 
 grp_attn_n:
   type: int
-  default: 0
   env: LLM_LLAMACPP_GRP_ATTN_N
   tier: advanced
   description: "Group attention factor."
 
 grp_attn_w:
   type: int
-  default: 0
   env: LLM_LLAMACPP_GRP_ATTN_W
   tier: advanced
   description: "Group attention width."
 
 embd_normalize:
   type: int
-  default: -1
   env: LLM_LLAMACPP_EMBD_NORMALIZE
   tier: advanced
   description: "Embedding normalization mode."
 
 embedding:
   type: bool
-  default: false
   env: LLM_LLAMACPP_EMBEDDING
   tier: advanced
   description: "Embedding-only server mode."
 
 reranking:
   type: bool
-  default: false
   env: LLM_LLAMACPP_RERANKING
   tier: advanced
   description: "Enable reranking endpoint."
 
 api_key:
   type: string
-  default: ""
   env: LLM_LLAMACPP_API_KEY
   tier: advanced
   description: "Comma-separated API keys."
 
 api_key_file:
   type: path
-  default: ""
   env: LLM_LLAMACPP_API_KEY_FILE
   tier: advanced
   description: "Path to API key file."
 
 ssl_key_file:
   type: path
-  default: ""
   env: LLM_LLAMACPP_SSL_KEY_FILE
   tier: advanced
   description: "TLS private key path."
 
 ssl_cert_file:
   type: path
-  default: ""
   env: LLM_LLAMACPP_SSL_CERT_FILE
   tier: advanced
   description: "TLS certificate path."
 
 threads_http:
   type: int
-  default: -1
   env: LLM_LLAMACPP_THREADS_HTTP
   tier: advanced
   description: "HTTP worker thread count."
 
 cache_prompt:
   type: bool
-  default: true
   env: LLM_LLAMACPP_CACHE_PROMPT
   tier: advanced
   description: "Enable prompt caching."
 
 cache_reuse:
   type: int
-  default: 0
   env: LLM_LLAMACPP_CACHE_REUSE
   tier: advanced
   description: "Minimum chunk size for cache reuse."
 
 metrics:
   type: bool
-  default: false
   env: LLM_LLAMACPP_METRICS
   tier: advanced
   description: "Enable metrics endpoint."
 
 props:
   type: bool
-  default: false
   env: LLM_LLAMACPP_PROPS
   tier: advanced
   description: "Enable /props endpoint."
 
 slots:
   type: bool
-  default: false
   env: LLM_LLAMACPP_SLOTS
   tier: advanced
   description: "Expose slots endpoint."
 
 slot_save_path:
   type: path
-  default: ""
   env: LLM_LLAMACPP_SLOT_SAVE_PATH
   tier: advanced
   description: "Directory for slot snapshots."
 
 media_path:
   type: path
-  default: ""
   env: LLM_LLAMACPP_MEDIA_PATH
   tier: advanced
   description: "Directory for local media file:// access."
 
 models_dir:
   type: path
-  default: ""
   env: LLM_LLAMACPP_MODELS_DIR
   tier: advanced
   description: "Router mode model directory."
 
 models_preset:
   type: path
-  default: ""
   env: LLM_LLAMACPP_MODELS_PRESET
   tier: advanced
   description: "Router mode preset INI."
 
 models_max:
   type: int
-  default: 0
   env: LLM_LLAMACPP_MODELS_MAX
   tier: advanced
   description: "Router mode max concurrently loaded models."
 
 models_autoload:
   type: bool
-  default: false
   env: LLM_LLAMACPP_MODELS_AUTOLOAD
   tier: advanced
   description: "Router mode autoload models."
 
 jinja:
   type: bool
-  default: false
   env: LLM_LLAMACPP_JINJA
   tier: advanced
   description: "Force jinja chat templates."
@@ -579,7 +499,6 @@ jinja:
 reasoning_format:
   type: enum
   values: [auto, none, deepseek, deepseek-legacy]
-  default: auto
   env: LLM_LLAMACPP_REASONING_FORMAT
   tier: advanced
   description: "Reasoning extraction format."
@@ -587,175 +506,150 @@ reasoning_format:
 reasoning:
   type: enum
   values: [auto, on, off]
-  default: auto
   env: LLM_LLAMACPP_REASONING
   tier: advanced
   description: "Reasoning mode."
 
 reasoning_budget:
   type: int
-  default: -1
   env: LLM_LLAMACPP_REASONING_BUDGET
   tier: advanced
   description: "Thinking token budget."
 
 reasoning_budget_message:
   type: string
-  default: ""
   env: LLM_LLAMACPP_REASONING_BUDGET_MESSAGE
   tier: advanced
   description: "Message appended when thinking budget is exhausted."
 
 chat_template:
   type: string
-  default: ""
   env: LLM_LLAMACPP_CHAT_TEMPLATE
   tier: advanced
   description: "Inline chat template."
 
 chat_template_file:
   type: path
-  default: ""
   env: LLM_LLAMACPP_CHAT_TEMPLATE_FILE
   tier: advanced
   description: "Chat template file path."
 
 chat_template_kwargs:
   type: string
-  default: ""
   env: LLM_LLAMACPP_CHAT_TEMPLATE_KWARGS
   tier: advanced
   description: "JSON object with template kwargs."
 
 skip_chat_parsing:
   type: bool
-  default: false
   env: LLM_LLAMACPP_SKIP_CHAT_PARSING
   tier: advanced
   description: "Force content-only chat parser."
 
 prefill_assistant:
   type: bool
-  default: false
   env: LLM_LLAMACPP_PREFILL_ASSISTANT
   tier: advanced
   description: "Allow assistant prefill behavior."
 
 slot_prompt_similarity:
   type: float
-  default: 0.0
   env: LLM_LLAMACPP_SLOT_PROMPT_SIMILARITY
   tier: advanced
   description: "Prompt similarity threshold for slot reuse."
 
 lora:
   type: string
-  default: ""
   env: LLM_LLAMACPP_LORA
   tier: advanced
   description: "Comma-separated LoRA adapter paths."
 
 lora_scaled:
   type: string
-  default: ""
   env: LLM_LLAMACPP_LORA_SCALED
   tier: advanced
   description: "Comma-separated LoRA path:scale entries."
 
 lora_init_without_apply:
   type: bool
-  default: false
   env: LLM_LLAMACPP_LORA_INIT_WITHOUT_APPLY
   tier: advanced
   description: "Load LoRAs without applying until API call."
 
 timeout:
   type: int
-  default: 0
   env: LLM_LLAMACPP_TIMEOUT
   tier: advanced
   description: "HTTP read/write timeout in seconds."
 
 sleep_idle_seconds:
   type: int
-  default: -1
   env: LLM_LLAMACPP_SLEEP_IDLE_SECONDS
   tier: advanced
   description: "Idle sleep timeout."
 
 reuse_port:
   type: bool
-  default: false
   env: LLM_LLAMACPP_REUSE_PORT
   tier: advanced
   description: "Enable SO_REUSEPORT."
 
 path:
   type: path
-  default: ""
   env: LLM_LLAMACPP_PATH
   tier: advanced
   description: "Static file root."
 
 api_prefix:
   type: string
-  default: ""
   env: LLM_LLAMACPP_API_PREFIX
   tier: advanced
   description: "HTTP API prefix."
 
 ui:
   type: bool
-  default: false
   env: LLM_LLAMACPP_UI
   tier: advanced
   description: "Enable web UI."
 
 ui_config:
   type: string
-  default: ""
   env: LLM_LLAMACPP_UI_CONFIG
   tier: advanced
   description: "Inline JSON UI config."
 
 ui_config_file:
   type: path
-  default: ""
   env: LLM_LLAMACPP_UI_CONFIG_FILE
   tier: advanced
   description: "Path to JSON UI config file."
 
 ui_mcp_proxy:
   type: bool
-  default: false
   env: LLM_LLAMACPP_UI_MCP_PROXY
   tier: advanced
   description: "Enable MCP CORS proxy in UI."
 
 tools:
   type: string
-  default: ""
   env: LLM_LLAMACPP_TOOLS
   tier: advanced
   description: "Built-in tools list (comma-separated)."
 
 model_alias:
   type: string
-  default: ""
   env: LLM_LLAMACPP_MODEL_ALIAS
   tier: advanced
   description: "Model aliases (comma-separated)."
 
 tags:
   type: string
-  default: ""
   env: LLM_LLAMACPP_TAGS
   tier: advanced
   description: "Informational tags (comma-separated)."
 
 extra_args:
   type: string
-  default: ""
   env: LLM_LLAMACPP_EXTRA_ARGS
   tier: advanced
   description: "Pass-through flags appended verbatim."

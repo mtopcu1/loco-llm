@@ -20,7 +20,7 @@ def _confirm(prompt: str, *, default: bool = True) -> bool:
 def _prompt_text(prompt: str, *, default: str = "") -> str:
     from llm_cli.core import wizards as wiz
 
-    return wiz.text(prompt, default=default or None)
+    return wiz.text(prompt, default=default)
 
 
 def _do_runtime_setup() -> str | None:
