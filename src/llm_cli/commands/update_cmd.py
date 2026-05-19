@@ -1,229 +1,255 @@
-"""`llm update` — upgrade CLI wheel and scaffold assets."""
+"""`llm update` — pull the latest tag (or a chosen ref) into the git checkout."""
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
-import sys
+from pathlib import Path
+
 import typer
 from rich.console import Console
 
-from llm_cli import __version__
 from llm_cli.commands import lifecycle_cmds
 from llm_cli.commands import serve as serve_cmd
-from llm_cli.core.doctor import run_quick_checks
 from llm_cli.core.lifecycle import read_running, state_root
 from llm_cli.core.lifecycle_status import service_is_running_for_settings
-from llm_cli.core.scaffold import configured_repo_root, read_scaffold_version
-from llm_cli.core.scaffold_update import (
-    install_scaffold_release,
-    remove_scaffold_backup,
-    rollback_scaffold,
-)
-from llm_cli.core.update_check import (
-    fetch_github_latest_release,
-    fetch_pypi_latest_version,
-    is_behind,
-    parse_version_tag,
-)
+from llm_cli.core.scaffold import scaffold_root
+from llm_cli.core.settings import load_settings, resolve
 
 console = Console()
 
-_GITHUB_RELEASE_URL = "https://github.com/mtopcu1/local-llm-scaffold/releases/tag/"
+_SEMVER_TAG = re.compile(r"^v\d+\.\d+\.\d+$")
+_EXPECTED_REMOTE_HOSTS = ("github.com/mtopcu1/loco-llm",)
 
 
-def _pipx_available() -> bool:
-    return shutil.which("pipx") is not None
-
-
-def _upgrade_cli_wheel() -> None:
-    if configured_repo_root() is not None:
-        console.print(
-            "[red]error:[/red] editable dev install detected; "
-            "use `git pull` in your checkout instead of upgrading the CLI."
-        )
-        raise typer.Exit(code=1)
-    if _pipx_available():
-        subprocess.run(
-            [
-                "pipx",
-                "upgrade",
-                "loco-llm-cli",
-                "--pip-args=--upgrade-strategy=eager",
-            ],
-            check=True,
-        )
-        return
-    subprocess.run(
-        [sys.executable, "-m", "pip", "install", "--upgrade", "loco-llm-cli"],
-        check=True,
+def _run_git(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", "-C", str(root), *args],
+        capture_output=True,
+        text=True,
+        check=check,
     )
 
 
-def _print_changelog(release: dict, tag: str) -> None:
-    body = (release.get("body") or "").strip()
-    console.print("\n[bold]Changelog highlights:[/bold]")
-    if body:
-        for line in body.splitlines()[:8]:
-            console.print(f"  {line}")
-        if len(body.splitlines()) > 8:
-            console.print("  ...")
-    console.print(f"  Full release: {_GITHUB_RELEASE_URL}{tag}")
-
-
-def _confirm(yes: bool) -> None:
-    if yes:
-        return
-    answer = typer.confirm("Continue?", default=True)
-    if not answer:
-        raise typer.Exit(code=0)
-
-
-def _reexec_version() -> str:
-    """Best-effort read of installed CLI version after pipx upgrade."""
-    from importlib.metadata import version as pkg_version
-
+def _is_git_clone(root: Path) -> bool:
+    if not (root / ".git").exists():
+        return False
     try:
-        return pkg_version("loco-llm-cli")
-    except Exception:  # noqa: BLE001
-        return __version__
+        _run_git(root, "rev-parse", "--is-inside-work-tree")
+    except subprocess.CalledProcessError:
+        return False
+    return True
+
+
+def _remote_matches_expected(root: Path) -> bool:
+    try:
+        out = _run_git(root, "remote", "get-url", "origin")
+    except subprocess.CalledProcessError:
+        return False
+    url = out.stdout.strip()
+    return any(host in url for host in _EXPECTED_REMOTE_HOSTS)
+
+
+def _fetch_remote(root: Path, refspec: str | None = None) -> None:
+    args = ["fetch", "--tags", "--prune", "origin"]
+    if refspec:
+        args.append(refspec)
+    _run_git(root, *args)
+
+
+def _list_semver_tags(root: Path) -> list[str]:
+    out = _run_git(root, "tag", "--list", "v*")
+    tags = [t for t in out.stdout.split() if _SEMVER_TAG.match(t)]
+
+    def key(tag: str) -> tuple[int, int, int]:
+        parts = tag[1:].split(".")
+        return tuple(int(p) for p in parts)  # type: ignore[return-value]
+
+    return sorted(tags, key=key)
+
+
+def _latest_tag(root: Path) -> str | None:
+    tags = _list_semver_tags(root)
+    return tags[-1] if tags else None
+
+
+def _current_state(root: Path) -> dict[str, str | None]:
+    """Return {kind, ref, sha} where kind is 'tag' | 'branch' | 'detached'."""
+    sha = _run_git(root, "rev-parse", "HEAD").stdout.strip()
+    branch = _run_git(root, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
+    if branch and branch != "HEAD":
+        return {"kind": "branch", "ref": branch, "sha": sha}
+    try:
+        tag = _run_git(root, "describe", "--tags", "--exact-match", "HEAD").stdout.strip()
+        if tag:
+            return {"kind": "tag", "ref": tag, "sha": sha}
+    except subprocess.CalledProcessError:
+        pass
+    return {"kind": "detached", "ref": None, "sha": sha}
+
+
+def _working_tree_dirty(root: Path) -> bool:
+    out = _run_git(root, "status", "--porcelain")
+    return bool(out.stdout.strip())
+
+
+def _checkout(root: Path, ref: str) -> None:
+    _run_git(root, "checkout", ref)
+
+
+def _ff_pull(root: Path, branch: str) -> None:
+    _run_git(root, "pull", "--ff-only", "origin", branch)
+
+
+def _sync_deps(root: Path) -> None:
+    uv = shutil.which("uv")
+    if uv is None:
+        console.print(
+            "[yellow]warning:[/yellow] `uv` not found on PATH; skipping dep sync. "
+            "Install uv and re-run `llm update` to pick up dependency changes."
+        )
+        return
+    subprocess.run([uv, "pip", "install", "-e", str(root)], check=True)
+
+
+def _service_running() -> bool:
+    settings = resolve(load_settings())
+    return service_is_running_for_settings(settings)
+
+
+def _maybe_restart_around_update(restart: bool):
+    """Context-manager-ish helper returning (saved_record_or_none)."""
+    if not _service_running():
+        return None
+    if not restart:
+        console.print(
+            "[red]error:[/red] a service is running. Stop it first (`llm stop`) "
+            "or pass --restart to stop and re-start it around the update."
+        )
+        raise typer.Exit(code=1)
+    settings = resolve(load_settings())
+    saved = read_running(state_root(settings))
+    lifecycle_cmds.stop()
+    return saved
+
+
+def _restore_service(saved) -> None:
+    if saved is None:
+        return
+    serve_cmd.serve_dispatch(
+        saved.config_id,
+        foreground=saved.mode == "foreground",
+        systemd=saved.mode == "systemd",
+    )
 
 
 def update(
-    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation."),
+    branch: str | None = typer.Option(
+        None,
+        "--branch",
+        help="Switch to the tip of the given branch (off-mainline; warns).",
+    ),
+    tag: str | None = typer.Option(
+        None,
+        "--tag",
+        help="Pin to a specific tag (e.g. v0.4.0).",
+    ),
     check: bool = typer.Option(
-        False, "--check", help="Report available versions; exit 1 if behind."
+        False,
+        "--check",
+        help="Report current vs. latest tag and exit 1 if behind. No changes.",
     ),
-    scaffold_only: bool = typer.Option(
-        False, "--scaffold-only", help="Update scaffold assets only."
-    ),
-    cli_only: bool = typer.Option(False, "--cli-only", help="Update CLI wheel only."),
     restart: bool = typer.Option(
         False,
         "--restart",
         help="Stop a running service before update and re-serve afterward.",
     ),
 ) -> None:
-    """Upgrade CLI and/or scaffold assets from PyPI and GitHub releases."""
-    if scaffold_only and cli_only:
-        console.print("[red]error:[/red] --scaffold-only and --cli-only are mutually exclusive.")
+    """Pull the latest tagged release (or a chosen ref) into the local checkout."""
+    if sum(bool(x) for x in (branch, tag, check)) > 1:
+        console.print(
+            "[red]error:[/red] --branch, --tag, and --check are mutually exclusive."
+        )
         raise typer.Exit(code=1)
 
-    from llm_cli.core.settings import load_settings, resolve
-
-    settings = resolve(load_settings())
-    cli_current = __version__
-    scaffold_current = read_scaffold_version()
-    scaffold_current_cmp = (
-        parse_version_tag(scaffold_current) if scaffold_current else None
-    )
-
-    console.print("Checking for updates...")
-    try:
-        pypi_latest = fetch_pypi_latest_version()
-        release = fetch_github_latest_release()
-    except Exception as exc:  # noqa: BLE001
-        console.print(f"[red]error:[/red] failed to check for updates: {exc}")
-        raise typer.Exit(code=1) from exc
-
-    tag = str(release.get("tag_name", ""))
-    if not tag:
-        console.print("[red]error:[/red] GitHub release missing tag_name")
+    root = scaffold_root()
+    if not _is_git_clone(root):
+        console.print(
+            f"[red]error:[/red] {root} is not a managed install (no .git). "
+            "Reinstall via the install.sh one-liner."
+        )
         raise typer.Exit(code=1)
-    scaffold_latest_cmp = parse_version_tag(tag)
+    if not _remote_matches_expected(root):
+        console.print(
+            f"[red]error:[/red] {root}/.git/config 'origin' does not look like "
+            "github.com/mtopcu1/loco-llm. Refusing to update."
+        )
+        raise typer.Exit(code=1)
 
-    cli_behind = is_behind(cli_current, pypi_latest)
-    scaffold_behind = (
-        scaffold_current_cmp is None
-        or is_behind(scaffold_current_cmp, scaffold_latest_cmp)
-    )
+    _fetch_remote(root, refspec=branch)
 
-    console.print(f"  CLI:      {cli_current}  →  {pypi_latest}  (PyPI)")
-    console.print(
-        f"  Scaffold: {scaffold_current or '(none)'}  →  {tag}  "
-        "(github.com/mtopcu1/local-llm-scaffold)"
-    )
+    state = _current_state(root)
 
     if check:
-        if cli_behind or scaffold_behind:
-            raise typer.Exit(code=1)
-        console.print("Already up to date.")
-        raise typer.Exit(code=0)
+        latest = _latest_tag(root)
+        if latest is None:
+            console.print("[yellow]warning:[/yellow] no semver tags on origin.")
+            raise typer.Exit(code=0)
+        console.print(f"  current: {state['ref'] or state['sha'][:7]}")
+        console.print(f"  latest:  {latest}")
+        if state["kind"] == "tag" and state["ref"] == latest:
+            console.print("Already on latest stable.")
+            raise typer.Exit(code=0)
+        raise typer.Exit(code=1)
 
-    need_cli = cli_behind and not scaffold_only
-    need_scaffold = scaffold_behind and not cli_only
-    if not need_cli and not need_scaffold:
-        console.print("Already up to date.")
-        raise typer.Exit(code=0)
-
-    running = service_is_running_for_settings(settings)
-    if running and not restart:
+    if branch is not None:
+        saved = _maybe_restart_around_update(restart)
+        if _working_tree_dirty(root):
+            _run_git(root, "stash", "push", "-u", "-m", "llm-update")
+            console.print("[yellow]stashed local changes[/yellow]")
+        _checkout(root, branch)
+        _ff_pull(root, branch)
+        _sync_deps(root)
+        _restore_service(saved)
         console.print(
-            "[red]error:[/red] Stop the running service first (`llm stop`), "
-            "or pass --restart to have update stop and re-start it."
+            f"[yellow]you are now on branch {branch} — not a stable release.[/yellow] "
+            "Run `llm update` to return to the latest stable tag."
+        )
+        return
+
+    if tag is not None:
+        saved = _maybe_restart_around_update(restart)
+        if _working_tree_dirty(root):
+            _run_git(root, "stash", "push", "-u", "-m", "llm-update")
+            console.print("[yellow]stashed local changes[/yellow]")
+        _checkout(root, tag)
+        _sync_deps(root)
+        _restore_service(saved)
+        console.print(f"[green]pinned to {tag}.[/green]")
+        return
+
+    latest = _latest_tag(root)
+    if latest is None:
+        console.print(
+            "[red]error:[/red] no semver tags on origin; cannot re-anchor. "
+            "Use `--branch main` if you intend to track an untagged branch."
         )
         raise typer.Exit(code=1)
 
-    saved_rec = None
-    if running and restart:
-        saved_rec = read_running(state_root(settings))
-        lifecycle_cmds.stop()
-
-    if need_cli or need_scaffold:
-        _print_changelog(release, tag)
-        _confirm(yes)
-
-    prev_cli = cli_current
-    did_cli = False
-    did_scaffold = False
-
-    if need_cli:
-        console.print("[bold]Upgrading CLI...[/bold]")
-        try:
-            _upgrade_cli_wheel()
-            did_cli = True
-        except subprocess.CalledProcessError as exc:
-            console.print(f"[red]error:[/red] CLI upgrade failed: {exc}")
-            raise typer.Exit(code=1) from exc
-
-    if need_scaffold:
-        console.print("[bold]Upgrading scaffold...[/bold]")
-        try:
-            install_scaffold_release(tag, list(release.get("assets") or []), yes=yes)
-            did_scaffold = True
-        except Exception as exc:  # noqa: BLE001
-            console.print(f"[red]error:[/red] scaffold update failed: {exc}")
-            raise typer.Exit(code=1) from exc
-
-    if did_scaffold:
-        new_cli = _reexec_version() if did_cli else cli_current
-        if did_cli and new_cli != pypi_latest:
-            console.print(
-                f"[yellow]warning:[/yellow] CLI reports {new_cli} "
-                f"(expected {pypi_latest}); re-open your shell if needed."
-            )
-        ok, detail = run_quick_checks()
-        if not ok:
-            console.print(f"[red]error:[/red] post-update verify failed: {detail}")
-            rollback_scaffold()
-            console.print("[yellow]warning:[/yellow] scaffold rolled back to previous version.")
-            if did_cli:
-                console.print(
-                    f"CLI was upgraded to {pypi_latest}. "
-                    f"To roll back: pipx install 'loco-llm-cli=={prev_cli}' --force"
-                )
-            raise typer.Exit(code=1)
-        remove_scaffold_backup()
-
-    if running and restart and saved_rec is not None:
-        serve_cmd.serve_dispatch(
-            saved_rec.config_id,
-            foreground=saved_rec.mode == "foreground",
-            systemd=saved_rec.mode == "systemd",
+    if state["kind"] == "branch":
+        console.print(
+            f"[yellow]currently on branch {state['ref']}; "
+            f"switching back to latest stable tag {latest}.[/yellow]"
         )
+    if state["kind"] == "tag" and state["ref"] == latest:
+        console.print(f"Already on latest stable ({latest}).")
+        return
 
-    if did_cli and did_scaffold:
-        console.print(f"[green]Updated to {pypi_latest} ({tag}).[/green]")
-    elif did_cli:
-        console.print(f"[green]Updated CLI to {pypi_latest}.[/green]")
-    elif did_scaffold:
-        console.print(f"[green]Updated scaffold to {tag}.[/green]")
+    saved = _maybe_restart_around_update(restart)
+    if _working_tree_dirty(root):
+        _run_git(root, "stash", "push", "-u", "-m", "llm-update")
+        console.print("[yellow]stashed local changes[/yellow]")
+    _checkout(root, latest)
+    _sync_deps(root)
+    _restore_service(saved)
+    console.print(f"[green]updated to {latest}.[/green]")
