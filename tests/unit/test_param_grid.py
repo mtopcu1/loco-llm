@@ -51,7 +51,7 @@ def test_run_param_grid_uses_plain_when_requested(monkeypatch) -> None:
     monkeypatch.setattr("llm_cli.core.param_grid.wizards.use_plain_prompts", lambda: True)
     monkeypatch.setattr(
         "llm_cli.core.param_grid.run_param_grid_plain",
-        lambda cells, meta, *, title, theme: expected,
+        lambda cells, meta, *, specs, title, theme: expected,
     )
 
     got = run_param_grid([], [], specs=[], title="T")
@@ -142,7 +142,7 @@ def test_run_param_grid_falls_back_on_import_error(monkeypatch) -> None:
     monkeypatch.setattr("llm_cli.core.param_grid._run_param_grid_tui", _boom)
     monkeypatch.setattr(
         "llm_cli.core.param_grid.run_param_grid_plain",
-        lambda cells, meta, *, title, theme: expected,
+        lambda cells, meta, *, specs, title, theme: expected,
     )
     got = run_param_grid([], [], specs=[], title="T")
     assert got is expected

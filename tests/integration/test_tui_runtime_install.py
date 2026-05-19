@@ -32,7 +32,7 @@ def _save_build_params_footer(session: TuiSession, *, visible_rows: int) -> None
     session.send(k.ENTER)
 
 
-def test_tui_runtime_install_common_only_saves_default_build_params(tui_repo) -> None:
+def test_tui_runtime_install_common_only_saves_opted_in_build_params(tui_repo) -> None:
     fixture = tui_repo
     add_tiered_build_runtime(fixture.repo_root)
     session = TuiSession.spawn(fixture, ["runtime", "install", "tier-rt"])
@@ -45,7 +45,7 @@ def test_tui_runtime_install_common_only_saves_default_build_params(tui_repo) ->
 
     rec = read_record(fixture.runtimes_dir, "tier-rt")
     assert rec is not None
-    assert rec.build_params == {"flavor": "cpu", "extra_jobs": 8}
+    assert rec.build_params == {"flavor": "cpu"}
 
 
 def test_tui_runtime_install_abort_from_param_grid(tui_repo) -> None:

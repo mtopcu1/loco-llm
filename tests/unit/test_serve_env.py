@@ -23,7 +23,7 @@ def test_serve_env_from_params_basic(tmp_path: Path) -> None:
     schema = parse_schema(
         {
             "gguf_path": {"type": "path", "required": True, "env": "LLM_LLAMACPP_GGUF"},
-            "ctx": {"type": "int", "default": 8192, "env": "LLM_LLAMACPP_CTX"},
+            "ctx": {"type": "int", "env": "LLM_LLAMACPP_CTX"},
         }
     )
     cfg_data = {

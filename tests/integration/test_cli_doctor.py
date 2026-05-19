@@ -203,7 +203,7 @@ def test_doctor_runtime_flag_rejects_unknown_runtime(tmp_path: Path, monkeypatch
     assert "unknown runtime 'ollamacpp'" in result.stdout
 
 
-def test_doctor_runtime_flag_uses_manifest_defaults_when_uninstalled(
+def test_doctor_runtime_flag_skips_conditional_reqs_when_uninstalled(
     tmp_path: Path, monkeypatch
 ) -> None:
     repo = tmp_path / "repo"
@@ -224,7 +224,6 @@ def test_doctor_runtime_flag_uses_manifest_defaults_when_uninstalled(
             "  flavor:\n"
             "    type: enum\n"
             "    values: [cuda, cpu]\n"
-            "    default: cuda\n"
         ),
     )
     _configure(tmp_path, repo)
@@ -242,10 +241,10 @@ def test_doctor_runtime_flag_uses_manifest_defaults_when_uninstalled(
     result = runner.invoke(app, ["doctor", "--runtime", "rt-a"])
 
     assert result.exit_code == 0, result.stdout
-    assert sorted(seen_ids) == ["cmake", "nvcc"]
+    assert sorted(seen_ids) == ["cmake"]
 
 
-def test_doctor_all_flag_includes_uninstalled_runtime_defaults(
+def test_doctor_all_flag_includes_uninstalled_runtime_baseline_reqs(
     tmp_path: Path, monkeypatch
 ) -> None:
     repo = tmp_path / "repo"
@@ -266,7 +265,6 @@ def test_doctor_all_flag_includes_uninstalled_runtime_defaults(
             "  flavor:\n"
             "    type: enum\n"
             "    values: [cuda, cpu]\n"
-            "    default: cuda\n"
         ),
     )
     _configure(tmp_path, repo)
@@ -284,4 +282,4 @@ def test_doctor_all_flag_includes_uninstalled_runtime_defaults(
     result = runner.invoke(app, ["doctor", "--all"])
 
     assert result.exit_code == 0, result.stdout
-    assert sorted(seen_ids) == ["cmake", "nvcc"]
+    assert sorted(seen_ids) == ["cmake"]

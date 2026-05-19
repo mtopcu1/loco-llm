@@ -171,7 +171,6 @@ def test_runtime_manifest_typed(tmp_path: Path) -> None:
         "  flavor:\n"
         "    type: enum\n"
         "    values: [cuda, cpu]\n"
-        "    default: cuda\n"
         "requires:\n"
         "  - id: cmake\n"
         "    verify: { cmd: cmake --version, version_regex: 'v ([\\d.]+)', min: '3.16' }\n"
@@ -180,8 +179,7 @@ def test_runtime_manifest_typed(tmp_path: Path) -> None:
     )
     (repo / "runtimes" / "rt-a" / "params.yaml").write_text(
         "ctx:\n"
-        "  type: int\n"
-        "  default: 8192\n",
+        "  type: int\n",
         encoding="utf-8",
     )
     for s in ("build.sh", "serve.sh", "healthcheck.sh"):
@@ -208,7 +206,7 @@ def test_validate_config_rejects_unknown_param(tmp_path: Path) -> None:
     _write_runtime(
         repo,
         "rt-a",
-        serve_schema={"ctx": {"type": "int", "default": 8}},
+        serve_schema={"ctx": {"type": "int"}},
     )
     _write_model(repo, "md-a")
     _write_config(repo, "c1", "rt-a", "md-a", params={"ctxx": 16})
@@ -240,7 +238,7 @@ def test_validate_config_warns_uninstalled_runtime(tmp_path: Path) -> None:
     _write_runtime(
         repo,
         "rt-a",
-        serve_schema={"ctx": {"type": "int", "default": 8}},
+        serve_schema={"ctx": {"type": "int"}},
     )
     _write_model(repo, "md-a")
     _write_config(repo, "c1", "rt-a", "md-a", params={"ctx": 16})
@@ -372,12 +370,10 @@ def test_runtime_loads_params_yaml_with_tier_and_description(tmp_path: Path) -> 
     (rt / "params.yaml").write_text(
         "n_threads:\n"
         "  type: int\n"
-        "  default: 4\n"
         "  tier: common\n"
         "  description: Number of worker threads.\n"
         "extra:\n"
         "  type: string\n"
-        "  default: ''\n"
         "  tier: advanced\n"
         "  description: Pass-through flags.\n",
         encoding="utf-8",
@@ -407,7 +403,7 @@ def test_runtime_manifest_with_inline_serve_is_rejected(tmp_path: Path) -> None:
     rt.mkdir(parents=True)
     (rt / "manifest.yaml").write_text(
         "id: demo\ndisplay_name: Demo\naccepts_formats: []\n"
-        "serve:\n  n: { type: int, default: 1 }\n",
+        "serve:\n  n: { type: int }\n",
         encoding="utf-8",
     )
     with pytest.raises(ValueError, match="serve: schema moved to params.yaml"):
@@ -456,7 +452,7 @@ def test_custom_kind_forbids_build_section(tmp_path: Path) -> None:
     (rt / "manifest.yaml").write_text(
         "id: demo\ndisplay_name: Demo\nkind: custom\naccepts_formats: []\n"
         "build:\n"
-        "  flavor: { type: enum, values: [a, b], default: a }\n",
+        "  flavor: { type: enum, values: [a, b] }\n",
         encoding="utf-8",
     )
     with pytest.raises(ValueError, match="custom runtimes must not declare a build section"):

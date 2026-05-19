@@ -111,12 +111,10 @@ def add_tiered_build_runtime(repo_root: Path) -> None:
         "  flavor:\n"
         "    type: enum\n"
         "    values: [cuda, cpu]\n"
-        "    default: cpu\n"
         "    tier: common\n"
         "    description: Build flavor\n"
         "  extra_jobs:\n"
         "    type: int\n"
-        "    default: 8\n"
         "    tier: advanced\n"
         "    description: Extra parallelism\n",
         encoding="utf-8",

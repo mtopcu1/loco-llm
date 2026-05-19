@@ -77,20 +77,15 @@ def test_runtime_install_vllm_mocks_bash_pip(mock_run_runtime_bash, monkeypatch,
     assert result.exit_code == 0
     rec = read_record(tmp_path / "data" / "runtimes", "vllm")
     assert rec is not None
-    assert rec.build_params == {
-        "vllm_version": "0.8.5",
-        "pip_extra": "none",
-        "extra_pip_packages": "",
-        "force_reinstall": False,
-    }
+    assert rec.build_params == {}
     assert mock_run_runtime_bash.call_count == 2
     scripts = [call.args[2] for call in mock_run_runtime_bash.call_args_list]
     assert scripts == ["build.sh", "verify.sh"]
     build_env = mock_run_runtime_bash.call_args_list[0].kwargs["extra_env"]
-    assert build_env["LLM_BUILD_VLLM_VERSION"] == "0.8.5"
-    assert build_env["LLM_BUILD_PIP_EXTRA"] == "none"
-    assert build_env["LLM_BUILD_EXTRA_PIP_PACKAGES"] == ""
-    assert build_env["LLM_BUILD_FORCE_REINSTALL"] == "False"
+    assert "LLM_BUILD_VLLM_VERSION" not in build_env
+    assert "LLM_BUILD_PIP_EXTRA" not in build_env
+    assert "LLM_BUILD_EXTRA_PIP_PACKAGES" not in build_env
+    assert "LLM_BUILD_FORCE_REINSTALL" not in build_env
 
 
 def test_config_new_vllm_injects_model_path(monkeypatch, tmp_path) -> None:
