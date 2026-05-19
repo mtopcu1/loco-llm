@@ -25,6 +25,7 @@ def _configure_user_settings(monkeypatch, tmp_path: Path, repo_root: Path) -> No
 
 
 def _patch_specs(monkeypatch):
+    from llm_cli.commands import advisor as advisor_mod
     from llm_cli.core import specs as specs_mod
     from llm_cli.core.specs import CpuInfo, GpuInfo, SystemSpecs
 
@@ -33,7 +34,13 @@ def _patch_specs(monkeypatch):
         ram_gb=16,
         gpus=[GpuInfo(index=0, name="NVIDIA RTX 4090", vram_gb=24, driver="560")],
     )
-    monkeypatch.setattr(specs_mod, "detect_all", lambda **kwargs: fake)
+
+    def fake_detect_all(**_kwargs):
+        return fake
+
+    # advisor imports detect_all by name; patch both module and consumer.
+    monkeypatch.setattr(specs_mod, "detect_all", fake_detect_all)
+    monkeypatch.setattr(advisor_mod, "detect_all", fake_detect_all)
 
 
 def _patch_model(monkeypatch, model_id: str, size_bytes: int):
