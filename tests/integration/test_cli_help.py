@@ -23,6 +23,15 @@ def test_top_level_build_pull_removed():
     assert r2.exit_code != 0
 
 
+def test_version_flag_prints_package_version():
+    result = runner.invoke(app, ["--version"])
+    assert result.exit_code == 0
+    assert "llm " in result.stdout.lower()
+    from llm_cli import __version__
+
+    assert __version__ in result.stdout
+
+
 def test_runtime_and_model_subapps_registered():
     r1 = runner.invoke(app, ["runtime", "--help"])
     assert r1.exit_code == 0

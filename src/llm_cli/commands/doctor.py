@@ -1,6 +1,7 @@
 """`llm doctor` — verify external requirements; `llm doctor render-requirements` regenerates the markdown."""
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import typer
@@ -15,8 +16,41 @@ from llm_cli.core.doctor import (
     systemd_linger_advisory,
 )
 from llm_cli.core.repo import scaffold_root
+from llm_cli.core.scaffold import scaffold_root as install_root
 
 console = Console()
+
+
+def _check_on_release_tag() -> tuple[str, str, str]:
+    """Return (id, status, detail) for the head-on-tag check."""
+    try:
+        root = install_root()
+    except RuntimeError as exc:
+        return ("install-channel", "error", str(exc))
+    try:
+        subprocess.run(
+            ["git", "-C", str(root), "describe", "--tags", "--exact-match", "HEAD"],
+            capture_output=True,
+            check=True,
+            timeout=2,
+        )
+        return ("install-channel", "ok", "on a release tag")
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        return (
+            "install-channel",
+            "warn",
+            "not on a release tag — run `llm update` to re-anchor to the latest stable tag",
+        )
+
+
+def _print_install_channel_check() -> None:
+    cid, status, detail = _check_on_release_tag()
+    if status == "ok":
+        return
+    if status == "warn":
+        console.print(f"[yellow]warning ({cid}):[/yellow] {detail}")
+        return
+    console.print(f"[red]error ({cid}):[/red] {detail}")
 doctor_app = typer.Typer(
     name="doctor",
     help="Verify external requirements (CUDA driver, Python, hf CLI, ...).",
@@ -63,6 +97,7 @@ def doctor(
 
     if quick:
         ok, detail = run_quick_checks()
+        _print_install_channel_check()
         if ok:
             console.print("[green]quick checks passed[/green]")
             return
@@ -149,6 +184,7 @@ def doctor(
             "[yellow]advisory (systemd-linger):[/yellow] "
             + linger
         )
+    _print_install_channel_check()
     if bad:
         console.print(f"[red]{bad} requirement(s) need attention[/red]")
         raise typer.Exit(code=1)

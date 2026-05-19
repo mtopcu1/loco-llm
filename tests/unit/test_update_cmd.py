@@ -1,9 +1,10 @@
-"""Tests for `llm update` command."""
+"""Tests for git-based llm update."""
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
-from unittest.mock import patch
 
+import pytest
 from typer.testing import CliRunner
 
 from llm_cli.main import app
@@ -11,107 +12,152 @@ from llm_cli.main import app
 runner = CliRunner()
 
 
-def _settings_env(tmp_path: Path, monkeypatch) -> None:
-    cfg = tmp_path / "cfg" / "llm"
-    cfg.mkdir(parents=True)
-    (cfg / "config.yaml").write_text(
-        f"data_root: {tmp_path / 'data'}\n",
-        encoding="utf-8",
+def _init_repo(root: Path, tags: list[str], on_branch: str | None = None) -> None:
+    """Initialize a fake clone with a sequence of tags and optional branch HEAD."""
+    subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+    subprocess.run(
+        ["git", "-C", str(root), "config", "user.email", "test@example.com"],
+        check=True,
     )
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
-    monkeypatch.delenv("LLM_SCAFFOLD_DIR", raising=False)
+    subprocess.run(
+        ["git", "-C", str(root), "config", "user.name", "Test"], check=True
+    )
+    (root / "pyproject.toml").write_text('[project]\nname = "loco-llm-cli"\n')
+    subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+    subprocess.run(
+        ["git", "-C", str(root), "commit", "-q", "-m", "initial"], check=True
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/mtopcu1/loco-llm.git",
+        ],
+        check=True,
+    )
+    for i, tag in enumerate(tags):
+        if i > 0:
+            (root / f"release-{tag}.txt").write_text(f"{tag}\n")
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+            subprocess.run(
+                ["git", "-C", str(root), "commit", "-q", "-m", f"release {tag}"],
+                check=True,
+            )
+        subprocess.run(
+            ["git", "-C", str(root), "tag", "-a", tag, "-m", tag], check=True
+        )
+    if on_branch is not None:
+        subprocess.run(
+            ["git", "-C", str(root), "checkout", "-q", "-b", on_branch], check=True
+        )
 
 
-def test_update_check_exits_nonzero_when_behind(tmp_path: Path, monkeypatch) -> None:
-    _settings_env(tmp_path, monkeypatch)
-    scaffold = tmp_path / "xdg" / "localllm" / "scaffold"
-    scaffold.mkdir(parents=True)
-    (scaffold / ".scaffold-version").write_text("v0.2.0\n", encoding="utf-8")
+@pytest.fixture
+def fake_clone(tmp_path, monkeypatch):
+    root = tmp_path / "loco"
+    root.mkdir()
+    _init_repo(root, tags=["v0.4.0", "v0.4.1"])
+    monkeypatch.setenv("LOCO_LLM_HOME", str(root))
+    monkeypatch.setattr(
+        "llm_cli.commands.update_cmd._sync_deps", lambda _root: None
+    )
+    monkeypatch.setattr(
+        "llm_cli.commands.update_cmd._fetch_remote", lambda _root, refspec=None: None
+    )
+    monkeypatch.setattr(
+        "llm_cli.commands.update_cmd._ff_pull", lambda _root, _branch: None
+    )
+    monkeypatch.setattr(
+        "llm_cli.commands.update_cmd._service_running", lambda: False
+    )
+    return root
 
-    with (
-        patch(
-            "llm_cli.commands.update_cmd.fetch_pypi_latest_version",
-            return_value="0.4.1",
-        ),
-        patch(
-            "llm_cli.commands.update_cmd.fetch_github_latest_release",
-            return_value={"tag_name": "v0.4.1", "body": "", "assets": []},
-        ),
-    ):
-        result = runner.invoke(app, ["update", "--check"])
-    assert result.exit_code == 1
-    assert "0.4.1" in result.stdout
 
-
-def test_update_check_up_to_date(tmp_path: Path, monkeypatch) -> None:
-    _settings_env(tmp_path, monkeypatch)
-    scaffold = tmp_path / "xdg" / "localllm" / "scaffold"
-    scaffold.mkdir(parents=True)
-    (scaffold / ".scaffold-version").write_text("v0.2.0\n", encoding="utf-8")
-
-    with (
-        patch(
-            "llm_cli.commands.update_cmd.fetch_pypi_latest_version",
-            return_value="0.2.0",
-        ),
-        patch(
-            "llm_cli.commands.update_cmd.fetch_github_latest_release",
-            return_value={"tag_name": "v0.2.0", "body": "", "assets": []},
-        ),
-    ):
-        result = runner.invoke(app, ["update", "--check"])
+def test_update_bare_already_on_latest_is_noop(fake_clone):
+    subprocess.run(
+        ["git", "-C", str(fake_clone), "checkout", "-q", "v0.4.1"], check=True
+    )
+    result = runner.invoke(app, ["update"])
     assert result.exit_code == 0
-    assert "Already up to date" in result.stdout
+    assert "already on latest stable" in result.stdout.lower()
 
 
-def test_update_refuses_when_service_running(tmp_path: Path, monkeypatch) -> None:
-    _settings_env(tmp_path, monkeypatch)
-    with (
-        patch(
-            "llm_cli.commands.update_cmd.fetch_pypi_latest_version",
-            return_value="0.4.1",
-        ),
-        patch(
-            "llm_cli.commands.update_cmd.fetch_github_latest_release",
-            return_value={"tag_name": "v0.4.1", "body": "", "assets": []},
-        ),
-        patch(
-            "llm_cli.commands.update_cmd.service_is_running_for_settings",
-            return_value=True,
-        ),
-    ):
-        result = runner.invoke(app, ["update", "--yes"])
-    assert result.exit_code == 1
-    assert "Stop the running service" in result.stdout
-
-
-def test_update_refuses_cli_in_dev_mode(tmp_path: Path, monkeypatch) -> None:
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    cfg = tmp_path / "cfg" / "llm"
-    cfg.mkdir(parents=True)
-    (cfg / "config.yaml").write_text(
-        f"data_root: {tmp_path / 'data'}\nrepo_root: {repo}\n",
-        encoding="utf-8",
+def test_update_bare_advances_to_latest_tag(fake_clone):
+    subprocess.run(
+        ["git", "-C", str(fake_clone), "checkout", "-q", "v0.4.0"], check=True
     )
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    result = runner.invoke(app, ["update"])
+    assert result.exit_code == 0
+    assert "updated to v0.4.1" in result.stdout.lower()
 
-    with (
-        patch(
-            "llm_cli.commands.update_cmd.fetch_pypi_latest_version",
-            return_value="0.4.1",
-        ),
-        patch(
-            "llm_cli.commands.update_cmd.fetch_github_latest_release",
-            return_value={"tag_name": "v0.4.1", "body": "", "assets": []},
-        ),
-        patch(
-            "llm_cli.commands.update_cmd.service_is_running_for_settings",
-            return_value=False,
-        ),
-        patch("llm_cli.commands.update_cmd._confirm"),
-    ):
-        result = runner.invoke(app, ["update", "--yes", "--cli-only"])
+
+def test_update_bare_reanchors_from_branch(fake_clone):
+    subprocess.run(
+        ["git", "-C", str(fake_clone), "checkout", "-q", "-b", "hotfix/x"],
+        check=True,
+    )
+    result = runner.invoke(app, ["update"])
+    assert result.exit_code == 0
+    assert "switching back to latest stable" in result.stdout.lower()
+    assert "v0.4.1" in result.stdout
+
+
+def test_update_branch_flag_checks_out_branch(fake_clone):
+    subprocess.run(
+        ["git", "-C", str(fake_clone), "branch", "hotfix/y", "v0.4.0"],
+        check=True,
+    )
+    result = runner.invoke(app, ["update", "--branch", "hotfix/y"])
+    assert result.exit_code == 0
+    assert "not a stable release" in result.stdout.lower()
+    head = subprocess.run(
+        ["git", "-C", str(fake_clone), "rev-parse", "--abbrev-ref", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    assert head == "hotfix/y"
+
+
+def test_update_tag_flag_pins_to_specific_tag(fake_clone):
+    result = runner.invoke(app, ["update", "--tag", "v0.4.0"])
+    assert result.exit_code == 0
+    assert "v0.4.0" in result.stdout
+    head = subprocess.run(
+        ["git", "-C", str(fake_clone), "describe", "--tags", "--exact-match"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    assert head == "v0.4.0"
+
+
+def test_update_check_flag_exits_nonzero_when_behind(fake_clone):
+    subprocess.run(
+        ["git", "-C", str(fake_clone), "checkout", "-q", "v0.4.0"], check=True
+    )
+    result = runner.invoke(app, ["update", "--check"])
     assert result.exit_code == 1
-    assert "editable dev install" in result.stdout
+    assert "v0.4.0" in result.stdout
+    assert "v0.4.1" in result.stdout
+
+
+def test_update_check_flag_exits_zero_when_up_to_date(fake_clone):
+    subprocess.run(
+        ["git", "-C", str(fake_clone), "checkout", "-q", "v0.4.1"], check=True
+    )
+    result = runner.invoke(app, ["update", "--check"])
+    assert result.exit_code == 0
+
+
+def test_update_refuses_unmanaged_directory(tmp_path, monkeypatch):
+    empty = tmp_path / "not-a-clone"
+    empty.mkdir()
+    monkeypatch.setenv("LOCO_LLM_HOME", str(empty))
+    result = runner.invoke(app, ["update"])
+    assert result.exit_code != 0
+    assert "not a managed install" in result.stdout.lower()

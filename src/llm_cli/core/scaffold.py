@@ -1,30 +1,28 @@
-"""Scaffold and user asset directory resolution."""
+"""Resolve LOCO_LLM_HOME — the git checkout that is the install root."""
 from __future__ import annotations
 
 import os
+import subprocess
 from pathlib import Path
 
 from llm_cli.core.settings import Settings, load_settings
 
 
-def xdg_data_home() -> Path:
-    """Return XDG_DATA_HOME or ~/.local/share."""
-    xdg = os.environ.get("XDG_DATA_HOME")
-    if xdg:
-        return Path(xdg).expanduser()
-    return Path.home() / ".local" / "share"
-
-
-def default_scaffold_dir() -> Path:
-    return xdg_data_home() / "localllm" / "scaffold"
-
-
-def scaffold_dir() -> Path:
-    """Managed scaffold directory (tarball extract target)."""
-    override = os.environ.get("LLM_SCAFFOLD_DIR")
-    if override:
-        return Path(override).expanduser()
-    return default_scaffold_dir()
+def _module_git_toplevel() -> Path | None:
+    """Best-effort: git toplevel of the directory containing this module."""
+    here = Path(__file__).resolve().parent
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(here), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=5,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    top = out.stdout.strip()
+    return Path(top).resolve() if top else None
 
 
 def configured_repo_root() -> Path | None:
@@ -38,11 +36,19 @@ def configured_repo_root() -> Path | None:
 
 
 def scaffold_root() -> Path:
-    """Read-only official assets: dev checkout or managed scaffold dir."""
+    """Return the git checkout root (LOCO_LLM_HOME, dev override, or git toplevel)."""
+    env = os.environ.get("LOCO_LLM_HOME")
+    if env:
+        return Path(env).expanduser().resolve()
     dev = configured_repo_root()
     if dev is not None:
         return dev
-    return scaffold_dir().resolve()
+    top = _module_git_toplevel()
+    if top is not None:
+        return top
+    raise RuntimeError(
+        "could not resolve scaffold root; set LOCO_LLM_HOME or run from a git checkout"
+    )
 
 
 def user_assets_root(settings: Settings) -> Path:
@@ -59,12 +65,3 @@ def user_configs_dir(settings: Settings) -> Path:
 
 def user_benchmarks_dir(settings: Settings) -> Path:
     return user_assets_root(settings) / "benchmarks"
-
-
-def read_scaffold_version() -> str | None:
-    """Return the tag in .scaffold-version, or None if missing."""
-    path = scaffold_dir() / ".scaffold-version"
-    if not path.is_file():
-        return None
-    text = path.read_text(encoding="utf-8").strip()
-    return text or None

@@ -36,7 +36,7 @@ def test_user_layer_wins_on_runtime_id_collision(tmp_path, monkeypatch) -> None:
     cfg = tmp_path / "cfg" / "llm"
     cfg.mkdir(parents=True)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
-    monkeypatch.setenv("LLM_SCAFFOLD_DIR", str(scaffold))
+    monkeypatch.setenv("LOCO_LLM_HOME", str(scaffold))
     save_settings({"data_root": str(tmp_path / "data")})
 
     merged = registry.discover_runtimes_merged()
@@ -53,7 +53,7 @@ def test_merged_includes_both_layers(tmp_path, monkeypatch) -> None:
     cfg = tmp_path / "cfg" / "llm"
     cfg.mkdir(parents=True)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
-    monkeypatch.setenv("LLM_SCAFFOLD_DIR", str(scaffold))
+    monkeypatch.setenv("LOCO_LLM_HOME", str(scaffold))
     save_settings({"data_root": str(tmp_path / "data")})
 
     ids = {r.id for r in registry.discover_runtimes_merged()}
@@ -68,7 +68,7 @@ def test_config_user_overrides_scaffold(tmp_path, monkeypatch) -> None:
     cfg = tmp_path / "cfg" / "llm"
     cfg.mkdir(parents=True)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
-    monkeypatch.setenv("LLM_SCAFFOLD_DIR", str(scaffold))
+    monkeypatch.setenv("LOCO_LLM_HOME", str(scaffold))
     save_settings({"data_root": str(tmp_path / "data")})
 
     merged = registry.discover_configs_merged()

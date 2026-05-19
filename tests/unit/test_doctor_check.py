@@ -118,6 +118,17 @@ def test_systemd_linger_advisory_skips_on_nonzero_exit() -> None:
     assert systemd_linger_advisory(run_command=run) is None
 
 
+def test_install_channel_check_warns_when_not_on_tag(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from llm_cli.commands.doctor import _check_on_release_tag
+
+    monkeypatch.setenv("LOCO_LLM_HOME", str(tmp_path))
+    cid, status, _ = _check_on_release_tag()
+    assert cid == "install-channel"
+    assert status in {"warn", "error"}
+
+
 def test_load_requirements_parses_yaml(tmp_path: Path) -> None:
     yaml_file = tmp_path / "requirements.yaml"
     yaml_file.write_text(
