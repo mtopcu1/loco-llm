@@ -26,52 +26,42 @@ build:
   flavor:
     type: enum
     values: [cuda, cpu, vulkan]
-    default: cuda
     tier: common
     prompt: "Which backend to build?"
   jobs:
     type: int
-    default: 0
     tier: common
     prompt: "Parallel build jobs (0 = nproc)"
   git_ref:
     type: string
-    default: "b9209"
     tier: common
     prompt: "Git tag, branch, or commit to build"
   cmake_build_type:
     type: enum
     values: [Release, RelWithDebInfo, Debug]
-    default: Release
     tier: advanced
     prompt: "CMake build type"
   cublas:
     type: bool
-    default: true
     tier: advanced
     prompt: "Prefer cuBLAS matmul paths when using CUDA (disable for MMQ-only)"
   flash_attn:
     type: bool
-    default: false
     tier: advanced
     prompt: "Compile CUDA FlashAttention kernels (GGML_CUDA_FA)"
   native:
     type: bool
-    default: true
     tier: advanced
     prompt: "Optimize for the current CPU (-march=native style)"
   cuda_architectures:
     type: string
-    default: ""
     tier: advanced
     prompt: "CMAKE_CUDA_ARCHITECTURES override (empty = CMake default), e.g. 86;89"
   static:
     type: bool
-    default: false
     tier: advanced
     prompt: "Static libraries (BUILD_SHARED_LIBS=OFF)"
   clean_build:
     type: bool
-    default: false
     tier: advanced
     prompt: "Delete the CMake build directory before configuring"

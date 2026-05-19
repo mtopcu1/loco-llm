@@ -4,6 +4,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+import yaml
 from typer.testing import CliRunner
 
 from llm_cli.main import app
@@ -87,6 +88,31 @@ def test_config_new_writes_valid_yaml(monkeypatch, tmp_path):
     assert "runtime: llamacpp" in text
     assert "model: qwen-7b" in text
     assert "gguf_path: ${model_path}" in text
+
+
+def test_config_new_saves_only_explicit_params(monkeypatch, tmp_path):
+    _seed_repo(tmp_path, monkeypatch)
+    result = runner.invoke(
+        app,
+        [
+            "config",
+            "new",
+            "--runtime",
+            "llamacpp",
+            "--model",
+            "qwen-7b",
+            "--preset",
+            "default",
+            "--param",
+            "ctx=8192",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    out_path = _user_config_path(tmp_path, "llamacpp__qwen-7b__default.yaml")
+    doc = yaml.safe_load(out_path.read_text(encoding="utf-8"))
+    params = doc["serve"]["params"]
+    assert params == {"gguf_path": "${model_path}", "ctx": 8192}
+    assert "n_gpu_layers" not in params
 
 
 def test_config_new_injects_model_path_without_gguf_param(monkeypatch, tmp_path):
