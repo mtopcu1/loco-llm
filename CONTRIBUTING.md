@@ -38,6 +38,8 @@ merge strategy.
 
 ## Release flow
 
+**One-time setup:** If `release-please` fails with "not permitted to create … pull requests", follow [docs/RELEASE_SETUP.md](docs/RELEASE_SETUP.md) (enable Actions PR creation, then re-run the workflow).
+
 Releases are fully automated:
 
 1. Merge PRs into `main` using Conventional Commit messages.
