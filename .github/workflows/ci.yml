@@ -24,6 +24,8 @@ jobs:
       - name: Run pytest
         env:
           CI: "true"
+          NO_COLOR: "1"
+          TERM: "dumb"
         run: pytest -q --tb=short
 
   build-check:
