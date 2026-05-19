@@ -79,6 +79,8 @@ def text(
     """Single-line text entry."""
     while True:
         answer = Prompt.ask(prompt, default=default)
+        if answer is None:
+            answer = ""
         if validate is None:
             return answer
         err = validate(answer)

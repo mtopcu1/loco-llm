@@ -41,6 +41,14 @@ def test_text_returns_default_when_user_hits_enter(monkeypatch):
     ask.assert_called_once()
 
 
+def test_text_empty_skip_returns_empty_string_when_prompt_returns_none(monkeypatch):
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    monkeypatch.setenv("TERM", "xterm-256color")
+    with patch("llm_cli.core.wizards.Prompt.ask", return_value=None):
+        out = wizards.text("Hugging Face model URL (empty to skip)", default="")
+    assert out == ""
+
+
 def test_select_falls_back_to_numbered_list_when_plain(monkeypatch, capsys):
     monkeypatch.setattr(wizards, "use_plain_prompts", lambda: True)
     with patch("llm_cli.core.wizards.Prompt.ask", return_value="2"):
