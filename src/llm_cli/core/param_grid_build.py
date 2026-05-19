@@ -75,6 +75,23 @@ def filter_visible_cells(
     return out
 
 
+def filter_cells_by_query(cells: list[ParamCell], query: str) -> list[ParamCell]:
+    """Return cells whose key, label, description, or hint contains query (case-insensitive)."""
+    token = query.strip().casefold()
+    if not token:
+        return cells
+    out: list[ParamCell] = []
+    for cell in cells:
+        haystack = " ".join(
+            part
+            for part in (cell.key, cell.label, cell.description, cell.hint or "")
+            if part
+        ).casefold()
+        if token in haystack:
+            out.append(cell)
+    return out
+
+
 def paginate_cells(
     cells: list[ParamCell],
     *,

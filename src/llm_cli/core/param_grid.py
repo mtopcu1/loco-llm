@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from llm_cli.core import wizards
-from llm_cli.core.param_grid_build import enabled_values_from_cells, filter_visible_cells
+from llm_cli.core.param_grid_build import enabled_values_from_cells, filter_cells_by_query, filter_visible_cells
 from llm_cli.core.param_grid_layout import (
     cell_indicator,
     format_param_row,
@@ -146,6 +146,8 @@ class _WizardState:
     editing: bool = False
     edit_buffer: str = ""
     error_message: str = ""
+    filter_text: str = ""
+    filter_editing: bool = False
 
 
 def _run_param_grid_tui(
@@ -162,9 +164,10 @@ def _run_param_grid_tui(
         from prompt_toolkit.formatted_text import StyleAndTextTuples
         from prompt_toolkit.key_binding import KeyBindings
         from prompt_toolkit.keys import Keys
-        from prompt_toolkit.layout import HSplit, Layout, Window
+        from prompt_toolkit.layout import ConditionalContainer, HSplit, Layout, Window
         from prompt_toolkit.layout.controls import FormattedTextControl
         from prompt_toolkit.layout.dimension import Dimension
+        from prompt_toolkit.filters import Condition
         from prompt_toolkit.styles import Style
     except ImportError as exc:
         raise ImportError("prompt_toolkit is unavailable") from exc
@@ -186,11 +189,36 @@ def _run_param_grid_tui(
             hide_readonly=True,
         )
 
+    def _list_param_cells() -> list[ParamCell]:
+        visible = _visible_param_cells()
+        if state.phase != "list" or not state.filter_text.strip():
+            return visible
+        return filter_cells_by_query(visible, state.filter_text)
+
+    def _reset_filter_focus() -> None:
+        state.focus.content_index = 0
+        state.focus.scroll_offset = 0
+        state.focus.zone = "content"
+
+    def _set_filter_text(text: str) -> None:
+        if text == state.filter_text:
+            return
+        state.filter_text = text
+        _reset_filter_focus()
+        _ensure_focus_bounds()
+
+    def _clear_filter() -> None:
+        state.filter_editing = False
+        if state.filter_text:
+            _set_filter_text("")
+        else:
+            _reset_filter_focus()
+
     def _content_row_count() -> int:
         if state.phase == "meta":
             return len(meta)
         if state.phase == "list":
-            return len(_visible_param_cells())
+            return len(_list_param_cells())
         return 1
 
     def _ensure_focus_bounds() -> None:
@@ -229,7 +257,7 @@ def _run_param_grid_tui(
         if kind == "meta":
             state.edit_buffer = meta[index].value
         else:
-            state.edit_buffer = _visible_param_cells()[index].value
+            state.edit_buffer = _list_param_cells()[index].value
         _clear_error()
 
     def _cancel_detail() -> None:
@@ -253,7 +281,7 @@ def _run_param_grid_tui(
                 return False
             field.value = raw
         else:
-            visible = _visible_param_cells()
+            visible = _list_param_cells()
             cell = visible[state.focus.content_index]
             try:
                 cell.value = _coerce_and_format(cell, raw)
@@ -313,6 +341,8 @@ def _run_param_grid_tui(
     def _navigate_page_back() -> None:
         """← : previous wizard page only (never abort/save)."""
         if state.phase == "list" and meta:
+            state.filter_editing = False
+            state.filter_text = ""
             state.phase = "meta"
             state.focus = ShellFocus()
             _clear_error()
@@ -337,6 +367,8 @@ def _run_param_grid_tui(
             return
         if state.phase == "list":
             if meta:
+                state.filter_editing = False
+                state.filter_text = ""
                 state.phase = "meta"
                 state.focus = ShellFocus()
                 _clear_error()
@@ -366,7 +398,7 @@ def _run_param_grid_tui(
             _wizard_next()
 
     def _toggle_enable_at(index: int) -> None:
-        visible = _visible_param_cells()
+        visible = _list_param_cells()
         if index < 0 or index >= len(visible):
             return
         cell = visible[index]
@@ -440,8 +472,22 @@ def _run_param_grid_tui(
         rows = [(m.label, m.value, m.description, "text") for m in meta]
         return _render_list_rows(rows)
 
+    def _render_filter_bar() -> StyleAndTextTuples:
+        if state.phase != "list":
+            return [("class:text-dim", "")]
+        if not state.filter_editing and not state.filter_text:
+            return [("class:text-dim", "")]
+        cols, _rows = _terminal_size()
+        matches = len(_list_param_cells())
+        match_note = f" ({matches} match{'es' if matches != 1 else ''})"
+        cursor = "█" if state.filter_editing else ""
+        line = f"Filter: {state.filter_text}{cursor}{match_note}"
+        if len(line) > cols:
+            line = line[: cols - 1] + "\u2026"
+        return [("class:hint", line)]
+
     def _render_param_list() -> StyleAndTextTuples:
-        visible = _visible_param_cells()
+        visible = _list_param_cells()
         cols, _rows = _terminal_size()
         viewport = _viewport_rows()
         keys = [c.key for c in visible]
@@ -483,7 +529,10 @@ def _run_param_grid_tui(
                 out.append((sug_cls, sug_txt))
             out.append(("", "\n"))
         if not visible:
-            out.append(("class:text-dim", "(no editable parameters)\n"))
+            if state.filter_text.strip():
+                out.append(("class:text-dim", "(no parameters match filter)\n"))
+            else:
+                out.append(("class:text-dim", "(no editable parameters)\n"))
         return out
 
     def _render_detail() -> StyleAndTextTuples:
@@ -497,7 +546,7 @@ def _run_param_grid_tui(
             description = field.description
             hint = None
         else:
-            cell = _visible_param_cells()[state.focus.content_index]
+            cell = _list_param_cells()[state.focus.content_index]
             key = cell.key
             description = cell.description
             hint = cell.hint
@@ -535,6 +584,8 @@ def _run_param_grid_tui(
 
     @kb.add("up")
     def _up(_event) -> None:
+        if state.filter_editing:
+            state.filter_editing = False
         if state.phase == "detail" and state.editing:
             return
         if state.focus.zone == "footer":
@@ -549,6 +600,8 @@ def _run_param_grid_tui(
 
     @kb.add("down")
     def _down(_event) -> None:
+        if state.filter_editing:
+            state.filter_editing = False
         if state.phase == "detail" and state.editing:
             if state.focus.zone == "content":
                 state.focus.zone = "footer"
@@ -598,6 +651,9 @@ def _run_param_grid_tui(
 
     @kb.add("enter")
     def _enter(_event) -> None:
+        if state.filter_editing:
+            state.filter_editing = False
+            return
         if state.focus.zone == "footer":
             _activate_footer()
             return
@@ -611,10 +667,21 @@ def _run_param_grid_tui(
 
     @kb.add("escape")
     def _escape(_event) -> None:
+        if state.filter_editing or state.filter_text:
+            _clear_filter()
+            return
         if state.phase == "detail":
             _cancel_detail()
             return
         _wizard_back()
+
+    @kb.add("c-f")
+    def _ctrl_f(_event) -> None:
+        if state.phase != "list":
+            return
+        state.filter_editing = True
+        state.focus.zone = "content"
+        _clear_error()
 
     @kb.add("c-s")
     def _ctrl_s(_event) -> None:
@@ -642,6 +709,9 @@ def _run_param_grid_tui(
 
     @kb.add(" ")
     def _space(_event) -> None:
+        if state.filter_editing:
+            _set_filter_text(state.filter_text + " ")
+            return
         if state.phase == "detail" and state.editing:
             state.edit_buffer += " "
             return
@@ -650,15 +720,28 @@ def _run_param_grid_tui(
 
     @kb.add("backspace")
     def _backspace(_event) -> None:
+        if state.filter_editing:
+            _set_filter_text(state.filter_text[:-1])
+            return
         if state.phase == "detail" and state.editing:
             state.edit_buffer = state.edit_buffer[:-1]
 
     @kb.add(Keys.Any)
     def _typed(event) -> None:
+        if state.filter_editing and event.data:
+            _set_filter_text(state.filter_text + event.data)
+            return
         if state.phase == "detail" and state.editing and event.data:
             state.edit_buffer += event.data
 
     header = Window(FormattedTextControl(_render_header), height=1)
+    filter_bar = ConditionalContainer(
+        Window(FormattedTextControl(_render_filter_bar), height=1),
+        filter=Condition(
+            lambda: state.phase == "list"
+            and (state.filter_editing or bool(state.filter_text))
+        ),
+    )
     content = Window(FormattedTextControl(_render_content), height=Dimension(weight=1))
     error_window = Window(
         FormattedTextControl(
@@ -672,14 +755,14 @@ def _run_param_grid_tui(
             lambda: [
                 (
                     "class:text-dim",
-                    "↑↓ rows · Space enable · ←→ pages · Enter detail · Esc Back · Ctrl+S Save",
+                    "↑↓ rows · Space enable · Ctrl+F filter · ←→ pages · Enter detail · Esc Back · Ctrl+S Save",
                 )
             ]
         ),
         height=1,
     )
 
-    root = HSplit([header, content, error_window, footer, hint])
+    root = HSplit([header, filter_bar, content, error_window, footer, hint])
     style = Style.from_dict(theme.to_prompt_toolkit_style())
     app = Application(
         layout=Layout(root),

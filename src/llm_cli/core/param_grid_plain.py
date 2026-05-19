@@ -9,7 +9,7 @@ from rich.markup import escape
 from rich.prompt import Prompt
 from rich.table import Table
 
-from llm_cli.core.param_grid_build import enabled_values_from_cells, filter_visible_cells
+from llm_cli.core.param_grid_build import enabled_values_from_cells, filter_cells_by_query, filter_visible_cells
 from llm_cli.core.param_grid_layout import cell_indicator, truncate
 from llm_cli.core.param_grid_models import MetaField, ParamCell, ParamGridResult, cell_state
 from llm_cli.core.param_grid_theme import DEFAULT_THEME, ParamGridTheme
@@ -183,6 +183,7 @@ def run_param_grid_plain(
     spec_list = list(specs or [])
     con = console if console is not None else Console()
     advanced_visible = False
+    filter_query = ""
     meta_map = {m.key: m.value for m in meta}
 
     if meta:
@@ -202,6 +203,8 @@ def run_param_grid_plain(
             advanced_visible=advanced_visible,
             hide_readonly=True,
         )
+        if filter_query.strip():
+            visible = filter_cells_by_query(visible, filter_query)
         table = Table(title=f"{title} — Parameters", show_header=True, header_style="bold")
         table.add_column("#", justify="right", style="dim")
         table.add_column("", justify="center", style="dim")
@@ -219,9 +222,14 @@ def run_param_grid_plain(
             )
 
         con.print(table)
+        if filter_query.strip():
+            con.print(
+                f"{theme.rich('hint')}Filter: {escape(filter_query)} "
+                f"({len(visible)} match{'es' if len(visible) != 1 else ''})[/]"
+            )
         legend = (
             f"{theme.rich('hint')}"
-            f"Number = enable · A = advanced · B = back · S = save · X = abort[/]"
+            f"Number = enable · F = filter · A = advanced · B = back · S = save · X = abort[/]"
         )
         con.print(legend)
 
@@ -233,6 +241,12 @@ def run_param_grid_plain(
 
         if choice == "a":
             advanced_visible = not advanced_visible
+            continue
+        if choice == "f":
+            filter_query = Prompt.ask(
+                f"{theme.rich('text')}Filter[/] (empty to clear)",
+                default=filter_query,
+            )
             continue
         if choice == "b":
             if meta:

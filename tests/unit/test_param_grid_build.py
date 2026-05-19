@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from llm_cli.core.model_bindings import MODEL_PATH_TOKEN
-from llm_cli.core.param_grid_build import cells_from_specs, filter_visible_cells, paginate_cells
+from llm_cli.core.param_grid_build import cells_from_specs, filter_cells_by_query, filter_visible_cells, paginate_cells
 from llm_cli.core.param_grid_models import MetaField, ParamCell, ParamGridResult, cell_state
 from llm_cli.core.params import ParamSpec, ParamType
 
@@ -163,6 +163,33 @@ def test_filter_visible_cells_keeps_readonly_when_requested() -> None:
     cells = [ParamCell("ro", "ro", "", "x", readonly=True, enabled=True, tier="common")]
     visible = filter_visible_cells(cells, advanced_visible=True, hide_readonly=False)
     assert [c.key for c in visible] == ["ro"]
+
+
+def test_filter_cells_by_query_matches_key_description_and_hint() -> None:
+    cells = [
+        ParamCell(
+            "ctx",
+            "Context window",
+            "Maximum context length",
+            "8192",
+            enabled=True,
+            hint="4096 for 8GB",
+            tier="common",
+        ),
+        ParamCell(
+            "gpu_layers",
+            "GPU layers",
+            "Offload layers to GPU",
+            "",
+            enabled=False,
+            tier="common",
+        ),
+    ]
+    assert [c.key for c in filter_cells_by_query(cells, "ctx")] == ["ctx"]
+    assert [c.key for c in filter_cells_by_query(cells, "8GB")] == ["ctx"]
+    assert [c.key for c in filter_cells_by_query(cells, "gpu")] == ["gpu_layers"]
+    assert filter_cells_by_query(cells, "missing") == []
+    assert [c.key for c in filter_cells_by_query(cells, "")] == ["ctx", "gpu_layers"]
 
 
 def test_param_grid_result_and_meta_shapes() -> None:
