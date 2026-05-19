@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.1.0](https://github.com/mtopcu1/loco-llm/compare/v1.0.1...v1.1.0) (2026-05-19)
+
+
+### Features
+
+* **config:** save opt-in serve params only ([87892a1](https://github.com/mtopcu1/loco-llm/commit/87892a1f0b3b62e470da9af12eebdae45ee42eca))
+* **param-grid:** add Ctrl+F live filter in config setup ([be4b109](https://github.com/mtopcu1/loco-llm/commit/be4b10942b34e6237923fbdc87a360732db82410))
+* **param-grid:** add enabled and locked flags to ParamCell ([8819025](https://github.com/mtopcu1/loco-llm/commit/88190255d2ee920bbd414a2b1df9d9301ac06af6))
+* **param-grid:** filter enabled param values on save ([9cbf6b2](https://github.com/mtopcu1/loco-llm/commit/9cbf6b2e1b3b87a9801cef57299ce28c388b4298))
+* **param-grid:** initialize optional params disabled without catalog defaults ([6275090](https://github.com/mtopcu1/loco-llm/commit/6275090fe790c153d0db3fe59230ffaa9815ea8b))
+* **param-grid:** plain fallback opt-in param semantics ([1645d35](https://github.com/mtopcu1/loco-llm/commit/1645d354d29456e2b7809669761c073931e203e7))
+* **param-grid:** space toggles enable; show suggestion column ([d68a6e1](https://github.com/mtopcu1/loco-llm/commit/d68a6e11cbf0aeb3ec054c230fc005bb1fbe1a40))
+* **runtime:** build install uses opt-in param grid ([f3b0722](https://github.com/mtopcu1/loco-llm/commit/f3b0722f5d7dc1ee97f0c4f3af7dacf21c89bc80))
+
+
+### Bug Fixes
+
+* **doctor:** use empty build params when uninstalled ([5398f7e](https://github.com/mtopcu1/loco-llm/commit/5398f7e93fd4e3915e6755e9d8e049dea8e9d302))
+* **setup:** treat empty HF URL prompt as skip ([48637b3](https://github.com/mtopcu1/loco-llm/commit/48637b34e79653eeb7066405ec2a5f6038fe4670))
+* **tests:** enable build param in TUI runtime install test ([c6e405d](https://github.com/mtopcu1/loco-llm/commit/c6e405d7399ebeeb2a33ff8efa616bc08ae86848))
+
+
+### Documentation
+
+* document opt-in serve and build params ([22a76b7](https://github.com/mtopcu1/loco-llm/commit/22a76b79baa8011f780a7b02d26fa036beb5c445))
+* **plan:** serve and build param opt-in implementation plan ([af0f2af](https://github.com/mtopcu1/loco-llm/commit/af0f2afe4dd065876b7e24399fc75adab60bedb8))
+* **spec:** serve and build param opt-in design ([eaf4f2d](https://github.com/mtopcu1/loco-llm/commit/eaf4f2d773d1a0ec0257ee35e42ce88a4d5fd13d))
+
 ## [1.0.1](https://github.com/mtopcu1/loco-llm/compare/v1.0.0...v1.0.1) (2026-05-19)
 
 
