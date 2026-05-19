@@ -17,7 +17,7 @@ curl -fsSL https://raw.githubusercontent.com/mtopcu1/local-llm-scaffold/main/scr
 export PATH="$HOME/.local/bin:$PATH"   # if not already
 
 # Or, if you already use pipx:
-pipx install localllm-cli
+pipx install loco-llm-cli
 llm setup
 ```
 

@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "localllm-cli"
+name = "loco-llm-cli"
 version = "0.2.0"
 description = "Personal control plane for local LLM runtimes."
 readme = "README.md"

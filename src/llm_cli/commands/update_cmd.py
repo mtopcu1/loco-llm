@@ -47,14 +47,14 @@ def _upgrade_cli_wheel() -> None:
             [
                 "pipx",
                 "upgrade",
-                "localllm-cli",
+                "loco-llm-cli",
                 "--pip-args=--upgrade-strategy=eager",
             ],
             check=True,
         )
         return
     subprocess.run(
-        [sys.executable, "-m", "pip", "install", "--upgrade", "localllm-cli"],
+        [sys.executable, "-m", "pip", "install", "--upgrade", "loco-llm-cli"],
         check=True,
     )
 
@@ -83,7 +83,7 @@ def _reexec_version() -> str:
     from importlib.metadata import version as pkg_version
 
     try:
-        return pkg_version("localllm-cli")
+        return pkg_version("loco-llm-cli")
     except Exception:  # noqa: BLE001
         return __version__
 
@@ -209,7 +209,7 @@ def update(
             if did_cli:
                 console.print(
                     f"CLI was upgraded to {pypi_latest}. "
-                    f"To roll back: pipx install 'localllm-cli=={prev_cli}' --force"
+                    f"To roll back: pipx install 'loco-llm-cli=={prev_cli}' --force"
                 )
             raise typer.Exit(code=1)
         remove_scaffold_backup()

@@ -5,14 +5,14 @@ import httpx
 
 from llm_cli.core.versions import compare_versions
 
-PYPI_JSON_URL = "https://pypi.org/pypi/localllm-cli/json"
+PYPI_JSON_URL = "https://pypi.org/pypi/loco-llm-cli/json"
 GITHUB_LATEST_RELEASE_URL = (
     "https://api.github.com/repos/mtopcu1/local-llm-scaffold/releases/latest"
 )
 
 
 def fetch_pypi_latest_version() -> str:
-    """Return the latest localllm-cli version from PyPI."""
+    """Return the latest loco-llm-cli version from PyPI."""
     with httpx.Client(timeout=30.0, follow_redirects=True) as client:
         resp = client.get(PYPI_JSON_URL)
         resp.raise_for_status()

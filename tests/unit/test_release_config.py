@@ -26,7 +26,7 @@ def test_release_please_config_declares_root_package():
     cfg = _load("release-please-config.json")
     assert "." in cfg["packages"], "expected the root package keyed by '.'"
     root = cfg["packages"]["."]
-    assert root["package-name"] == "localllm-cli"
+    assert root["package-name"] == "loco-llm-cli"
 
 
 def test_release_please_config_updates_init_py():

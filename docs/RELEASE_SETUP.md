@@ -6,7 +6,7 @@
 GitHub Actions is not permitted to create or approve pull requests.
 ```
 
-The workflow **did** prepare a release branch (`release-please--branches--main--components--localllm-cli`) with version **0.3.0** and `CHANGELOG.md`. Only opening the release **pull request** was blocked.
+The workflow **did** prepare a release branch (`release-please--branches--main--components--loco-llm-cli`) with version **0.3.0** and `CHANGELOG.md`. Only opening the release **pull request** was blocked.
 
 ## 1. Enable Actions to open PRs (required)
 
@@ -44,7 +44,7 @@ Or **Actions → release-please → Run workflow** (uses `workflow_dispatch` on 
 ```bash
 gh pr create \
   --repo mtopcu1/local-llm-scaffold \
-  --head release-please--branches--main--components--localllm-cli \
+  --head release-please--branches--main--components--loco-llm-cli \
   --base main \
   --title "chore(main): release 0.3.0" \
   --body "Release PR prepared by release-please. Review CHANGELOG and version bumps, then merge."
@@ -59,7 +59,7 @@ When you merge the release PR, `publish.yml` runs on `release: published`.
    - Repository: `local-llm-scaffold`
    - Workflow: `publish.yml`
    - Environment: (leave empty unless you use one)
-2. Register the project name `localllm-cli` on PyPI if not already claimed.
+2. Register the project name `loco-llm-cli` on PyPI if not already claimed.
 
 ## 4. Expected flow after setup
 

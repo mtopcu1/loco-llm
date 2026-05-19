@@ -73,9 +73,9 @@ gh pr checkout 123
 ./scripts/install-dev.sh
 llm-dev <whatever-you-want-to-test>
 # when done:
-pipx uninstall localllm-cli
+pipx uninstall loco-llm-cli
 ```
 
-(`pipx` names the venv `localllm-cli` even when the binary is `llm-dev`.)
+(`pipx` names the venv `loco-llm-cli` even when the binary is `llm-dev`.)
 
 Do **not** use `git pull` in a production data directory for updates — end users run `llm update`. For unreleased code, use the dev install above; there is no per-branch PyPI channel.
