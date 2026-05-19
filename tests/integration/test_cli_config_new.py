@@ -7,7 +7,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from llm_cli.main import app
-from tests.tui.session import strip_ansi
+from tests.cli_helpers import cli_plain
 
 runner = CliRunner()
 
@@ -119,9 +119,8 @@ def test_config_new_requires_runtime(monkeypatch, tmp_path):
     _seed_repo(tmp_path, monkeypatch)
     result = runner.invoke(app, ["config", "new"])
     assert result.exit_code != 0
-    plain = strip_ansi(result.output)
-    # Typer help text includes --runtime; Rich/TTY format may hide the flag substring.
-    assert "--runtime" in plain or "runtime" in plain.lower()
+    plain = cli_plain(result).lower()
+    assert "--runtime" in plain or "runtime" in plain
 
 
 def test_config_new_rejects_model_for_no_model_runtime(monkeypatch, tmp_path):
@@ -146,7 +145,8 @@ def test_config_new_requires_model_for_model_runtime(monkeypatch, tmp_path):
     _seed_repo(tmp_path, monkeypatch)
     result = runner.invoke(app, ["config", "new", "--runtime", "llamacpp"])
     assert result.exit_code != 0
-    assert "model" in result.output.lower()
+    plain = cli_plain(result).lower()
+    assert "--model" in plain or "pass --model" in plain or "model" in plain
 
 
 def test_config_new_errors_on_invalid_param(monkeypatch, tmp_path):

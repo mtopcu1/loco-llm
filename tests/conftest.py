@@ -29,3 +29,11 @@ def xdg_isolated(tmp_path_factory, monkeypatch):
     cfg = tmp_path_factory.mktemp("xdg")
     monkeypatch.setenv("XDG_CONFIG_HOME", str(cfg))
     return cfg
+
+
+@pytest.fixture(autouse=True)
+def cli_output_env(monkeypatch):
+    """Match GitHub Actions: plain CLI output without Rich TTY styling."""
+    monkeypatch.setenv("NO_COLOR", "1")
+    monkeypatch.setenv("TERM", "dumb")
+    monkeypatch.delenv("FORCE_COLOR", raising=False)

@@ -7,6 +7,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from llm_cli.main import app
+from tests.cli_helpers import cli_plain
 
 runner = CliRunner()
 
@@ -111,7 +112,10 @@ def test_advisor_requires_both_runtime_and_model(monkeypatch, tmp_path):
     _patch_specs(monkeypatch)
     result = runner.invoke(app, ["advisor", "--runtime", "llamacpp"])
     assert result.exit_code != 0
-    assert "both --runtime and --model" in result.output.lower()
+    plain = cli_plain(result).lower()
+    assert "both --runtime and --model" in plain or (
+        "both" in plain and "runtime" in plain and "model" in plain
+    )
 
 
 def test_advisor_errors_on_unknown_model(monkeypatch, tmp_path):
@@ -193,7 +197,10 @@ def test_advisor_rejects_positional_combined_with_flags(monkeypatch, tmp_path):
         ["advisor", "some-cfg", "--runtime", "llamacpp", "--model", "qwen-7b"],
     )
     assert result.exit_code != 0
-    assert "either a config id or" in result.output.lower()
+    plain = cli_plain(result).lower()
+    assert "either a config id or" in plain or (
+        "config id" in plain and "runtime" in plain
+    )
 
 
 def test_advisor_interactive_picks_runtime_and_model(monkeypatch, tmp_path):

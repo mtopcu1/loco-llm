@@ -13,6 +13,7 @@ from llm_cli.core.model_registry import (
 )
 from llm_cli.core.settings import save_settings
 from llm_cli.main import app
+from tests.cli_helpers import cli_plain
 
 runner = CliRunner()
 
@@ -163,7 +164,7 @@ def test_model_pull_ambiguous_url_errors(tmp_path: Path) -> None:
     ) as mock_dl:
         result = runner.invoke(app, ["model", "pull", url], catch_exceptions=False)
     assert result.exit_code == 1
-    assert "--include" in result.stdout
+    assert "--include" in cli_plain(result)
     assert not mock_dl.called
     from llm_cli.core.model_registry import load_registry
     assert load_registry(models_dir) == {}
