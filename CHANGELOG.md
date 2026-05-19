@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.0.0](https://github.com/mtopcu1/loco-llm/compare/v0.3.2...v1.0.0) (2026-05-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* llm update no longer reads from PyPI or installs a scaffold tarball.
+
+### Features
+
+* **cli:** warn when running off a release tag ([4d5ee57](https://github.com/mtopcu1/loco-llm/commit/4d5ee57a8492439b608dd573908f43cb64e0671a))
+* **install:** curl-installable git-clone installer with uv editable install ([3d8bd1c](https://github.com/mtopcu1/loco-llm/commit/3d8bd1cc0b0889af7503ced3bed8c52122d952a3))
+* rewrite llm update as git-tag-based with re-anchor semantics ([bd361a5](https://github.com/mtopcu1/loco-llm/commit/bd361a54ff2572695c70eb8849417ea452f72bbb))
+
+
+### Documentation
+
+* document git-clone install and tag-based update flow ([06d4e5f](https://github.com/mtopcu1/loco-llm/commit/06d4e5f9c43326e24fe09819e92f739fdd2cf50c))
+* **plan:** git-tag distribution implementation plan ([44a5e42](https://github.com/mtopcu1/loco-llm/commit/44a5e4228ee3cdfae6577ed0e4b1d987c75eecd9))
+* **spec:** git-tag distribution design supersedes PyPI model ([481089b](https://github.com/mtopcu1/loco-llm/commit/481089b688c17f26b5849880259adb312125ee82))
+
 ## [0.3.2](https://github.com/mtopcu1/loco-llm/compare/v0.3.1...v0.3.2) (2026-05-19)
 
 
