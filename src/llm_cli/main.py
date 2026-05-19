@@ -1,9 +1,13 @@
 """LocalLLM CLI entrypoint."""
+from __future__ import annotations
+
+import subprocess
 from typing import Optional
 
 import typer
 
 from llm_cli import __version__
+from llm_cli.core.scaffold import scaffold_root
 from llm_cli.commands import config_cmd, list_cmd
 from llm_cli.commands import setup as setup_cmd
 from llm_cli.commands import specs as specs_cmd
@@ -23,9 +27,48 @@ app = typer.Typer(
 )
 
 
+def _head_suffix() -> str:
+    try:
+        root = scaffold_root()
+    except RuntimeError:
+        return ""
+    try:
+        tag = subprocess.run(
+            ["git", "-C", str(root), "describe", "--tags", "--exact-match", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=2,
+        ).stdout.strip()
+        if tag:
+            return ""
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+    try:
+        branch = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=2,
+        ).stdout.strip()
+        if branch and branch != "HEAD":
+            return f" (branch: {branch})"
+        sha = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=2,
+        ).stdout.strip()
+        return f" (detached: {sha})" if sha else ""
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        return ""
+
+
 def _version_callback(value: bool) -> None:
     if value:
-        typer.echo(f"llm {__version__}")
+        typer.echo(f"llm {__version__}{_head_suffix()}")
         raise typer.Exit()
 
 
