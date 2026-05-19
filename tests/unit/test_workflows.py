@@ -46,6 +46,17 @@ class TestReleasePleaseWorkflow:
         uses = [s.get("uses", "") for s in steps]
         assert any(u.startswith("googleapis/release-please-action@") for u in uses)
 
+    def test_release_please_can_be_rerun_manually(self):
+        doc = _load("release-please.yml")
+        on = _get_on(doc)
+        assert "workflow_dispatch" in on
+
+    def test_release_please_grants_pr_write(self):
+        doc = _load("release-please.yml")
+        perms = doc.get("permissions", {})
+        assert perms.get("pull-requests") == "write"
+        assert perms.get("contents") == "write"
+
 
 class TestCIWorkflow:
     def test_triggers_on_pr_and_push_to_main(self):

@@ -1,8 +1,12 @@
 name: release-please
 
+# Opens/updates the long-lived release PR (version + CHANGELOG).
+# Requires repo setting: Actions may create/approve pull requests.
+# See docs/RELEASE_SETUP.md if this job fails at "create pull request".
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write

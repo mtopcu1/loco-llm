@@ -32,7 +32,7 @@ class HFRepoInfo:
 
 
 def _request(url: str, *, token: str | None) -> bytes:
-    headers = {"Accept": "application/json", "User-Agent": "localllm-cli/0.1"}
+    headers = {"Accept": "application/json", "User-Agent": "loco-llm-cli/0.1"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     req = Request(url, headers=headers, method="GET")

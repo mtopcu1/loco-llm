@@ -5,7 +5,7 @@
   "include-v-in-tag": true,
   "packages": {
     ".": {
-      "package-name": "localllm-cli",
+      "package-name": "loco-llm-cli",
       "release-type": "python",
       "extra-files": [
         {

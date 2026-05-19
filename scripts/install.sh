@@ -42,8 +42,8 @@ main() {
   ensure_pipx
   export PATH="${HOME}/.local/bin:${PATH}"
 
-  echo "==> Installing localllm-cli==${PINNED_VERSION} via pipx"
-  pipx install "localllm-cli==${PINNED_VERSION}" --force
+  echo "==> Installing loco-llm-cli==${PINNED_VERSION} via pipx"
+  pipx install "loco-llm-cli==${PINNED_VERSION}" --force
 
   echo "==> Bootstrapping scaffold assets"
   llm update --scaffold-only --yes

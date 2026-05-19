@@ -291,7 +291,7 @@ print_plan() {
   if [ -d "$venv_dir" ]; then
     echo "  remove   ${venv_dir}  (after confirming pipx install works)"
   fi
-  echo "  install  pipx install localllm-cli==${TARGET_CLI_VERSION}"
+  echo "  install  pipx install loco-llm-cli==${TARGET_CLI_VERSION}"
   echo
   echo "Settings changes:"
   echo "  unset    repo_root  (was: ${REPO_ROOT})"
@@ -434,8 +434,8 @@ apply_migration() {
     echo "  removed: ${llm_link}"
   fi
 
-  echo "==> Installing localllm-cli==${TARGET_CLI_VERSION} via pipx"
-  if ! pipx install "localllm-cli==${TARGET_CLI_VERSION}" --force; then
+  echo "==> Installing loco-llm-cli==${TARGET_CLI_VERSION} via pipx"
+  if ! pipx install "loco-llm-cli==${TARGET_CLI_VERSION}" --force; then
     restore_on_failure
     die "pipx install failed; config and llm symlink restored where possible"
   fi

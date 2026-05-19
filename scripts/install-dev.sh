@@ -57,7 +57,7 @@ main() {
   ensure_pipx
   export PATH="${HOME}/.local/bin:${PATH}"
 
-  echo "==> Installing editable localllm-cli as llm-dev"
+  echo "==> Installing editable loco-llm-cli as llm-dev"
   pipx install --editable . --force --suffix=-dev
 
   config_path="${XDG_CONFIG_HOME:-$HOME/.config}/llm/config.yaml"
