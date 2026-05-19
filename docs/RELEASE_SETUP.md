@@ -29,11 +29,13 @@ Then confirm the checkbox above is still enabled in the UI (some org policies re
 
 ## 1b. Require CI before merge (recommended)
 
-`main` is protected so PRs cannot merge unless these checks pass:
+`main` is protected so **feature PRs** cannot merge unless these checks pass:
 
 - `test (3.11)`
 - `test (3.12)`
 - `build-check`
+
+**Release PRs** (`release-please--…` branches) skip full CI — they only change version/changelog files. Merge them after the **`release-please` workflow** shows a green **`release-pr-check`** job (fast build + version sync). GitHub may not attach those checks to the PR itself (bot-opened PR limitation); use admin bypass if the PR stays blocked with no checks.
 
 Configured via **Settings → Branches → Branch protection rules** (or `gh api` on `repos/mtopcu1/loco-llm/branches/main/protection`).
 
@@ -62,27 +64,35 @@ gh pr create \
 
 ## 3. PyPI trusted publishing (before first real release)
 
-When you merge the release PR, `publish.yml` runs on `release: published`.
+When you merge the release PR, **`release-please.yml`** publishes (same workflow run, `releases_created == true`). The standalone `publish.yml` is a manual fallback only — GitHub does not fire `release: published` workflows for releases created by `GITHUB_TOKEN`.
 
-1. [pypi.org](https://pypi.org) → **Publishing** → add trusted publisher:
+1. [pypi.org](https://pypi.org) → **Publishing** → add trusted publisher(s):
    - Owner: `mtopcu1`
-   - Repository: `local-llm-scaffold`
-   - Workflow: `publish.yml`
+   - Repository: `loco-llm` (or `local-llm-scaffold` if that is still the linked repo)
+   - Workflow: **`release-please.yml`** (primary) and optionally `publish.yml` (manual fallback)
    - Environment: (leave empty unless you use one)
 2. Register the project name `loco-llm-cli` on PyPI if not already claimed.
+
+To backfill a release that shipped without assets (e.g. v0.3.1): **Actions → publish → Run workflow** with tag `v0.3.1`.
 
 ## 4. Expected flow after setup
 
 ```mermaid
 flowchart LR
-  merge[Merge to main] --> rp[release-please.yml]
-  rp --> pr[Release PR]
-  pr --> mergeRP[Merge release PR]
-  mergeRP --> tag[Tag + GitHub Release]
-  tag --> pub[publish.yml]
+  feat[Feature PR merges to main] --> ci[ci.yml full pytest]
+  feat --> rp[release-please.yml]
+  rp --> rpc[release-pr-check fast build]
+  rp --> relpr[Release PR opened/updated]
+  relpr --> mergeRP[Merge release PR admin OK]
+  mergeRP --> rp2[release-please.yml on main]
+  rp2 --> rel[GitHub Release tag]
+  rp2 --> pub[publish job in release-please.yml]
   pub --> pypi[PyPI wheel/sdist]
   pub --> assets[scaffold tarball on Release]
+  mergeRP --> skip[ci.yml skipped on main push]
 ```
+
+**Why CI runs again after merging the release PR:** `ci.yml` triggers on every push to `main`. That used to re-run the full suite for a 4-file version bump. Release merges whose commit message contains `release-please--` now **skip** `ci.yml` entirely — only `release-please.yml` runs (which exits quickly with “0 commits” after a release, plus publish when applicable).
 
 ## 5. Commit message warnings (normal)
 
