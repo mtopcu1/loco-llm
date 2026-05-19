@@ -44,7 +44,6 @@ dev = [
     "pytest-mock>=3.12",
     "pexpect>=4.9; sys_platform != 'win32'",
     "build>=1.0",
-    "twine>=5.0",
 ]
 
 [project.scripts]
