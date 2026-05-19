@@ -60,11 +60,11 @@ build:
   flavor:
     type: enum
     values: [cuda, cpu, vulkan]
-    default: cuda
+    tier: common
     prompt: "Which backend to build?"
   jobs:
     type: int
-    default: 0
+    tier: common
     prompt: "Parallel build jobs (0 = nproc)"
 
 serve:
@@ -74,15 +74,12 @@ serve:
     env: LLM_LLAMACPP_GGUF
   n_gpu_layers:
     type: int
-    default: -1
     env: LLM_LLAMACPP_N_GPU_LAYERS
   ctx:
     type: int
-    default: 8192
     env: LLM_LLAMACPP_CTX
   extra_args:
     type: string
-    default: ""
     env: LLM_LLAMACPP_EXTRA_ARGS
 ```
 
@@ -113,11 +110,27 @@ Each key under `build:` / `serve:` is a parameter spec:
 
 Optional fields:
 
-- **`required`** — must be set in config (`serve`) or supplied at install (`build`).
-- **`default`** — used when omitted.
-- **`prompt`** — interactive prompt during `llm runtime install` when not passed as `--param key=value`.
+- **`required`** — must be enabled in the param grid and present in `serve.params` / `build_params` (locked rows always count).
+- **`prompt`** — label in the param grid during `llm runtime install` / config setup.
+- **`tier`** — `common` (default) or `advanced`; advanced rows need **Ctrl+A** in the grid.
+- **`description`** — shown in the grid list/detail; use for operator-facing notes.
 - **`env`** — explicit environment variable name for **serve** params mapped into `serve.sh` / `healthcheck.sh`. If omitted, the CLI derives **`LLM_<RUNTIME_ID>_<PARAM>`** (uppercase; hyphens → underscores).
 - **`bind`** — optional; **`model_path`** ties this key to the selected registry model. Wizards and `llm config new` write **`"${model_path}"`** for that param when `model:` is set (see [`add-a-config.md`](add-a-config.md)).
+
+Do **not** use **`default:`** in `params.yaml` or inline manifest schemas — the loader rejects it. Suggested values come from **`llm advisor`** in the param grid detail view, not from the catalog.
+
+### Opt-in parameters (build and serve)
+
+Optional knobs are **opt-in** everywhere the param grid is used (`llm config setup`, `llm runtime install`, wizard **`review()`**):
+
+| Behavior | Detail |
+|---|---|
+| Grid | Optional rows start **disabled** (`[ ]`). **Space** enables a row; disabled rows are cleared. Required / bound rows are **locked** (`[•]`) and always saved. |
+| Saved maps | **`serve.params`** in configs and **`build_params`** in `.installed` list **only keys you enabled** (plus locked required keys). Omitted keys are not written and are not exported to `serve.sh` / `build.sh`. |
+| `--yes` / `--param` | `llm runtime install --yes` skips the grid; only explicit **`--param key=value`** flags are stored (may be `{}` when nothing is required). |
+| Suggestions | **`llm advisor`** supplies hints in grid detail; scripts apply their own fallbacks for env vars that were not set. |
+
+**Breaking change:** configs that previously listed every catalog key under `serve.params` should be **recreated** with **`llm config setup`** (or hand-edited to a sparse map). Keys you no longer want must be removed from YAML — they are not silently dropped on save.
 
 Build-time values use **`LLM_BUILD_<PARAM>`** with the same normalization; the runtime id is omitted so every `build.sh` sees a uniform contract.
 
@@ -147,9 +160,9 @@ bash runtimes/my-runtime/build.sh
 
 ## 5. Install flow and configs
 
-1. **`llm runtime install <runtime-id>`** — prompts for build params (unless `--yes` / `--param`), runs `build.sh`, runs `verify.sh` if present, writes **`$LLM_RUNTIMES/<id>/.installed`** (JSON record with params, script hashes, schema hash).
+1. **`llm runtime install <runtime-id>`** — param grid for build params (unless `--yes` / `--param` only), runs `build.sh`, runs `verify.sh` if present, writes **`$LLM_RUNTIMES/<id>/.installed`** (JSON record with **opted-in** `build_params`, script hashes, schema hash).
 2. **`llm runtime info <id>`** — shows manifest path, install state, drift hints.
-3. Launch configs use **`serve.params`** (not free-form `serve.env`): keys must match the manifest `serve:` schema; values are validated and converted to env for serve/switch.
+3. Launch configs use **`serve.params`** (not free-form `serve.env`): keys must match the runtime serve schema; only **enabled** keys are stored; values are validated and converted to env for serve/switch.
 
 Example stub config:
 
@@ -163,17 +176,16 @@ serve:
   params: {}
 ```
 
-Example llamacpp-oriented snippet:
+Example llamacpp-oriented snippet (sparse — only knobs you enabled in **`llm config setup`**):
 
 ```yaml
 serve:
   host: 127.0.0.1
   port: 8080
   params:
-    gguf_path: "${data_root}/models/my-model/weights.gguf"
+    gguf_path: "${model_path}"
     n_gpu_layers: -1
     ctx: 8192
-    extra_args: ""
 ```
 
 ## 6. Verification commands
