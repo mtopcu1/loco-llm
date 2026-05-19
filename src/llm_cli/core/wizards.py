@@ -211,7 +211,6 @@ def review(
             ParamSpec(
                 key=key,
                 type=ParamType.STRING,
-                default=str(value),
                 prompt=label,
                 description="",
             )

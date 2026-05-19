@@ -101,20 +101,18 @@ def test_walk_tier_yields_common_then_offers_advanced(monkeypatch):
         ParamSpec(
             key="ctx",
             type=ParamType.INT,
-            default=8192,
             tier="common",
             description="Context window",
         ),
         ParamSpec(
             key="extra",
             type=ParamType.STRING,
-            default="",
             tier="advanced",
             description="Pass-through",
         ),
     ]
     monkeypatch.setattr(wizards, "use_plain_prompts", lambda: True)
-    # Plain grid: edit row 1, toggle advanced (A), edit row 2, save (S).
+    # Plain grid: enable row 1, toggle advanced (A), enable row 2, save (S).
     answers = iter(["1", "8192", "a", "2", "--foo", "s"])
     with patch(
         "llm_cli.core.param_grid_plain.Prompt.ask",
@@ -132,14 +130,12 @@ def test_walk_tier_skips_advanced_when_user_declines(monkeypatch):
         ParamSpec(
             key="ctx",
             type=ParamType.INT,
-            default=8192,
             tier="common",
             description="Context window",
         ),
         ParamSpec(
             key="extra",
             type=ParamType.STRING,
-            default="",
             tier="advanced",
             description="Pass-through",
         ),
@@ -160,7 +156,7 @@ def test_walk_tier_delegates_to_grid(monkeypatch):
     from llm_cli.core.params import ParamSpec, ParamType
 
     specs = [
-        ParamSpec(key="only", type=ParamType.INT, default=1, tier="common"),
+        ParamSpec(key="only", type=ParamType.INT, tier="common"),
     ]
     captured: dict[str, object] = {}
 
@@ -187,7 +183,7 @@ def test_walk_tier_abort_from_grid_returns_empty_values(monkeypatch):
     from llm_cli.core.params import ParamSpec, ParamType
 
     specs = [
-        ParamSpec(key="only", type=ParamType.INT, default=1, tier="common"),
+        ParamSpec(key="only", type=ParamType.INT, tier="common"),
     ]
 
     def stub_edit_params(_specs: list[ParamSpec], **kwargs: object) -> ParamGridResult:
@@ -229,7 +225,7 @@ def test_review_save_returns_save(monkeypatch):
         wizards,
         "edit_params",
         lambda specs, **kwargs: ParamGridResult(
-            values={s.key: str(s.default or "") for s in specs},
+            values={k: str(v) for k, v in kwargs.get("values", {}).items()},
             meta={},
             action="save",
             advanced_revealed=False,
@@ -248,7 +244,7 @@ def test_review_abort_returns_abort(monkeypatch):
         wizards,
         "edit_params",
         lambda specs, **kwargs: ParamGridResult(
-            values={s.key: str(s.default or "") for s in specs},
+            values={k: str(v) for k, v in kwargs.get("values", {}).items()},
             meta={},
             action="abort",
             advanced_revealed=False,
@@ -265,7 +261,7 @@ def test_review_edit_loops_until_save(monkeypatch):
     edited: list[str] = []
 
     def stub_edit_params(specs, **kwargs):
-        values = {s.key: str(s.default or "") for s in specs}
+        values = {k: str(v) for k, v in kwargs.get("values", {}).items()}
         values["row_1"] = "9090"
         return ParamGridResult(
             values=values,
