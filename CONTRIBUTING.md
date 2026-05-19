@@ -48,34 +48,21 @@ Releases are fully automated:
    `pyproject.toml` and `src/llm_cli/__init__.py`.
 3. When ready to release, **review the release PR** (it shows you exactly
    what version + changelog will land) and **merge it**.
-4. The merge triggers tag creation, GitHub Release creation, PyPI upload,
-   and scaffold-tarball attach. No human action between merge and the
-   release going live.
+4. The merge creates a git tag and GitHub Release with the CHANGELOG.
+   Users run `llm update` to pick up the tag. There is no PyPI publish step.
 
-## Dev workflow
-
-Contributors install an **editable** `llm-dev` binary alongside the stable `llm` pipx install. The dev binary reads scaffold assets from your git checkout via `repo_root`.
+## Dev install
 
 ```bash
-git clone https://github.com/mtopcu1/local-llm-scaffold.git
-cd local-llm-scaffold
-./scripts/install-dev.sh
-export PATH="$HOME/.local/bin:$PATH"
-llm-dev doctor
+git clone https://github.com/mtopcu1/loco-llm.git
+cd loco-llm
+uv venv && uv pip install -e ".[dev]"
+uv run pytest
 ```
 
-`install-dev.sh` runs `pipx install --editable . --force --suffix=-dev`, sets `repo_root` to the checkout, and runs `llm-dev setup --default` when no settings file exists yet.
+No separate `install-dev.sh`. To use this checkout as your runtime install,
+set `LOCO_LLM_HOME=$(pwd)` or configure `repo_root` in `llm settings`.
 
-### Try a PR branch
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for PR branches, tests, and workflow.
 
-```bash
-gh pr checkout 123
-./scripts/install-dev.sh
-llm-dev <whatever-you-want-to-test>
-# when done:
-pipx uninstall loco-llm-cli
-```
-
-(`pipx` names the venv `loco-llm-cli` even when the binary is `llm-dev`.)
-
-Do **not** use `git pull` in a production data directory for updates — end users run `llm update`. For unreleased code, use the dev install above; there is no per-branch PyPI channel.
+End users install via the curl one-liner in [docs/INSTALLATION.md](docs/INSTALLATION.md) and upgrade with `llm update` — do not use `git pull` in `~/.loco-llm` unless you know you are off the supported update path.

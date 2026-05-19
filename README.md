@@ -9,43 +9,50 @@ filesystem under `~/llm/` (configurable via `llm setup` / `llm settings ...`).
 
 ## Getting started (first time)
 
-Inside WSL2:
+Inside WSL2 (or any Linux/macOS shell with `git` and Python 3.11+):
 
 ```bash
-# Public install (no git clone)
-curl -fsSL https://raw.githubusercontent.com/mtopcu1/local-llm-scaffold/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mtopcu1/loco-llm/main/scripts/install.sh | bash
 export PATH="$HOME/.local/bin:$PATH"   # if not already
-
-# Or, if you already use pipx:
-pipx install loco-llm-cli
 llm setup
 ```
 
-`llm setup` runs on first use if you skipped it during install. Verify prerequisites with `llm doctor` (or read `requirements.md` before install).
+The installer clones the repo to `~/.loco-llm`, checks out the latest stable
+tag, creates a uv venv, and symlinks `llm`. Run `llm doctor` to verify.
+See [`docs/INSTALLATION.md`](docs/INSTALLATION.md) for options (`--dir`, `--tag`, `--branch`).
 
-### Upgrading from 0.2.x
-
-If you installed via the old editable clone + `./install.sh`, migrate in place:
+### Updating
 
 ```bash
-cd ~/local-llm-scaffold   # your existing clone
-git fetch && git checkout v0.3.0
-./scripts/migrate-from-v0.2.sh
-# review the plan, then:
-./scripts/migrate-from-v0.2.sh --apply
+llm update              # latest stable tag
+llm update --check      # report current vs. available, no changes
+llm update --branch X   # switch to a branch (hotfix testing)
+llm update --tag vX.Y.Z # pin to a specific tag (rollback)
+```
+
+Bare `llm update` always re-anchors to the latest tag, even if you were on a
+branch. See [`docs/UPDATE.md`](docs/UPDATE.md).
+
+### Upgrading from a prior pipx-based install
+
+If you previously installed with `pipx install loco-llm-cli`, switch over:
+
+```bash
+pipx uninstall loco-llm-cli || true
+rm -f ~/.local/bin/llm
+curl -fsSL https://raw.githubusercontent.com/mtopcu1/loco-llm/main/scripts/install.sh | bash
 ```
 
 ### Developer install (git clone)
 
 ```bash
-git clone https://github.com/mtopcu1/local-llm-scaffold.git
-cd local-llm-scaffold
-./scripts/install-dev.sh
-export PATH="$HOME/.local/bin:$PATH"
-llm-dev setup    # if install-dev.sh did not run setup
+git clone https://github.com/mtopcu1/loco-llm.git
+cd loco-llm
+uv venv && uv pip install -e ".[dev]"
+export PATH="$HOME/.local/bin:$PATH"   # optional: uv run llm ...
 ```
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for branch/PR workflow (`llm-dev` vs stable `llm`).
+See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 For an existing setup, the granular commands still work as before:
 
@@ -95,6 +102,7 @@ for the full design.
 | `llm specs` | Regenerate the auto block in `specs.md` |
 | `llm specs --check` | Exit nonzero if `specs.md` differs from current detection |
 | `llm specs --print` | Print detection without writing |
+| `llm update` | Pull latest stable tag into `LOCO_LLM_HOME` (`--branch`, `--tag`, `--check`, `--restart`) |
 | `llm doctor` | Run all checks from `requirements.yaml`; prints a **systemd-linger** advisory when `loginctl` reports `Linger=no` |
 | `llm doctor render-requirements` | Regenerate `requirements.md` from `requirements.yaml` |
 | `llm list` | List runtimes, models, configs, and benchmarks |
