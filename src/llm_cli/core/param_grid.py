@@ -6,18 +6,21 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from llm_cli.core import wizards
-from llm_cli.core.param_grid_build import filter_visible_cells
+from llm_cli.core.param_grid_build import enabled_values_from_cells, filter_visible_cells
 from llm_cli.core.param_grid_layout import (
+    cell_indicator,
+    format_param_row,
     format_row_triple,
     key_column_width,
     scroll_offset_for_focus,
+    suggestion_column_width,
     value_column_width,
     wrap_lines,
 )
 from llm_cli.core.param_grid_models import MetaField, ParamCell, ParamGridResult, cell_state
 from llm_cli.core.param_grid_plain import run_param_grid_plain
-from llm_cli.core.param_grid_theme import DEFAULT_THEME, ParamGridTheme
-from llm_cli.core.params import ParamType, ParamValidationError, coerce_value
+from llm_cli.core.param_grid_theme import DEFAULT_THEME, ParamGridTheme, style_for_cell_state
+from llm_cli.core.params import ParamSpec, ParamType, ParamValidationError, coerce_value
 from llm_cli.core.wizard_shell import (
     ShellFocus,
     footer_next_label,
@@ -109,6 +112,7 @@ def run_param_grid(
     cells: list[ParamCell],
     meta: list[MetaField],
     *,
+    specs: list[ParamSpec],
     title: str,
     theme: ParamGridTheme = DEFAULT_THEME,
 ) -> ParamGridResult:
@@ -117,7 +121,7 @@ def run_param_grid(
         if wizards.use_plain_prompts():
             return run_param_grid_plain(cells, meta, title=title, theme=theme)
         try:
-            return _run_param_grid_tui(cells, meta, title=title, theme=theme)
+            return _run_param_grid_tui(cells, meta, specs=specs, title=title, theme=theme)
         except ImportError:
             return run_param_grid_plain(cells, meta, title=title, theme=theme)
     except KeyboardInterrupt:
@@ -144,6 +148,7 @@ def _run_param_grid_tui(
     cells: list[ParamCell],
     meta: list[MetaField],
     *,
+    specs: list[ParamSpec],
     title: str,
     theme: ParamGridTheme = DEFAULT_THEME,
 ) -> ParamGridResult:
@@ -268,22 +273,23 @@ def _run_param_grid_tui(
                 return f"{field.key} must not be empty"
         return None
 
-    def _validate_all_params() -> str | None:
+    def _exit_save() -> None:
+        try:
+            filtered = enabled_values_from_cells(cells, specs)
+        except ParamValidationError as exc:
+            _set_error(str(exc))
+            return
         for cell in cells:
+            if not (cell.enabled or cell.locked):
+                continue
             try:
                 _coerce_and_format(cell, cell.value)
             except ParamValidationError as exc:
-                return f"{cell.key}: {exc}"
-        return None
-
-    def _exit_save() -> None:
-        err = _validate_all_params()
-        if err is not None:
-            _set_error(err)
-            return
+                _set_error(f"{cell.key}: {exc}")
+                return
         app.exit(
             result=ParamGridResult(
-                values={c.key: c.value for c in cells},
+                values=filtered,
                 meta={m.key: m.value for m in meta},
                 action="save",
                 advanced_revealed=state.advanced_visible,
@@ -355,18 +361,16 @@ def _run_param_grid_tui(
         else:
             _wizard_next()
 
-    def _toggle_bool_at(index: int) -> None:
+    def _toggle_enable_at(index: int) -> None:
         visible = _visible_param_cells()
         if index < 0 or index >= len(visible):
             return
         cell = visible[index]
-        if cell.readonly or cell.param_type is not ParamType.BOOL:
+        if cell.locked or cell.readonly:
             return
-        try:
-            current = coerce_value(_spec_for_cell(cell), cell.value)
-        except ParamValidationError:
-            current = False
-        cell.value = "false" if bool(current) else "true"
+        cell.enabled = not cell.enabled
+        if not cell.enabled:
+            cell.value = ""
         _clear_error()
 
     def _render_header() -> StyleAndTextTuples:
@@ -384,11 +388,9 @@ def _run_param_grid_tui(
         return [("class:text", line)]
 
     def _style_class(row_state: str) -> str:
-        if row_state == "modified":
-            return "class:cell-modified"
         if row_state == "text":
             return "class:text"
-        return "class:cell-default"
+        return f"class:{style_for_cell_state(row_state)}"
 
     def _render_list_rows(
         rows: list[tuple[str, str, str, str]],
@@ -436,11 +438,49 @@ def _run_param_grid_tui(
 
     def _render_param_list() -> StyleAndTextTuples:
         visible = _visible_param_cells()
-        rows = [
-            (c.key, c.value, c.description, cell_state(c))
-            for c in visible
-        ]
-        return _render_list_rows(rows)
+        cols, _rows = _terminal_size()
+        viewport = _viewport_rows()
+        keys = [c.key for c in visible]
+        values = [c.value for c in visible]
+        suggestions = [c.hint or "" for c in visible]
+        key_w = key_column_width(keys, cols)
+        val_w = value_column_width(values, cols, key_w)
+        sug_w = suggestion_column_width(suggestions, cols, key_w, val_w)
+        out: StyleAndTextTuples = []
+        start = state.focus.scroll_offset
+        end = min(len(visible), start + viewport)
+        for idx in range(start, end):
+            cell = visible[idx]
+            state_name = cell_state(cell)
+            row_cls = _style_class(state_name)
+            focused = state.focus.zone == "content" and state.focus.content_index == idx
+            key_cls = "class:cell-focus" if focused else row_cls
+            val_cls = key_cls
+            ind_txt, key_txt, val_txt, sug_txt = format_param_row(
+                cell_indicator(cell),
+                cell.key,
+                cell.value,
+                cell.hint or "",
+                key_width=key_w,
+                val_width=val_w,
+                sug_width=sug_w,
+                total_width=cols,
+            )
+            prefix = ">" if focused else " "
+            out.append(("class:text-dim", prefix))
+            out.append((key_cls, ind_txt))
+            out.append(("class:text-dim", "  "))
+            out.append((key_cls, key_txt))
+            out.append(("class:text-dim", "  "))
+            out.append((val_cls, val_txt))
+            if sug_txt:
+                out.append(("class:text-dim", "  "))
+                sug_cls = "class:hint" if focused else "class:text-dim"
+                out.append((sug_cls, sug_txt))
+            out.append(("", "\n"))
+        if not visible:
+            out.append(("class:text-dim", "(no editable parameters)\n"))
+        return out
 
     def _render_detail() -> StyleAndTextTuples:
         cols, _rows = _terminal_size()
@@ -563,15 +603,7 @@ def _run_param_grid_tui(
         if state.phase == "meta":
             _enter_detail(kind="meta", index=state.focus.content_index)
             return
-        visible = _visible_param_cells()
-        idx = state.focus.content_index
-        if idx < 0 or idx >= len(visible):
-            return
-        cell = visible[idx]
-        if cell.param_type is ParamType.BOOL:
-            _toggle_bool_at(idx)
-        else:
-            _enter_detail(kind="cell", index=idx)
+        _enter_detail(kind="cell", index=state.focus.content_index)
 
     @kb.add("escape")
     def _escape(_event) -> None:
@@ -610,7 +642,7 @@ def _run_param_grid_tui(
             state.edit_buffer += " "
             return
         if state.phase == "list" and state.focus.zone == "content":
-            _toggle_bool_at(state.focus.content_index)
+            _toggle_enable_at(state.focus.content_index)
 
     @kb.add("backspace")
     def _backspace(_event) -> None:
@@ -636,7 +668,7 @@ def _run_param_grid_tui(
             lambda: [
                 (
                     "class:text-dim",
-                    "↑↓ rows · ←→ pages · Enter detail · Esc Back · Ctrl+S Save · Ctrl+C abort",
+                    "↑↓ rows · Space enable · ←→ pages · Enter detail · Esc Back · Ctrl+S Save",
                 )
             ]
         ),

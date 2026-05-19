@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import textwrap
 
+from llm_cli.core.param_grid_models import ParamCell
+
+INDICATOR_WIDTH = 3
+
 
 def key_column_width(keys: list[str], terminal_width: int, *, min_width: int = 8) -> int:
     """Width of the key column for aligned list rows."""
@@ -52,6 +56,61 @@ def value_column_width(
     remaining = max(min_width, terminal_width - key_width - 6)
     cap = max(min_width, remaining // 2)
     return max(min_width, min(natural, cap))
+
+
+def cell_indicator(cell: ParamCell) -> str:
+    """Row enable indicator: locked [•], enabled [x], disabled [ ]."""
+    if cell.locked or cell.readonly:
+        return "[\u2022]"
+    if cell.enabled:
+        return "[x]"
+    return "[ ]"
+
+
+def suggestion_column_width(
+    suggestions: list[str],
+    terminal_width: int,
+    key_width: int,
+    val_width: int,
+    *,
+    min_width: int = 6,
+) -> int:
+    """Width of the suggestion column given other fixed columns."""
+    if terminal_width < 32:
+        return min_width
+    if not suggestions:
+        return min_width
+    natural = max(len(s) for s in suggestions) + 2
+    fixed = INDICATOR_WIDTH + key_width + val_width + 8
+    remaining = max(min_width, terminal_width - fixed)
+    return max(min_width, min(natural, remaining // 2))
+
+
+def format_param_row(
+    indicator: str,
+    key: str,
+    value: str,
+    suggestion: str,
+    *,
+    key_width: int,
+    val_width: int,
+    sug_width: int,
+    total_width: int,
+) -> tuple[str, str, str, str]:
+    """Return aligned indicator, key, value, and suggestion for a param list row."""
+    gap = 2
+    marker = 1
+    ind_part = truncate(indicator.ljust(INDICATOR_WIDTH), INDICATOR_WIDTH)
+    key_part = truncate(key.ljust(key_width), key_width)
+    val_part = truncate(value.ljust(val_width), val_width)
+    sug_width = max(0, sug_width)
+    used = marker + INDICATOR_WIDTH + key_width + val_width + (gap * 3)
+    desc_width = total_width - used
+    if desc_width < 1 or not suggestion:
+        sug_part = ""
+    else:
+        sug_part = truncate(suggestion, min(sug_width, desc_width))
+    return ind_part, key_part, val_part, sug_part
 
 
 def format_row_triple(

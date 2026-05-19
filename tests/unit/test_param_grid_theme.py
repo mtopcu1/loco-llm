@@ -27,6 +27,13 @@ def test_rich_modified_markup():
     assert DEFAULT_THEME.rich("modified") == "[#6BCB77]"
 
 
+def test_style_for_cell_state_maps_classes():
+    from llm_cli.core.param_grid_theme import style_for_cell_state
+
+    assert style_for_cell_state("disabled") == "cell-disabled"
+    assert style_for_cell_state("enabled-set") == "cell-enabled-set"
+
+
 def test_to_prompt_toolkit_style_has_expected_classes():
     from llm_cli.core.param_grid_theme import DEFAULT_THEME
 
@@ -35,6 +42,10 @@ def test_to_prompt_toolkit_style_has_expected_classes():
         "cell-default",
         "cell-modified",
         "cell-readonly",
+        "cell-disabled",
+        "cell-enabled-empty",
+        "cell-enabled-set",
+        "cell-locked",
         "cell-focus",
         "header-advanced",
         "header-common",
