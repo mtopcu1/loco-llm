@@ -6,6 +6,7 @@ break, releases break. Catch typos in CI rather than on the next release.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -47,9 +48,11 @@ def test_release_please_changelog_sections_cover_feat_and_fix():
     assert "fix" in types
 
 
-def test_release_please_manifest_starts_at_known_version():
+def test_release_please_manifest_matches_pyproject_version():
     manifest = _load(".release-please-manifest.json")
-    assert manifest["."] in {"0.2.0", "0.2.1"}, (
-        "the manifest's recorded version for '.' should match the last "
-        "released version; if you're bumping pre-release, update this test"
+    pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    match = re.search(r'^version = "([^"]+)"', pyproject, re.MULTILINE)
+    assert match, "pyproject.toml missing version field"
+    assert manifest["."] == match.group(1), (
+        "release-please manifest and pyproject.toml version must stay in sync"
     )

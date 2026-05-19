@@ -27,6 +27,16 @@ gh api repos/mtopcu1/local-llm-scaffold/actions/permissions/workflow \
 
 Then confirm the checkbox above is still enabled in the UI (some org policies require both).
 
+## 1b. Require CI before merge (recommended)
+
+`main` is protected so PRs cannot merge unless these checks pass:
+
+- `test (3.11)`
+- `test (3.12)`
+- `build-check`
+
+Configured via **Settings → Branches → Branch protection rules** (or `gh api` on `repos/mtopcu1/loco-llm/branches/main/protection`).
+
 ## 2. Re-run release-please
 
 After step 1, either:

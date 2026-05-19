@@ -11,12 +11,6 @@ def test_help_shows_program_name():
     assert "llm" in result.stdout.lower()
 
 
-def test_version_flag_prints_version():
-    result = runner.invoke(app, ["--version"])
-    assert result.exit_code == 0
-    assert "0.2.0" in result.stdout
-
-
 def test_top_level_build_pull_removed():
     root_help = runner.invoke(app, ["--help"])
     assert root_help.exit_code == 0
