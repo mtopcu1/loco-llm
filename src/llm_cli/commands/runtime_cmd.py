@@ -55,7 +55,6 @@ curl -fsS -o /dev/null "http://${HOST}:${LLM_SERVE_PORT}/v1/models"
 
 _CUSTOM_PARAMS_YAML = """extra_args:
   type: string
-  default: ""
   env: LLM_EXTRA_ARGS
   tier: common
   description: "Pass-through flags appended to your serve command."
@@ -552,8 +551,6 @@ def runtime_info(runtime_id: str = typer.Argument(...)) -> None:
         console.print("\n[bold]build params:[/bold]")
         for spec in manifest.build_schema:
             line = f"  - {spec.key} ({spec.type.value})"
-            if spec.default is not None:
-                line += f" default={spec.default!r}"
             if spec.required:
                 line += " required"
             console.print(line)
@@ -562,8 +559,6 @@ def runtime_info(runtime_id: str = typer.Argument(...)) -> None:
         console.print("\n[bold]serve params:[/bold]")
         for spec in manifest.serve_schema:
             line = f"  - {spec.key} ({spec.type.value})"
-            if spec.default is not None:
-                line += f" default={spec.default!r}"
             if spec.required:
                 line += " required"
             console.print(line)

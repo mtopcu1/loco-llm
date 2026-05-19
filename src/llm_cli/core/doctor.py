@@ -163,7 +163,8 @@ def requirements_for_runtime(
 
 
 def _default_build_params(mf: _registry.RuntimeManifest) -> dict[str, Any]:
-    return {spec.key: spec.default for spec in mf.build_schema if spec.default is not None}
+    del mf
+    return {}
 
 
 def requirements_for_all_runtimes(
