@@ -44,10 +44,31 @@ def test_cell_state_locked() -> None:
     assert cell_state(c) == "locked"
 
 
+def test_cells_from_specs_optional_starts_disabled_empty() -> None:
+    specs = [
+        ParamSpec("ctx", ParamType.INT),
+        ParamSpec("name", ParamType.STRING, required=True),
+    ]
+    cells = cells_from_specs(specs)
+    by = {c.key: c for c in cells}
+    assert by["ctx"].enabled is False
+    assert by["ctx"].value == ""
+    assert by["name"].enabled is True
+    assert by["name"].locked is True
+
+
+def test_cells_from_specs_explicit_value_enables_key() -> None:
+    specs = [ParamSpec("ctx", ParamType.INT)]
+    cells = cells_from_specs(specs, values={"ctx": "8192"})
+    c = cells[0]
+    assert c.enabled is True
+    assert c.value == "8192"
+
+
 def test_cells_from_specs_marks_readonly() -> None:
     specs = [
-        ParamSpec("a", ParamType.INT, default=1),
-        ParamSpec("b", ParamType.STRING, default="x"),
+        ParamSpec("a", ParamType.INT),
+        ParamSpec("b", ParamType.STRING),
     ]
     cells = cells_from_specs(
         specs,
@@ -62,10 +83,9 @@ def test_cells_from_specs_skip_keys_prefill_model_binding() -> None:
         ParamSpec(
             "model_arg",
             ParamType.PATH,
-            default=None,
             bind="model_path",
         ),
-        ParamSpec("other", ParamType.STRING, default="z"),
+        ParamSpec("other", ParamType.STRING),
     ]
     cells = cells_from_specs(
         specs,
@@ -81,7 +101,6 @@ def test_cells_from_specs_skip_keys_respects_explicit_values() -> None:
         ParamSpec(
             "model_arg",
             ParamType.PATH,
-            default=None,
             bind="model_path",
         ),
     ]

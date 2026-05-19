@@ -7,12 +7,6 @@ from llm_cli.core.param_grid_models import ParamCell
 from llm_cli.core.params import ParamSpec
 
 
-def _default_str(spec: ParamSpec) -> str:
-    if spec.default is None:
-        return ""
-    return str(spec.default)
-
-
 def cells_from_specs(
     specs: list[ParamSpec],
     *,
@@ -30,23 +24,22 @@ def cells_from_specs(
     for spec in specs:
         if spec.key not in skip:
             continue
-        if spec.key in merged:
-            continue
-        if spec.bind == "model_path":
+        if spec.key not in merged and spec.bind == "model_path":
             merged[spec.key] = MODEL_PATH_TOKEN
-            continue
-        dv = _default_str(spec)
-        merged[spec.key] = dv
 
     out: list[ParamCell] = []
     for spec in specs:
-        default_s = _default_str(spec)
+        locked = spec.required or spec.key in readonly_keys or spec.key in skip
         if spec.key in merged:
             value_s = merged[spec.key]
-        elif spec.default is not None:
-            value_s = default_s
+            enabled = True
+        elif locked:
+            value_s = merged.get(spec.key, "")
+            enabled = True
         else:
             value_s = ""
+            enabled = False
+
         label = (spec.prompt or spec.key).strip() or spec.key
         out.append(
             ParamCell(
@@ -54,14 +47,14 @@ def cells_from_specs(
                 label=label,
                 description=spec.description or "",
                 value=value_s,
-                default=default_s,
-                readonly=spec.key in readonly_keys,
+                enabled=enabled,
+                locked=locked,
+                readonly=spec.key in readonly_keys or spec.key in skip,
                 tier=spec.tier,
                 hint=hints.get(spec.key),
                 param_type=spec.type,
             )
         )
-
     return out
 
 
