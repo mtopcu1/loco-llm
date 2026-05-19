@@ -101,6 +101,12 @@ def _ff_pull(root: Path, branch: str) -> None:
     _run_git(root, "pull", "--ff-only", "origin", branch)
 
 
+def _venv_python(root: Path) -> Path | None:
+    """Return the managed venv interpreter, matching scripts/install.sh layout."""
+    candidate = root / ".venv" / "bin" / "python"
+    return candidate if candidate.is_file() else None
+
+
 def _sync_deps(root: Path) -> None:
     uv = shutil.which("uv")
     if uv is None:
@@ -109,7 +115,17 @@ def _sync_deps(root: Path) -> None:
             "Install uv and re-run `llm update` to pick up dependency changes."
         )
         return
-    subprocess.run([uv, "pip", "install", "-e", str(root)], check=True)
+    venv_python = _venv_python(root)
+    if venv_python is None:
+        console.print(
+            f"[red]error:[/red] no venv at {root / '.venv'}; "
+            "re-run the install.sh one-liner to recreate the managed environment."
+        )
+        raise typer.Exit(code=1)
+    subprocess.run(
+        [uv, "pip", "install", "--python", str(venv_python), "-e", str(root)],
+        check=True,
+    )
 
 
 def _service_running() -> bool:
