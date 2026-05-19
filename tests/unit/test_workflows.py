@@ -39,41 +39,29 @@ class TestReleasePleaseWorkflow:
         assert "push" in on
         assert "main" in on["push"]["branches"]
 
-    def test_uses_release_please_action(self):
-        doc = _load("release-please.yml")
-        jobs = doc["jobs"]
-        steps = next(iter(jobs.values()))["steps"]
-        uses = [s.get("uses", "") for s in steps]
-        assert any(u.startswith("googleapis/release-please-action@") for u in uses)
-
-    def test_release_please_can_be_rerun_manually(self):
+    def test_supports_manual_dispatch(self):
         doc = _load("release-please.yml")
         on = _get_on(doc)
         assert "workflow_dispatch" in on
 
-    def test_release_please_grants_pr_write(self):
+    def test_uses_release_please_action(self):
+        doc = _load("release-please.yml")
+        steps = doc["jobs"]["release-please"]["steps"]
+        uses = [s.get("uses", "") for s in steps]
+        assert any(u.startswith("googleapis/release-please-action@") for u in uses)
+
+    def test_grants_only_minimum_permissions(self):
         doc = _load("release-please.yml")
         perms = doc.get("permissions", {})
-        assert perms.get("pull-requests") == "write"
         assert perms.get("contents") == "write"
-        assert perms.get("id-token") == "write"
+        assert perms.get("pull-requests") == "write"
+        assert "id-token" not in perms, "no OIDC needed without PyPI publish"
 
-    def test_release_please_validates_release_branch(self):
+    def test_has_no_publish_or_check_jobs(self):
         doc = _load("release-please.yml")
-        job = doc["jobs"].get("release-pr-check")
-        assert job is not None, "expected a release-pr-check job"
-        run_steps = [s.get("run", "") for s in job["steps"] if "run" in s]
-        assert any("version sync ok" in cmd or "release-please-manifest" in cmd for cmd in run_steps)
-        assert any("python -m build" in cmd for cmd in run_steps)
-
-    def test_release_please_publishes_when_release_created(self):
-        doc = _load("release-please.yml")
-        job = doc["jobs"].get("publish")
-        assert job is not None, "expected a publish job chained to release-please"
-        assert "releases_created" in job.get("if", "")
-        all_steps = job.get("steps", [])
-        uses = [s.get("uses", "") for s in all_steps]
-        assert any(u.startswith("pypa/gh-action-pypi-publish@") for u in uses)
+        assert set(doc["jobs"].keys()) == {"release-please"}, (
+            "release-please.yml should have exactly one job"
+        )
 
 
 class TestCIWorkflow:
