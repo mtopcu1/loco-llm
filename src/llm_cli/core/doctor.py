@@ -47,6 +47,13 @@ class RequirementResult:
     detail: str = ""
 
 
+@dataclass(frozen=True)
+class ScopeCheckResult:
+    name: str
+    status: str
+    message: str
+
+
 def load_requirements(path: Path) -> list[Requirement]:
     """Load requirements.yaml into a list of Requirement objects."""
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or []
@@ -127,6 +134,91 @@ def check_all(
     run_command: RunCommand = _real_run_command,
 ) -> list[RequirementResult]:
     return [check_requirement(r, run_command=run_command) for r in requirements]
+
+
+def _dashboard_scope_checks() -> list[ScopeCheckResult]:
+    from llm_cli.core import dashboard as dash
+    from llm_cli.core.versions import current_cli_version
+    import shutil
+
+    results: list[ScopeCheckResult] = []
+    node = shutil.which("node")
+    npm = shutil.which("npm")
+    record = dash.load_installed_record()
+
+    results.append(
+        ScopeCheckResult(
+            name="node",
+            status="error" if (node is None and record is not None) else "info" if node is None else "ok",
+            message="Node.js not found (install Node 20+)" if node is None else f"Found at {node}",
+        )
+    )
+    results.append(
+        ScopeCheckResult(
+            name="npm",
+            status="error" if (npm is None and record is not None) else "info" if npm is None else "ok",
+            message="npm not found" if npm is None else f"Found at {npm}",
+        )
+    )
+    results.append(
+        ScopeCheckResult(
+            name="dashboard installed",
+            status="info" if record is None else "ok",
+            message=(
+                "Not installed (run `llm dashboard install`)"
+                if record is None
+                else f"Installed for CLI {record.cli_version} at {record.installed_at}"
+            ),
+        )
+    )
+    if record is not None:
+        cur = current_cli_version()
+        results.append(
+            ScopeCheckResult(
+                name="dashboard version matches CLI",
+                status="ok" if record.cli_version == cur else "error",
+                message=(
+                    "Match"
+                    if record.cli_version == cur
+                    else f"Built for CLI {record.cli_version}, current is {cur}. "
+                    "Run `llm dashboard install --reset`."
+                ),
+            )
+        )
+        verdict, reason = dash.verify_installed(cur)
+        results.append(
+            ScopeCheckResult(
+                name="dashboard dist integrity",
+                status="ok" if verdict == "ok" else "warning",
+                message="OK" if verdict == "ok" else f"{verdict}: {reason}",
+            )
+        )
+
+    try:
+        pid = dash.read_server_pid()
+    except RuntimeError:
+        pid = None
+    if pid is not None:
+        alive = dash.is_server_alive(pid)
+        results.append(
+            ScopeCheckResult(
+                name="dashboard server pid alive",
+                status="ok" if alive else "warning",
+                message=(
+                    f"pid={pid} alive"
+                    if alive
+                    else f"Stale pid file (pid={pid}); run `llm dashboard stop`."
+                ),
+            )
+        )
+
+    return results
+
+
+def run_scope(scope: str) -> list[ScopeCheckResult]:
+    if scope == "dashboard":
+        return _dashboard_scope_checks()
+    raise ValueError(f"unknown doctor scope: {scope}")
 
 
 def _req_from_entry(entry: dict[str, Any], owner: str) -> Requirement | None:
