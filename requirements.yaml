@@ -55,3 +55,26 @@
     version_regex: 'curl\s+([\d.]+)'
     min: "7.80"
   install_hint: "apt install curl"
+
+- id: node
+  name: Node.js
+  scope: dashboard
+  why: llm dashboard install / serve
+  verify:
+    cmd: node --version
+    version_regex: 'v?([\d.]+)'
+    min: "20.0.0"
+  install_hint: |
+    Install Node.js 20+:
+      WSL/Linux: `curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash && nvm install --lts`
+      macOS:     `brew install node`
+
+- id: npm
+  name: npm
+  scope: dashboard
+  why: llm dashboard install / serve
+  verify:
+    cmd: npm --version
+    version_regex: '([\d.]+)'
+    min: "10.0.0"
+  install_hint: "Bundled with Node.js (see Node.js install hint)."

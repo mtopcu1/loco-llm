@@ -36,6 +36,7 @@ class Requirement:
     version_regex: str
     min_version: str | None
     install_hint: str
+    scope: str | None = None
 
 
 @dataclass(frozen=True)
@@ -68,6 +69,7 @@ def load_requirements(path: Path) -> list[Requirement]:
                 version_regex=str(verify["version_regex"]),
                 min_version=verify.get("min"),
                 install_hint=str(entry.get("install_hint", "")),
+                scope=entry.get("scope"),
             )
         )
     return out
@@ -285,11 +287,17 @@ def run_quick_checks() -> tuple[bool, str]:
 
 
 def render_requirements_md_grouped(
-    universal: list[Requirement], by_runtime: dict[str, list[Requirement]]
+    universal: list[Requirement],
+    by_runtime: dict[str, list[Requirement]],
+    *,
+    by_scope: dict[str, list[Requirement]] | None = None,
 ) -> str:
-    """Render universal requirements plus one table per runtime."""
+    """Render universal requirements plus optional scope and per-runtime sections."""
     lines: list[str] = [_REQ_HEADER.rstrip(), "", "## Universal", ""]
     lines.extend(_render_table(universal))
+    for scope_id in sorted(by_scope or {}):
+        lines.extend(["", f"## Scope: {scope_id}", ""])
+        lines.extend(_render_table(by_scope[scope_id]))
     for runtime_id in sorted(by_runtime):
         lines.extend(["", f"## Runtime: {runtime_id}", ""])
         lines.extend(_render_table(by_runtime[runtime_id]))

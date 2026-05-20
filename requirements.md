@@ -15,9 +15,18 @@ These prerequisites must exist on the machine for the LocalLLM CLI and the runti
 | git | Git | 2.30 | `git --version` | apt install git | Cloning runtime forks in runtimes/*/build.sh |
 | curl | curl | 7.80 | `curl --version` | apt install curl | healthcheck.sh and ad-hoc endpoint probing |
 
+## Scope: dashboard
+
+| ID | Name | Min | Verify | Install | Why |
+|---|---|---|---|---|---|
+| node | Node.js | 20.0.0 | `node --version` | Install Node.js 20+:
+  WSL/Linux: `curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh \| bash && nvm install --lts`
+  macOS:     `brew install node`
+ | llm dashboard install / serve |
+| npm | npm | 10.0.0 | `npm --version` | Bundled with Node.js (see Node.js install hint). | llm dashboard install / serve |
+
 ## Runtime: llamacpp
 
 | ID | Name | Min | Verify | Install | Why |
 |---|---|---|---|---|---|
 | cmake | cmake | 3.16 | `cmake --version` | apt install cmake | required by llamacpp |
-| nvcc | nvcc | 12.0 | `nvcc --version` | Install CUDA toolkit; see NVIDIA docs. | required by llamacpp |
