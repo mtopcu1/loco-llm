@@ -99,6 +99,24 @@ def append_history(repo: Path, event: dict[str, Any]) -> None:
         fh.write(json.dumps(line, sort_keys=True) + "\n")
 
 
+def read_history(repo: Path) -> list[dict[str, Any]]:
+    path = history_path(repo)
+    if not path.is_file():
+        return []
+    out: list[dict[str, Any]] = []
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            value = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            out.append(value)
+    return out
+
+
 def is_alive(pid: int) -> bool:
     """Return True if pid identifies a live process owned by this user.
 

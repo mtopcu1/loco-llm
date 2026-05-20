@@ -19,6 +19,7 @@ from llm_cli.webapi.routes import (
     disk,
     doctor,
     health,
+    history,
     instance,
     models,
     runtimes,
@@ -75,6 +76,7 @@ def create_app(
     api.include_router(disk.router)
     api.include_router(doctor.router)
     api.include_router(health.router)
+    api.include_router(history.router)
     api.include_router(instance.router)
     api.include_router(models.router)
     api.include_router(runtimes.router)
