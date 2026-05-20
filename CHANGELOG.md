@@ -1,5 +1,84 @@
 # Changelog
 
+## [1.2.0](https://github.com/mtopcu1/loco-llm/compare/v1.1.0...v1.2.0) (2026-05-20)
+
+
+### Features
+
+* **dashboard:** `llm dashboard serve` (background + foreground, readiness wait, browser auto-open) ([5532710](https://github.com/mtopcu1/loco-llm/commit/5532710e4b00ae8d3a2ef4366c4f1f44f0c4d27d))
+* **dashboard:** app shell (Layout/Header/Sidebar), status pill, error card, useSSE hook ([4d1a20c](https://github.com/mtopcu1/loco-llm/commit/4d1a20cfa2ea63deb9ac03f13aaf618cc86b743d))
+* **dashboard:** centralized error→toast mapping by ErrorCode ([2aa73e9](https://github.com/mtopcu1/loco-llm/commit/2aa73e9a53737a1e48ab4849d7e191add1e78007))
+* **dashboard:** Configs list + detail (Overview/Params/Validate/Raw YAML, read-only) ([664e143](https://github.com/mtopcu1/loco-llm/commit/664e14308bc96d1c773631d5297248cc9a4cbb38))
+* **dashboard:** core install lifecycle helpers (dist_hash, .installed, server-pid) ([3365e33](https://github.com/mtopcu1/loco-llm/commit/3365e3377d3bda1a4ace66ecd3736934c37aa858))
+* **dashboard:** Disk page (data root summary + per-model usage) ([81dee0b](https://github.com/mtopcu1/loco-llm/commit/81dee0b57d982e0eb191f8641975de7ce4828924))
+* **dashboard:** Doctor page with per-scope check results ([f77c3c4](https://github.com/mtopcu1/loco-llm/commit/f77c3c4799d24117289f6f5caff487b323b869b7))
+* **dashboard:** editable Settings form built from KEY_REGISTRY ([a8b3c0b](https://github.com/mtopcu1/loco-llm/commit/a8b3c0b37c415e4fc5a83e18480e667bede7c9dd))
+* **dashboard:** enable model pull/add/uninstall with form validation ([12c3201](https://github.com/mtopcu1/loco-llm/commit/12c3201d92a865755003caa303b28109132c3772))
+* **dashboard:** enable runtime install/rebuild/uninstall mutations with error toasts ([07c3bad](https://github.com/mtopcu1/loco-llm/commit/07c3badd45b8c2e02b02d8043bba6fd3fa295abc))
+* **dashboard:** History page with filters and live SSE updates ([031bd07](https://github.com/mtopcu1/loco-llm/commit/031bd07c4ddb53ccb726f7cddbfa69e56c7b4fc3))
+* **dashboard:** implement `llm dashboard install` (python deps + npm build + .installed) ([8d4ca41](https://github.com/mtopcu1/loco-llm/commit/8d4ca4192ff11f3aaf9d2ada4b7b1cd9002878bb))
+* **dashboard:** implement `llm dashboard stop` and `uninstall [--purge]` ([2b6f2d9](https://github.com/mtopcu1/loco-llm/commit/2b6f2d97234ca9f69594f392bdbba74deaf8f5a9))
+* **dashboard:** Instance page with live log streaming (read-only) ([134781e](https://github.com/mtopcu1/loco-llm/commit/134781e64170099a251da68dab81f5d8633d125c))
+* **dashboard:** instance start/stop/switch controls ([53b8b1c](https://github.com/mtopcu1/loco-llm/commit/53b8b1c0d798646af12b2eb2224f40e14cdb270f))
+* **dashboard:** Jobs tray in sidebar + JobDetailSheet with streaming log ([673c474](https://github.com/mtopcu1/loco-llm/commit/673c474b7447384712883fa04af5516be6a3d30c))
+* **dashboard:** Models list + detail pages (read-only) ([d95ea80](https://github.com/mtopcu1/loco-llm/commit/d95ea80208d4a350ba091ac60a9360b1282a43c4))
+* **dashboard:** mutations and jobs system (Plan 2/5) ([f80aa77](https://github.com/mtopcu1/loco-llm/commit/f80aa77ba5baa320a6b79617fc4ea5693230f23c))
+* **dashboard:** Overview page (read-only) + Vitest+msw test infra ([ae09c1d](https://github.com/mtopcu1/loco-llm/commit/ae09c1d2ae25e04f743c01a31f1e1d0372a361cf))
+* **dashboard:** raw config form for create/edit + delete (param grid arrives in Plan 3) ([0bc5fdf](https://github.com/mtopcu1/loco-llm/commit/0bc5fdfac875ce924a53a6e52d1c2d898560dda5))
+* **dashboard:** Runtimes list + detail pages (read-only) ([9a208db](https://github.com/mtopcu1/loco-llm/commit/9a208dba89e79480afbcded5fc072b7dbb7f41f5))
+* **dashboard:** scaffold Vite + React 19 + TS + Tailwind v4 + shadcn/ui ([d76cd00](https://github.com/mtopcu1/loco-llm/commit/d76cd00a96d7069c3fb4e71681b5084da779d3f3))
+* **dashboard:** Settings page (read-only stored + resolved view) ([c57d424](https://github.com/mtopcu1/loco-llm/commit/c57d424e5711d0b640a1184b179c36d8c00de608))
+* **dashboard:** typed API client generated from OpenAPI schema ([6522037](https://github.com/mtopcu1/loco-llm/commit/6522037d2f90fc747748005caba00644490f43e9))
+* **dashboard:** useJobs/useJob/useStartJob hooks with SSE-into-Query integration ([81e4938](https://github.com/mtopcu1/loco-llm/commit/81e49382eab5a4ff38039b094da7781dca9d463a))
+* **dashboard:** web dashboard MVP (Plan 1/5) ([7877253](https://github.com/mtopcu1/loco-llm/commit/787725314db17042ee6bc563b6b531541db37846))
+* **dashboard:** wire llm dashboard subcommand group with status stub ([e36111a](https://github.com/mtopcu1/loco-llm/commit/e36111a0ec3995466482fa3071a457c51e1bafb7))
+* **dashboard:** wire TanStack Router/Query, Zustand store, sonner toaster ([31ed8ee](https://github.com/mtopcu1/loco-llm/commit/31ed8ee4b60942a29108650580159d725870c899))
+* **disk:** per-model disk usage and data-root capacity scan ([1292315](https://github.com/mtopcu1/loco-llm/commit/129231509b9809d522d2629d6933ee6c26dd1d6e))
+* **doctor:** add `dashboard` scope (node/npm, install record, dist integrity, server pid) ([2af345a](https://github.com/mtopcu1/loco-llm/commit/2af345acd2d54a41f7b5353678f396bea64ef116))
+* **jobs:** in-memory job registry with per-job log file and SSE fan-out ([8e387f0](https://github.com/mtopcu1/loco-llm/commit/8e387f0ca133679b90814a902950e69614fdc668))
+* **setup:** offer optional dashboard install at end of `llm setup` chain ([d6ff269](https://github.com/mtopcu1/loco-llm/commit/d6ff269de25f953a0481c0235e9bb4c3e9b8d9e9))
+* **update:** rebuild dashboard after `llm update` when version drifts (best-effort) ([2822faf](https://github.com/mtopcu1/loco-llm/commit/2822faf27f4aa1e51c256f599e7d4f7bc42a870a))
+* **webapi:** /api/jobs list/get/stream/cancel routes ([6ace4cf](https://github.com/mtopcu1/loco-llm/commit/6ace4cf449938d447f673fc0ebb23196f707c74b))
+* **webapi:** extend ErrorCode enum for mutation paths ([6019356](https://github.com/mtopcu1/loco-llm/commit/6019356d568d61a776c83b5d9ce6c244eb229ba0))
+* **webapi:** FastAPI factory + health + version routes + middleware wiring ([6c8d13a](https://github.com/mtopcu1/loco-llm/commit/6c8d13a0205518841cb9dcc22778055562abcd37))
+* **webapi:** GET /api/disk ([81182ee](https://github.com/mtopcu1/loco-llm/commit/81182ee3e22da2ac08073136ddaa91a7e2c38347))
+* **webapi:** GET /api/doctor with all scopes ([9cb234f](https://github.com/mtopcu1/loco-llm/commit/9cb234fe37b5521778b8fe5c87c30841d152de3b))
+* **webapi:** GET /api/history + SSE history stream ([85c64e5](https://github.com/mtopcu1/loco-llm/commit/85c64e5ed5bc4332d43ae727bfe9c8bb85768d6f))
+* **webapi:** GET /api/instance + SSE state + SSE logs (read-only) ([216686c](https://github.com/mtopcu1/loco-llm/commit/216686cabec25ca3aaea067283a9fc8be4d117db))
+* **webapi:** GET /api/models and /api/models/{id} ([4bd96e3](https://github.com/mtopcu1/loco-llm/commit/4bd96e37e2b7ed5404c2545e9c36c5c8b6dccb1b))
+* **webapi:** GET /api/overview aggregate ([098a0c9](https://github.com/mtopcu1/loco-llm/commit/098a0c93fd7ee353435bcd7b1f37e2ef3383cced))
+* **webapi:** GET /api/runtimes and /api/runtimes/{id} ([49a6d2e](https://github.com/mtopcu1/loco-llm/commit/49a6d2e26a0ef9e3a7f40f30a11e63a0c91888de))
+* **webapi:** GET /api/settings (stored + resolved + registry) ([16aceb9](https://github.com/mtopcu1/loco-llm/commit/16aceb934828a4dfe9d68919fe9733873f6d3dbe))
+* **webapi:** GET configs (list, detail, params, validate) ([d64b838](https://github.com/mtopcu1/loco-llm/commit/d64b83850b9f5a7fdbf1bf2ba19aa16f11c9e8f2))
+* **webapi:** host-header allow-list, security headers, request-id middleware ([a4db6fb](https://github.com/mtopcu1/loco-llm/commit/a4db6fb0e60585f5ef78f61d27d02c2086689a1c))
+* **webapi:** in-process EventHub for SSE fan-out ([a22aec6](https://github.com/mtopcu1/loco-llm/commit/a22aec663d6b5d401bf38c5b689418d17a2d91cc))
+* **webapi:** OpenAPI exporter + regen-api-client.sh with --check mode ([2549c76](https://github.com/mtopcu1/loco-llm/commit/2549c7606a5613630a26f57626ef19ba9e25d932))
+* **webapi:** POST /api/instance/start|stop|switch (async start, sync stop, fg-mode refusals) ([1d8ce0b](https://github.com/mtopcu1/loco-llm/commit/1d8ce0b9aa20da83be3aaeb96ad546f7416968b5))
+* **webapi:** POST /api/models/pull|add + DELETE (sync) ([ee58724](https://github.com/mtopcu1/loco-llm/commit/ee5872471a4e89fde589cfa95158509d9e79de6c))
+* **webapi:** POST /api/runtimes/{id}/install|rebuild + DELETE (sync uninstall) ([4a3c920](https://github.com/mtopcu1/loco-llm/commit/4a3c920f42adbb49062b7c42c864ee94c5c51120))
+* **webapi:** POST/PUT/DELETE /api/configs with validation + in-use refusal ([d4cd760](https://github.com/mtopcu1/loco-llm/commit/d4cd760affd151a2d5af18d4a69bdfbe998872d0))
+* **webapi:** PUT /api/settings/{key} with validation against KEY_REGISTRY ([599eed9](https://github.com/mtopcu1/loco-llm/commit/599eed94016a01d2614529d1d3fe74d4bbc86dab))
+* **webapi:** SPA serving with index.html fallback and not-built JSON 503 ([786d58c](https://github.com/mtopcu1/loco-llm/commit/786d58c83e509dddf27423d97346ed8cec35277b))
+* **webapi:** uniform ApiError response shape with ErrorCode enum ([34cad46](https://github.com/mtopcu1/loco-llm/commit/34cad46033443e7f2fdb15950ab9cddf62237dff))
+
+
+### Bug Fixes
+
+* **ci:** install dashboard extras in main pytest job and drop uv.lock cache ([e6d5967](https://github.com/mtopcu1/loco-llm/commit/e6d59675058c4c1868855a84efc26e5347a6c596))
+* **ci:** regen-api-client use absolute temp paths for openapi-typescript ([1ed0a67](https://github.com/mtopcu1/loco-llm/commit/1ed0a675df154c55193effa8d136e87aaf7c28f9))
+* **ci:** use uv run python in regen-api-client.sh for venv-aware OpenAPI export ([8cf5bb1](https://github.com/mtopcu1/loco-llm/commit/8cf5bb1fed73143ed4b63782f92ed66d213583de))
+
+
+### Documentation
+
+* **dashboard:** user-facing install/serve guide + frontend dev README ([123e331](https://github.com/mtopcu1/loco-llm/commit/123e3310998b4476c6b7f487bb7999c78888c994))
+* **plan:** web dashboard hardening and polish (Plan 5/5) ([10fa1b6](https://github.com/mtopcu1/loco-llm/commit/10fa1b6f43bbde38e4b59da83eac1b7bd37f2ca6))
+* **plan:** web dashboard live metrics (Plan 4/5) ([53cdb43](https://github.com/mtopcu1/loco-llm/commit/53cdb430ffc81bd63739addc92fc14fae7fa548c))
+* **plan:** web dashboard mutations and jobs (Plan 2/5) ([fc38f97](https://github.com/mtopcu1/loco-llm/commit/fc38f9751aa43eab5c2e829e1836b51309d46ea1))
+* **plan:** web dashboard MVP (Plan 1/5) implementation plan ([603f1fa](https://github.com/mtopcu1/loco-llm/commit/603f1fa5daa557694f148d8665f02690862102ca))
+* **plan:** web dashboard param grid and new-config wizard (Plan 3/5) ([cc093e6](https://github.com/mtopcu1/loco-llm/commit/cc093e6f6616d9c380fc2b26947f5d6ac7db34ec))
+* **spec:** web dashboard design ([d2cfa6f](https://github.com/mtopcu1/loco-llm/commit/d2cfa6fc3b3f014a303f486f70721bdf81aa4968))
+
 ## [1.1.0](https://github.com/mtopcu1/loco-llm/compare/v1.0.1...v1.1.0) (2026-05-19)
 
 
