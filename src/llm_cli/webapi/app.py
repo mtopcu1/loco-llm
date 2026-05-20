@@ -19,7 +19,10 @@ from llm_cli.webapi.static import mount_spa
 
 
 def _dist_dir() -> Path:
-    return dash.dist_dir()
+    try:
+        return dash.dist_dir()
+    except RuntimeError:
+        return Path.cwd() / "dashboard" / "dist"
 
 
 def create_app(
