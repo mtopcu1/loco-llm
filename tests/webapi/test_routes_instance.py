@@ -58,3 +58,51 @@ def test_instance_endpoint_returns_running_payload(test_client, webapi_repo):
     assert r.status_code == 200
     assert r.json()["running"] is True
     assert r.json()["config_id"] == "cfg-1"
+
+
+@pytest.mark.webapi
+def test_instance_metrics_stream_not_running(test_client, webapi_repo):
+    del webapi_repo
+    r = test_client.get(
+        "/api/instance/metrics/stream",
+        headers={"Host": "testserver", "Accept": "text/event-stream"},
+    )
+    assert r.status_code == 409
+    assert r.json()["error"]["code"] == "INSTANCE_NOT_RUNNING"
+
+
+@pytest.mark.webapi
+def test_instance_metrics_stream_no_metrics_event(test_client, webapi_repo, monkeypatch):
+    from llm_cli.core.registry import RuntimeRecord
+
+    rt_dir = webapi_repo["repo_root"] / "runtimes" / "stub-runtime"
+    monkeypatch.setattr(
+        "llm_cli.core.lifecycle_status.current",
+        lambda: {
+            "running": True,
+            "config_id": "cfg-stub",
+            "runtime_id": "stub-runtime",
+            "port": 8000,
+            "mode": "background",
+        },
+    )
+    monkeypatch.setattr(
+        "llm_cli.core.registry.get_runtime_merged",
+        lambda rid: RuntimeRecord(
+            id="stub-runtime",
+            path=rt_dir,
+            manifest={"id": "stub-runtime", "metrics": None},
+        )
+        if rid == "stub-runtime"
+        else None,
+    )
+
+    with test_client.stream(
+        "GET",
+        "/api/instance/metrics/stream",
+        headers={"Host": "testserver", "Accept": "text/event-stream"},
+        timeout=2.0,
+    ) as r:
+        assert r.status_code == 200
+        body = "".join(r.iter_text(chunk_size=1))
+        assert "no_metrics" in body
