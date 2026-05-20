@@ -119,6 +119,11 @@ def _expand(value: str) -> Path:
     return Path(value).expanduser()
 
 
+def resolve_settings() -> Settings:
+    """Load settings from disk and return fully-resolved paths."""
+    return resolve(load_settings())
+
+
 def resolve(values: dict[str, str]) -> Settings:
     """Return a fully-populated Settings, filling defaults + derived dir keys."""
     data_root_raw = values.get("data_root", KEY_REGISTRY["data_root"]["default"])
