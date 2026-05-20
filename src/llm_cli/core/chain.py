@@ -143,6 +143,12 @@ def _do_serve(config_id: str) -> int:
     return 0
 
 
+def _do_dashboard_install() -> None:
+    from llm_cli.commands.dashboard_cmd import install as dashboard_install
+
+    dashboard_install()
+
+
 def run_setup_chain() -> int:
     """Interactive post-settings chain (runtime → model URL → config → serve)."""
     from llm_cli.commands.model_cmd import PullModelError
@@ -228,5 +234,16 @@ def run_setup_chain() -> int:
         console.print("\n[green]Tip:[/green] run `llm status` to inspect the server.")
     elif config_id:
         console.print(f"\n[dim]Next:[/dim] llm serve {config_id}")
+
+    if _confirm("Install the web dashboard now?", default=False):
+        try:
+            _do_dashboard_install()
+            steps.append("dashboard-install")
+        except typer.Exit as exc:
+            if int(exc.exit_code or 1) != 0:
+                console.print(
+                    "[yellow]Dashboard install failed; continuing setup. "
+                    "Run `llm dashboard install` to retry.[/yellow]"
+                )
 
     return 0

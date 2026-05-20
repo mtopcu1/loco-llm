@@ -48,6 +48,7 @@ def test_chain_runtime_setup_failure_aborts(monkeypatch, tmp_path):
     _chain_settings(tmp_path, monkeypatch)
     monkeypatch.setattr(chain, "_confirm", lambda *a, **k: True)
     monkeypatch.setattr(chain, "_prompt_text", lambda *a, **k: "")
+    monkeypatch.setattr(chain, "_do_dashboard_install", lambda: None)
 
     def boom():
         raise typer.Exit(1)
@@ -61,6 +62,7 @@ def test_chain_threads_ids_forward(monkeypatch, tmp_path):
     calls: list[object] = []
 
     monkeypatch.setattr(chain, "_confirm", lambda *a, **k: True)
+    monkeypatch.setattr(chain, "_do_dashboard_install", lambda: None)
     monkeypatch.setattr(
         chain,
         "_prompt_text",
@@ -84,6 +86,25 @@ def test_chain_threads_ids_forward(monkeypatch, tmp_path):
     assert calls[0]["runtime_id"] == "rt-x"
     assert calls[0]["model_id"] == "model-x"
     assert calls[1]["serve_id"] == "cfg-x"
+
+
+def test_setup_chain_offers_dashboard_step(monkeypatch, tmp_path):
+    """The setup chain should offer dashboard install last with default No."""
+    _chain_settings(tmp_path, monkeypatch)
+    prompts: list[tuple[str, bool]] = []
+    installed: list[bool] = []
+
+    def confirm(prompt: str, *, default: bool = True) -> bool:
+        prompts.append((prompt, default))
+        return False
+
+    monkeypatch.setattr(chain, "_confirm", confirm)
+    monkeypatch.setattr(chain, "_prompt_text", lambda *a, **k: "")
+    monkeypatch.setattr(chain, "_do_dashboard_install", lambda: installed.append(True))
+
+    assert chain.run_setup_chain() == 0
+    assert any("dashboard" in prompt.lower() and default is False for prompt, default in prompts)
+    assert installed == []
 
 
 def test_chain_duplicate_model_keep(monkeypatch, tmp_path):
