@@ -427,7 +427,9 @@ def model_uninstall(
             if purge
             else f"Remove registry entry {model_id!r}?"
         )
-        if not typer.confirm(msg, default=False):
+        from llm_cli.core import wizards as wiz
+
+        if not wiz.confirm(msg, default=False):
             console.print("aborted")
             raise typer.Exit(code=1)
     remove_entry(models_dir, model_id)

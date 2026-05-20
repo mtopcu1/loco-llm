@@ -1,6 +1,10 @@
 # Cross-cutting external prerequisites for the LocalLLM repo.
 # Source of truth — `requirements.md` is auto-generated from this file.
-# Add a new entry with: id, name, why, verify (cmd + version_regex + min), install_hint.
+#
+# install_hint authoring:
+#   - Prefer `pip install <pkg>` when PyPI ships the tool (e.g. cmake, huggingface_hub[cli]).
+#   - Otherwise OS packages (apt/brew) or official URLs for drivers/toolkits.
+#   - Multi-line hints: first line = quickest path; include official link when helpful.
 
 - id: cuda-driver
   name: NVIDIA CUDA Driver (Windows host)
@@ -9,7 +13,9 @@
     cmd: nvidia-smi
     version_regex: 'Driver Version:\s*([\d.]+)'
     min: "535.0"
-  install_hint: "https://www.nvidia.com/Download/index.aspx"
+  install_hint: |
+    Install the NVIDIA GPU driver on Windows (WSL2 uses the host driver).
+    https://www.nvidia.com/Download/index.aspx
 
 - id: python
   name: Python
@@ -18,7 +24,10 @@
     cmd: python3 --version
     version_regex: 'Python\s+([\d.]+)'
     min: "3.11"
-  install_hint: "apt install python3.11 python3.11-venv"
+  install_hint: |
+    https://www.python.org/downloads/ (3.11+)
+    Debian/Ubuntu: sudo apt install python3.11 python3.11-venv
+    macOS: brew install python@3.11
 
 - id: hf-cli
   name: huggingface-hub CLI
@@ -27,16 +36,22 @@
     cmd: hf --version
     version_regex: '([\d.]+)'
     min: "0.20.0"
-  install_hint: "curl -LsSf https://hf.co/cli/install.sh | bash"
+  install_hint: |
+    pip install -U "huggingface_hub[cli]"
+    https://huggingface.co/docs/huggingface_hub/en/guides/cli
 
 - id: build-essential
-  name: build-essential + cmake
+  name: C/C++ toolchain (gcc, g++)
   why: Building llama.cpp and similar native runtimes
   verify:
     cmd: gcc --version
     version_regex: 'gcc.*?([\d.]+)'
     min: "11.0"
-  install_hint: "apt install build-essential cmake"
+  install_hint: |
+    Debian/Ubuntu: sudo apt install build-essential
+    Fedora: sudo dnf groupinstall "Development Tools"
+    macOS: xcode-select --install
+    https://gcc.gnu.org/install/
 
 - id: git
   name: Git
@@ -45,7 +60,10 @@
     cmd: git --version
     version_regex: 'git version\s+([\d.]+)'
     min: "2.30"
-  install_hint: "apt install git"
+  install_hint: |
+    https://git-scm.com/downloads
+    Debian/Ubuntu: sudo apt install git
+    macOS: brew install git
 
 - id: curl
   name: curl
@@ -54,27 +72,32 @@
     cmd: curl --version
     version_regex: 'curl\s+([\d.]+)'
     min: "7.80"
-  install_hint: "apt install curl"
+  install_hint: |
+    https://curl.se/download.html
+    Debian/Ubuntu: sudo apt install curl
+    macOS: brew install curl
 
 - id: node
   name: Node.js
   scope: dashboard
-  why: llm dashboard install / serve
+  why: loco dashboard install / serve
   verify:
     cmd: node --version
     version_regex: 'v?([\d.]+)'
     min: "20.0.0"
   install_hint: |
-    Install Node.js 20+:
-      WSL/Linux: `curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash && nvm install --lts`
-      macOS:     `brew install node`
+    https://nodejs.org/ (LTS 20+)
+    WSL/Linux: https://github.com/nvm-sh/nvm#installing-and-updating
+    macOS: brew install node
 
 - id: npm
   name: npm
   scope: dashboard
-  why: llm dashboard install / serve
+  why: loco dashboard install / serve
   verify:
     cmd: npm --version
     version_regex: '([\d.]+)'
     min: "10.0.0"
-  install_hint: "Bundled with Node.js (see Node.js install hint)."
+  install_hint: |
+    Bundled with Node.js — install Node first (see node hint).
+    https://docs.npmjs.com/downloading-and-installing-node-js-and-npm

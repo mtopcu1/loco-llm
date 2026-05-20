@@ -21,7 +21,7 @@ The script:
 5. Symlinks `~/.local/bin/loco` → `~/.loco/install/.venv/bin/loco`.
 6. Creates `~/.loco/config.yaml`, `configs/`, `models/`, `runtimes/`, `cache/`, `state/`.
 7. Seeds example launch configs from the repo into `~/.loco/configs/` (skip existing).
-8. Runs `loco setup --default` when a TTY is available.
+8. Prints next steps: `loco setup` (first-run wizard) and `loco doctor`.
 
 ## Installer flags
 
@@ -35,7 +35,6 @@ curl -fsSL .../scripts/install.sh | bash -s -- --data-home /opt/loco-data
 | `--dir <path>` | Git install root (default `$DATA_HOME/install`) |
 | `--tag vX.Y.Z` | Pin to a specific release tag |
 | `--branch <name>` | Track a branch tip instead of latest tag (testing) |
-| `--skip-setup` | Skip `loco setup --default` at end of install |
 
 Environment:
 

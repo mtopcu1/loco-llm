@@ -41,6 +41,8 @@ Three forms: interactive (pick runtime + model), `llm advisor <config-id>`, or `
 
 **Selections** (runtime, model, menu choices) use **questionary** on a real TTY and fall back to numbered Rich prompts on non-TTY, dumb `TERM`, or when `wizards.force_plain(True)` is in effect.
 
+**Yes/No** (`wizards.confirm`, setup chain, uninstall prompts) use **No / Yes** buttons (same focus style as wizard footers): **← →** or **Tab** to move focus, **Y** / **N** to choose, **Enter** to accept the focused button. Plain/CI fallback: numbered **1 = No**, **2 = Yes** (still accepts `y`/`n`).
+
 **Typed parameters** — config serve params, interactive runtime **build** params, and **`review()`** re-edits — use the **param grid** everywhere.
 
 ### Param grid shortcuts (TTY)

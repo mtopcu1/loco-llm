@@ -7,7 +7,6 @@
 #   --dir <path>        git install root (default: $DATA_HOME/install)
 #   --branch <name>     clone+checkout a branch instead of the latest tag
 #   --tag <vX.Y.Z>      pin to a specific tag
-#   --skip-setup        skip loco setup after install
 set -euo pipefail
 
 REPO_URL="https://github.com/mtopcu1/loco-llm.git"
@@ -17,8 +16,6 @@ LOCO_INSTALL="${LOCO_INSTALL:-${LOCO_LLM_HOME:-}}"
 PYTHON_MIN="3.11"
 REF_BRANCH=""
 REF_TAG=""
-RUN_SETUP=true
-
 die() { echo "error: $*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"; }
 
@@ -28,7 +25,6 @@ while [ $# -gt 0 ]; do
     --dir)       LOCO_INSTALL="$2"; shift 2 ;;
     --branch)    REF_BRANCH="$2"; shift 2 ;;
     --tag)       REF_TAG="$2"; shift 2 ;;
-    --skip-setup) RUN_SETUP=false; shift ;;
     *)           die "unknown argument: $1" ;;
   esac
 done
@@ -128,21 +124,9 @@ fi
 export LOCO_HOME
 export LOCO_INSTALL
 
-if [ "$RUN_SETUP" = true ]; then
-  if [ -t 0 ] || { [ -r /dev/tty ] && [ -w /dev/tty ]; }; then
-    echo "==> running loco setup --default"
-    if [ -r /dev/tty ] && [ -w /dev/tty ]; then
-      "$LOCO_INSTALL/.venv/bin/loco" setup --default < /dev/tty || true
-    else
-      "$LOCO_INSTALL/.venv/bin/loco" setup --default || true
-    fi
-  else
-    echo "==> no TTY; run 'loco setup --default' when ready"
-  fi
-fi
-
 echo
 echo "loco-llm installed"
 echo "  data:    $LOCO_HOME"
 echo "  code:    $LOCO_INSTALL (ref: $target)"
-echo "next: loco doctor && loco config setup"
+echo "next: loco setup    # first-run wizard (runtime, model, config)"
+echo "      loco doctor   # verify environment"

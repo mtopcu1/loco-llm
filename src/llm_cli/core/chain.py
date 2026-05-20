@@ -1,4 +1,4 @@
-"""Orchestration for extended `llm setup` after settings are written."""
+"""Orchestration for `loco setup` onboarding chain."""
 from __future__ import annotations
 
 from typing import Any
@@ -202,8 +202,8 @@ def run_setup_chain() -> int:
     config_default = model_id is not None
     if not config_default:
         console.print(
-            "[dim]Tip:[/dim] pull a model first (`llm model pull <hf-url>`), "
-            "then run `llm config setup`."
+            "[dim]Tip:[/dim] pull a model first (`loco model pull <hf-url>`), "
+            "then run `loco config setup`."
         )
     if _confirm("Create a launch config now?", default=config_default):
         cid = _do_config_setup(
@@ -237,9 +237,9 @@ def run_setup_chain() -> int:
     append_history(state_base, {"action": "setup-chain", "steps": steps, "outcome": "ok"})
 
     if config_id and "serve" in steps:
-        console.print("\n[green]Tip:[/green] run `llm status` to inspect the server.")
+        console.print("\n[green]Tip:[/green] run `loco status` to inspect the server.")
     elif config_id:
-        console.print(f"\n[dim]Next:[/dim] llm serve {config_id}")
+        console.print(f"\n[dim]Next:[/dim] loco serve {config_id}")
 
     if _confirm("Install the web dashboard now?", default=False):
         try:
@@ -249,7 +249,7 @@ def run_setup_chain() -> int:
             if int(exc.exit_code or 1) != 0:
                 console.print(
                     "[yellow]Dashboard install failed; continuing setup. "
-                    "Run `llm dashboard install` to retry.[/yellow]"
+                    "Run `loco dashboard install` to retry.[/yellow]"
                 )
 
     return 0
