@@ -18,7 +18,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
       - uses: astral-sh/setup-uv@v3
-        with: { enable-cache: true }
+      - name: Set up Python
+        run: uv python install 3.11
       - run: uv venv && uv pip install -e ".[dev,dashboard]"
       - run: uv run pytest tests/webapi/ -m webapi -v
       - run: uv run pytest tests/unit/test_core_dashboard.py tests/unit/test_core_disk.py tests/unit/test_cli_dashboard.py -v
