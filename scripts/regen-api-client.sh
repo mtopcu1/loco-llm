@@ -19,7 +19,7 @@ if ! command -v npx >/dev/null 2>&1; then
   exit 2
 fi
 
-(cd dashboard && npx --yes openapi-typescript@7 "../$TMP_SCHEMA" -o "../$TMP_OUT")
+npx --yes openapi-typescript@7 "$TMP_SCHEMA" -o "$TMP_OUT"
 
 if [[ "${1:-}" == "--check" ]]; then
   if ! diff -u "$OUT" "$TMP_OUT" >/dev/null 2>&1; then
