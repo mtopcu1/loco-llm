@@ -16,6 +16,7 @@ from llm_cli.webapi.middleware import (
 )
 from llm_cli.webapi.routes import (
     configs,
+    disk,
     doctor,
     health,
     instance,
@@ -71,6 +72,7 @@ def create_app(
     api = FastAPI(title="api")
     install_exception_handlers(api)
     api.include_router(configs.router)
+    api.include_router(disk.router)
     api.include_router(doctor.router)
     api.include_router(health.router)
     api.include_router(instance.router)
