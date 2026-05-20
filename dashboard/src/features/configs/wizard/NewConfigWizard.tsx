@@ -1,6 +1,7 @@
-import { useReducer, useRef } from 'react'
+import { useReducer, useRef, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
+import type { ParamCell } from '@/lib/paramCell'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { WizardContext } from './WizardContext'
@@ -53,6 +54,27 @@ export function NewConfigWizard() {
     enabled: state.step === 4,
   })
 
+  const defaultParamsQuery = useQuery({
+    queryKey: ['runtimes', state.runtimeId, 'default-params', state.modelId],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/runtimes/{runtime_id}/default-params', {
+        params: {
+          path: { runtime_id: state.runtimeId! },
+          query: state.modelId ? { model_id: state.modelId } : {},
+        },
+      })
+      if (error) throw new Error('Failed to load default params')
+      return (data ?? []) as ParamCell[]
+    },
+    enabled: state.step === 3 && !!state.runtimeId,
+  })
+
+  useEffect(() => {
+    if (state.step === 3 && defaultParamsQuery.data && !state.params) {
+      dispatch({ type: 'setParams', params: defaultParamsQuery.data })
+    }
+  }, [state.step, defaultParamsQuery.data, state.params, dispatch])
+
   const idTaken =
     state.step === 4 &&
     state.configId.trim() !== '' &&
@@ -62,7 +84,7 @@ export function NewConfigWizard() {
     let working = state
 
     if (state.step === 3) {
-      const cells = paramsGridRef.current?.getCells()
+      const cells = paramsGridRef.current?.getCells() ?? state.params
       if (!cells?.length) {
         dispatch({ type: 'setValidationError', error: 'Load parameters before continuing.' })
         return
