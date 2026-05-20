@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import tempfile
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Union
 
@@ -194,3 +196,86 @@ def remove_entry(models_dir: Path, entry_id: str) -> bool:
     entries.pop(entry_id)
     write_registry(models_dir, entries)
     return True
+
+
+class ModelRegistryError(ValueError):
+    """Base error for model registry mutations."""
+
+
+class ModelNotFoundError(ModelRegistryError):
+    pass
+
+
+class ModelAlreadyRegisteredError(ModelRegistryError):
+    pass
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _symlink_or_copy(src: Path, dst: Path) -> None:
+    if dst.exists() or dst.is_symlink():
+        dst.unlink()
+    try:
+        os.symlink(src, dst)
+    except (OSError, NotImplementedError):
+        if src.is_dir():
+            shutil.copytree(src, dst)
+        else:
+            shutil.copy2(src, dst)
+
+
+def add_local(models_dir: Path, model_id: str, path: Path, fmt: str) -> RegistryEntry:
+    """Register pre-existing local weights under a model id."""
+    from llm_cli.core.model_resolve import build_artifact
+
+    if not path.exists():
+        raise ModelRegistryError(f"path does not exist: {path}")
+    if get_entry(models_dir, model_id) is not None:
+        raise ModelAlreadyRegisteredError(f"{model_id!r} already registered")
+
+    target = models_dir / model_id
+    target.mkdir(parents=True, exist_ok=True)
+
+    if fmt == "gguf":
+        if path.is_file():
+            _symlink_or_copy(path, target / path.name)
+        elif path.is_dir():
+            for entry in sorted(path.iterdir()):
+                if entry.suffix.lower() == ".gguf":
+                    _symlink_or_copy(entry, target / entry.name)
+        else:
+            raise ModelRegistryError(f"unsupported gguf path: {path}")
+    elif fmt == "safetensors-dir":
+        if not path.is_dir():
+            raise ModelRegistryError(f"safetensors-dir requires a directory: {path}")
+        if not (path / "config.json").is_file():
+            raise ModelRegistryError(f"safetensors-dir missing config.json: {path}")
+        for entry in sorted(path.iterdir()):
+            _symlink_or_copy(entry, target / entry.name)
+    else:
+        raise ModelRegistryError(f"unknown format {fmt!r}")
+
+    artifact = build_artifact(target, fmt)
+    entry = RegistryEntry(
+        id=model_id,
+        format=fmt,
+        source=LocalSource(original_path=str(path.resolve())),
+        artifact=artifact,
+        metadata=Metadata(display_name=model_id),
+        installed_at=_utc_now_iso(),
+    )
+    upsert_entry(models_dir, entry)
+    return entry
+
+
+def uninstall(models_dir: Path, model_id: str, *, purge: bool = False) -> None:
+    """Remove a registered model; optionally delete its on-disk directory."""
+    if get_entry(models_dir, model_id) is None:
+        raise ModelNotFoundError(f"unknown model {model_id!r}")
+    remove_entry(models_dir, model_id)
+    if purge:
+        target = models_dir / model_id
+        if target.exists():
+            shutil.rmtree(target)
