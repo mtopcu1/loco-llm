@@ -14,7 +14,16 @@ from llm_cli.webapi.middleware import (
     RequestIDMiddleware,
     SecurityHeadersMiddleware,
 )
-from llm_cli.webapi.routes import configs, doctor, health, instance, models, runtimes, version
+from llm_cli.webapi.routes import (
+    configs,
+    doctor,
+    health,
+    instance,
+    models,
+    runtimes,
+    settings,
+    version,
+)
 from llm_cli.webapi.static import mount_spa
 
 
@@ -67,6 +76,7 @@ def create_app(
     api.include_router(instance.router)
     api.include_router(models.router)
     api.include_router(runtimes.router)
+    api.include_router(settings.router)
     api.include_router(version.router)
     app.mount("/api", api)
 
