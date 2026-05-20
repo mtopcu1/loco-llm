@@ -1,8 +1,10 @@
 """`llm update` — pull the latest tag (or a chosen ref) into the git checkout."""
 from __future__ import annotations
 
+import json
 import re
 import shutil
+from dataclasses import asdict
 import subprocess
 from pathlib import Path
 
@@ -15,7 +17,7 @@ from llm_cli.core.lifecycle import read_running, state_root
 from llm_cli.core.lifecycle_status import service_is_running_for_settings
 from llm_cli.core.scaffold import scaffold_root
 from llm_cli.core.settings import load_settings, resolve
-from llm_cli.core.versions import current_cli_version
+from llm_cli.core.versions import check_for_update, current_cli_version
 
 console = Console()
 
@@ -209,6 +211,11 @@ def update(
         "--check",
         help="Report current vs. latest tag and exit 1 if behind. No changes.",
     ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Machine-readable output (only with --check).",
+    ),
     restart: bool = typer.Option(
         False,
         "--restart",
@@ -216,6 +223,9 @@ def update(
     ),
 ) -> None:
     """Pull the latest tagged release (or a chosen ref) into the local checkout."""
+    if json_output and not check:
+        console.print("[red]error:[/red] --json is only valid with --check.")
+        raise typer.Exit(code=1)
     if sum(bool(x) for x in (branch, tag, check)) > 1:
         console.print(
             "[red]error:[/red] --branch, --tag, and --check are mutually exclusive."
@@ -241,6 +251,10 @@ def update(
     state = _current_state(root)
 
     if check:
+        if json_output:
+            info = check_for_update()
+            typer.echo(json.dumps(asdict(info)))
+            raise typer.Exit(code=0 if not info.update_available else 1)
         latest = _latest_tag(root)
         if latest is None:
             console.print("[yellow]warning:[/yellow] no semver tags on origin.")

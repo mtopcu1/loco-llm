@@ -30,6 +30,7 @@ from llm_cli.webapi.routes import (
     recommendations,
     runtimes,
     settings,
+    update,
     version,
 )
 from llm_cli.webapi.static import mount_spa
@@ -92,6 +93,7 @@ def create_app(
     api.include_router(recommendations.router)
     api.include_router(runtimes.router)
     api.include_router(settings.router)
+    api.include_router(update.router)
     api.include_router(version.router)
     app.mount("/api", api)
 
