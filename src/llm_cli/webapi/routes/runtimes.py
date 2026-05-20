@@ -63,7 +63,7 @@ def list_runtimes():
                 kind=rt.kind,
                 installed=rec is not None,
                 installed_at=rec.installed_at if rec else None,
-                has_metrics=False,
+                has_metrics=bool(rt.raw.get("metrics")),
             )
         )
     return out

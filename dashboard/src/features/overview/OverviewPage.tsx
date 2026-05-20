@@ -26,11 +26,13 @@ export function OverviewPage() {
     },
   })
 
+  const running = overview.data?.instance.running ?? false
+  const metrics = useMetricsStream(running)
+
   if (overview.isPending) return <Skeleton className="h-96 w-full" />
   if (overview.isError) return <ErrorCard title="Failed to load" message={String(overview.error)} />
 
   const o = overview.data!
-  const metrics = useMetricsStream(o.instance.running)
 
   const liveTps =
     metrics.latest && typeof metrics.latest.tps_decode === 'number'

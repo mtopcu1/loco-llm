@@ -56,3 +56,48 @@ def test_get_runtime_detail_404_when_missing(test_client):
     r = test_client.get("/api/runtimes/does-not-exist", headers={"Host": "testserver"})
     assert r.status_code == 404
     assert r.json()["error"]["code"] == "RUNTIME_NOT_FOUND"
+
+
+@pytest.mark.webapi
+def test_list_runtimes_has_metrics_from_manifest(test_client, webapi_repo, seed_runtime):
+    del webapi_repo
+    seed_runtime("with-metrics", kind="official")
+    seed_runtime("without-metrics", kind="official")
+
+    from llm_cli.core.settings import resolve_settings
+
+    settings = resolve_settings()
+    repo = settings.repo_root
+    assert repo is not None
+    (repo / "runtimes" / "with-metrics" / "manifest.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "id": "with-metrics",
+                "display_name": "with-metrics",
+                "kind": "official",
+                "accepts_formats": [],
+                "metrics": {"endpoint": "/metrics", "fields": {}},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    (repo / "runtimes" / "without-metrics" / "manifest.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "id": "without-metrics",
+                "display_name": "without-metrics",
+                "kind": "official",
+                "accepts_formats": [],
+                "metrics": None,
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    r = test_client.get("/api/runtimes", headers={"Host": "testserver"})
+    assert r.status_code == 200
+    by_id = {rt["id"]: rt["has_metrics"] for rt in r.json()}
+    assert by_id["with-metrics"] is True
+    assert by_id["without-metrics"] is False
