@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.0](https://github.com/mtopcu1/loco-llm/compare/v1.3.0...v1.4.0) (2026-05-20)
+
+
+### Features
+
+* **install:** adopt hermes ~/.loco layout and loco CLI ([9564abf](https://github.com/mtopcu1/loco-llm/commit/9564abf2353c436d90b074b42f11ad2ec4af5872))
+* **install:** hermes ~/.loco layout, loco CLI, and setup UX ([8a0519a](https://github.com/mtopcu1/loco-llm/commit/8a0519a31d16ed72661433c60998faef971360aa))
+
+
+### Bug Fixes
+
+* **cli:** setup and update ux from interactive audit ([54076c9](https://github.com/mtopcu1/loco-llm/commit/54076c91394e7427c218ccc74e2338fca7ba84e8))
+* repair config discovery and ci test fixtures for hermes layout ([101ac01](https://github.com/mtopcu1/loco-llm/commit/101ac01fa2fd4f3310d44c69ead0052adb21a059))
+* **tests:** align integration tests with hermes data/configs layout ([4682048](https://github.com/mtopcu1/loco-llm/commit/4682048a5bd07cb9e1ea0fe5cb8670672b0e2dc5))
+
 ## [1.3.0](https://github.com/mtopcu1/loco-llm/compare/v1.2.0...v1.3.0) (2026-05-20)
 
 
