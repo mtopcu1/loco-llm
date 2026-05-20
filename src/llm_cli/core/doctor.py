@@ -215,7 +215,49 @@ def _dashboard_scope_checks() -> list[ScopeCheckResult]:
     return results
 
 
+def _requirement_results_to_scope_checks(
+    results: list[RequirementResult],
+) -> list[ScopeCheckResult]:
+    mapped: list[ScopeCheckResult] = []
+    for result in results:
+        if result.status == CheckStatus.OK:
+            status = "ok"
+        elif result.status in (CheckStatus.OUTDATED, CheckStatus.UNKNOWN):
+            status = "warning"
+        else:
+            status = "error"
+
+        message_bits: list[str] = []
+        if result.detected_version:
+            message_bits.append(f"detected={result.detected_version}")
+        if result.detail:
+            message_bits.append(result.detail)
+        if not message_bits:
+            message_bits.append("ok")
+
+        mapped.append(
+            ScopeCheckResult(
+                name=result.requirement.id,
+                status=status,
+                message="; ".join(message_bits),
+            )
+        )
+    return mapped
+
+
 def run_scope(scope: str) -> list[ScopeCheckResult]:
+    from llm_cli.core.scaffold import scaffold_root
+    from llm_cli.core.settings import load_settings, resolve
+
+    if scope == "default":
+        reqs = [req for req in load_requirements(scaffold_root() / "requirements.yaml") if req.scope is None]
+        return _requirement_results_to_scope_checks(check_all(reqs))
+    if scope == "runtime":
+        settings = resolve(load_settings())
+        reqs = requirements_for_all_runtimes(
+            scaffold_root(), settings.runtimes_dir, installed_only=True
+        )
+        return _requirement_results_to_scope_checks(check_all(reqs))
     if scope == "dashboard":
         return _dashboard_scope_checks()
     raise ValueError(f"unknown doctor scope: {scope}")

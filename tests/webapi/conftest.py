@@ -39,6 +39,7 @@ def webapi_repo(tmp_path):
     repo_root.mkdir(parents=True, exist_ok=True)
     for dirname in ("runtimes", "configs", "benchmarks", "state"):
         (repo_root / dirname).mkdir(parents=True, exist_ok=True)
+    (repo_root / "requirements.yaml").write_text("[]\n", encoding="utf-8")
 
     data_root = tmp_path / "data"
     save_settings({"data_root": str(data_root), "repo_root": str(repo_root)})
