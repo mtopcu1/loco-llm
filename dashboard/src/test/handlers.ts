@@ -143,4 +143,40 @@ export const handlers = [
   http.get('http://localhost/api/disk', () => HttpResponse.json(diskPayload)),
   http.get('http://localhost/api/history', () => HttpResponse.json(historyPayload)),
   http.get('http://localhost/api/settings', () => HttpResponse.json(settingsPayload)),
+  http.get('http://localhost/api/jobs', () => HttpResponse.json([])),
+  http.get('http://localhost/api/jobs/:id', ({ params }) =>
+    HttpResponse.json({
+      id: params.id,
+      kind: 'runtime_install',
+      status: 'running',
+      created_at: '2026-01-01T00:00:00Z',
+      context: { runtime_id: 'vllm' },
+    }),
+  ),
+  http.post('http://localhost/api/jobs/:id/cancel', () =>
+    HttpResponse.json({ cancelled: true }),
+  ),
+  http.post('http://localhost/api/runtimes/:id/install', () =>
+    HttpResponse.json({ job_id: 'job-install' }),
+  ),
+  http.post('http://localhost/api/runtimes/:id/rebuild', () =>
+    HttpResponse.json({ job_id: 'job-rebuild' }),
+  ),
+  http.delete('http://localhost/api/runtimes/:id', () => HttpResponse.json({ ok: true })),
+  http.post('http://localhost/api/models/pull', () =>
+    HttpResponse.json({ job_id: 'job-pull' }),
+  ),
+  http.post('http://localhost/api/models/add', () => HttpResponse.json({ ok: true })),
+  http.delete('http://localhost/api/models/:id', () => HttpResponse.json({ ok: true })),
+  http.post('http://localhost/api/configs', () => HttpResponse.json({ id: 'new-cfg' })),
+  http.put('http://localhost/api/configs/:id', () => HttpResponse.json({ id: 'default' })),
+  http.delete('http://localhost/api/configs/:id', () => HttpResponse.json({ ok: true })),
+  http.post('http://localhost/api/instance/start', () =>
+    HttpResponse.json({ job_id: 'job-start' }),
+  ),
+  http.post('http://localhost/api/instance/stop', () => HttpResponse.json({ ok: true })),
+  http.post('http://localhost/api/instance/switch', () =>
+    HttpResponse.json({ job_id: 'job-switch' }),
+  ),
+  http.put('http://localhost/api/settings/:key', () => HttpResponse.json(settingsPayload)),
 ]

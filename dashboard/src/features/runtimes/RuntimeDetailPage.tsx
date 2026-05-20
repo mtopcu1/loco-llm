@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from '@tanstack/react-router'
 import { api } from '@/api/client'
 import { ErrorCard } from '@/components/ErrorCard'
+import { RuntimeActions } from '@/features/runtimes/RuntimeActions'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
@@ -31,6 +32,13 @@ export function RuntimeDetailPage() {
         </Link>
         <h1 className="text-2xl font-semibold font-mono mt-1">{rt.id}</h1>
         <p className="text-sm text-zinc-500">{rt.kind}</p>
+        <div className="mt-3">
+          <RuntimeActions
+            runtimeId={rt.id}
+            installed={!!rt.install_record}
+            size="sm"
+          />
+        </div>
       </div>
 
       <Tabs defaultValue="manifest">
