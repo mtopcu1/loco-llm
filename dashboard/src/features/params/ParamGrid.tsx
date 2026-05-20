@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -29,17 +29,34 @@ export interface ParamGridProps {
   saving?: boolean
 }
 
-export function ParamGrid({
-  cells,
-  recommendations,
-  onSave,
-  mode = 'edit',
-  saveErrors,
-  saving = false,
-}: ParamGridProps) {
+export interface ParamGridHandle {
+  getCells: () => ParamCell[]
+  applyAllSuggestions: (recs: Recommendation[]) => void
+}
+
+export const ParamGrid = forwardRef<ParamGridHandle, ParamGridProps>(function ParamGrid(
+  {
+    cells,
+    recommendations,
+    onSave,
+    mode = 'edit',
+    saveErrors,
+    saving = false,
+  },
+  ref,
+) {
   const readOnly = mode === 'review'
   const filterRef = useRef<HTMLInputElement>(null)
   const grid = useParamGridState(cells)
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      getCells: () => grid.cells,
+      applyAllSuggestions: (recs: Recommendation[]) => grid.applyAllSuggestions(recs),
+    }),
+    [grid],
+  )
 
   useEffect(() => {
     grid.replaceAll(cells)
@@ -185,4 +202,4 @@ export function ParamGrid({
       </Table>
     </div>
   )
-}
+})
