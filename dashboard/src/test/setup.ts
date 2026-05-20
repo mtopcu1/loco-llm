@@ -12,11 +12,34 @@ class MockEventSource {
   onopen: ((ev: Event) => void) | null = null
   onmessage: ((ev: MessageEvent) => void) | null = null
   onerror: ((ev: Event) => void) | null = null
+  private listeners = new Map<string, Array<(ev: MessageEvent) => void>>()
 
   constructor(url: string) {
     this.url = url
     MockEventSource.instances.push(this)
-    queueMicrotask(() => this.onopen?.(new Event('open')))
+    queueMicrotask(() => {
+      this.onopen?.(new Event('open'))
+      if (url.includes('/jobs/') && url.includes('/stream')) {
+        this.emit('snapshot', { status: 'running', kind: 'runtime_install' })
+      }
+    })
+  }
+
+  addEventListener(type: string, handler: (ev: MessageEvent) => void) {
+    const list = this.listeners.get(type) ?? []
+    list.push(handler)
+    this.listeners.set(type, list)
+  }
+
+  emit(type: string, payload: unknown) {
+    const ev = { data: JSON.stringify(payload) } as MessageEvent
+    if (type === 'message') {
+      this.onmessage?.(ev)
+      return
+    }
+    for (const handler of this.listeners.get(type) ?? []) {
+      handler(ev)
+    }
   }
 
   close() {}
