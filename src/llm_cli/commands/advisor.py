@@ -110,6 +110,9 @@ def do_advisor(
     else:
         _render_text(runtime_id, model_id, specs, recs)
 
+    if not recs:
+        return 1
+
     append_history(
         state_root(settings),
         {
