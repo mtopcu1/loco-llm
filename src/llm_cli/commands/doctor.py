@@ -12,6 +12,7 @@ from llm_cli.core.doctor import (
     CheckStatus,
     check_all,
     load_requirements,
+    run_scope,
     run_quick_checks,
     systemd_linger_advisory,
 )
@@ -90,6 +91,11 @@ def doctor(
         "--quick",
         help="Fast checks only (settings, scaffold dir, requirements.yaml).",
     ),
+    scope: str | None = typer.Option(
+        None,
+        "--scope",
+        help="Run a specialized doctor scope (currently: dashboard).",
+    ),
 ) -> None:
     """Run requirement checks: universal + runtime-scoped extras."""
     if ctx.invoked_subcommand is not None:
@@ -103,6 +109,36 @@ def doctor(
             return
         console.print(f"[red]error:[/red] {detail}")
         raise typer.Exit(code=1)
+
+    if scope is not None:
+        if scope != "dashboard":
+            console.print(f"[red]error:[/red] unknown scope {scope!r} (supported: dashboard)")
+            raise typer.Exit(code=1)
+        results = run_scope(scope)
+        table = Table(title=f"Doctor Scope: {scope}")
+        table.add_column("Check", no_wrap=True)
+        table.add_column("Status")
+        table.add_column("Detail", overflow="fold")
+        bad = 0
+        for result in results:
+            status = result.status
+            style = {
+                "ok": "green",
+                "info": "cyan",
+                "warning": "yellow",
+                "error": "red",
+            }.get(status, "white")
+            if status == "error":
+                bad += 1
+            table.add_row(
+                result.name,
+                f"[{style}]{status}[/{style}]",
+                result.message,
+            )
+        console.print(table)
+        if bad:
+            raise typer.Exit(code=1)
+        return
 
     repo = scaffold_root()
     universal = load_requirements(_requirements_yaml(repo))
@@ -194,13 +230,20 @@ def render_requirements() -> None:
     )
 
     repo = scaffold_root()
-    universal = load_requirements(_requirements_yaml(repo))
+    all_reqs = load_requirements(_requirements_yaml(repo))
+    universal: list = []
+    by_scope: dict[str, list] = {}
+    for req in all_reqs:
+        if req.scope:
+            by_scope.setdefault(str(req.scope), []).append(req)
+        else:
+            universal.append(req)
     by_runtime: dict[str, list] = {}
     for mf in _registry.load_runtime_manifests_merged():
         reqs = requirements_for_runtime(repo, mf.id, build_params={})
         if reqs:
             by_runtime[mf.id] = reqs
-    md = render_requirements_md_grouped(universal, by_runtime)
+    md = render_requirements_md_grouped(universal, by_runtime, by_scope=by_scope)
     out = repo / "requirements.md"
     out.write_text(md, encoding="utf-8")
     console.print(f"[green]wrote[/green] {out}")

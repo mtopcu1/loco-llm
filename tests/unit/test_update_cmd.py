@@ -195,3 +195,41 @@ def test_update_refuses_unmanaged_directory(tmp_path, monkeypatch):
     result = runner.invoke(app, ["update"])
     assert result.exit_code != 0
     assert "not a managed install" in result.stdout.lower()
+
+
+def test_update_rebuilds_dashboard_if_installed(monkeypatch):
+    called = {"install": False}
+    monkeypatch.setattr(
+        "llm_cli.core.dashboard.load_installed_record",
+        lambda: type("R", (), {"cli_version": "0.9.0"})(),
+    )
+    monkeypatch.setattr("llm_cli.commands.update_cmd.current_cli_version", lambda: "1.1.0")
+
+    def fake_install(**kwargs):
+        called["install"] = True
+        return type(
+            "R",
+            (),
+            {"cli_version": "1.1.0", "node_version": "20", "npm_version": "10"},
+        )()
+
+    monkeypatch.setattr("llm_cli.core.dashboard.run_install", fake_install)
+    monkeypatch.setattr("llm_cli.commands.update_cmd.shutil.which", lambda cmd: f"/usr/bin/{cmd}")
+
+    from llm_cli.commands.update_cmd import _post_update_hooks
+
+    _post_update_hooks()
+    assert called["install"] is True
+
+
+def test_update_skips_dashboard_rebuild_if_node_missing(monkeypatch):
+    monkeypatch.setattr(
+        "llm_cli.core.dashboard.load_installed_record",
+        lambda: type("R", (), {"cli_version": "0.9.0"})(),
+    )
+    monkeypatch.setattr("llm_cli.commands.update_cmd.current_cli_version", lambda: "1.1.0")
+    monkeypatch.setattr("llm_cli.commands.update_cmd.shutil.which", lambda _cmd: None)
+
+    from llm_cli.commands.update_cmd import _post_update_hooks
+
+    _post_update_hooks()

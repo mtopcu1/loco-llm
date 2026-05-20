@@ -15,6 +15,7 @@ from llm_cli.core.lifecycle import read_running, state_root
 from llm_cli.core.lifecycle_status import service_is_running_for_settings
 from llm_cli.core.scaffold import scaffold_root
 from llm_cli.core.settings import load_settings, resolve
+from llm_cli.core.versions import current_cli_version
 
 console = Console()
 
@@ -159,6 +160,39 @@ def _restore_service(saved) -> None:
     )
 
 
+def _post_update_hooks() -> None:
+    """Run best-effort post-update hooks."""
+    from llm_cli.core import dashboard as dash
+
+    try:
+        record = dash.load_installed_record()
+    except RuntimeError:
+        return
+    if record is None:
+        return
+
+    cli_version = current_cli_version()
+    if record.cli_version == cli_version:
+        return
+    if not shutil.which("node") or not shutil.which("npm"):
+        console.print(
+            "[yellow]warning:[/yellow] dashboard is installed but node/npm not found; "
+            "skipping rebuild. Run `llm dashboard install` after installing Node 20+."
+        )
+        return
+
+    try:
+        dash.run_install(
+            cli_version=cli_version,
+            skip_python=False,
+            skip_frontend=False,
+            reset=False,
+        )
+        console.print("[green]dashboard rebuilt to match updated CLI version.[/green]")
+    except Exception as exc:  # noqa: BLE001
+        console.print(f"[yellow]warning:[/yellow] dashboard rebuild failed: {exc}")
+
+
 def update(
     branch: str | None = typer.Option(
         None,
@@ -227,6 +261,7 @@ def update(
         _ff_pull(root, branch)
         _sync_deps(root)
         _restore_service(saved)
+        _post_update_hooks()
         console.print(
             f"[yellow]you are now on branch {branch} — not a stable release.[/yellow] "
             "Run `llm update` to return to the latest stable tag."
@@ -241,6 +276,7 @@ def update(
         _checkout(root, tag)
         _sync_deps(root)
         _restore_service(saved)
+        _post_update_hooks()
         console.print(f"[green]pinned to {tag}.[/green]")
         return
 
@@ -268,4 +304,5 @@ def update(
     _checkout(root, latest)
     _sync_deps(root)
     _restore_service(saved)
+    _post_update_hooks()
     console.print(f"[green]updated to {latest}.[/green]")

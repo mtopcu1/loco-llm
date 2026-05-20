@@ -19,6 +19,7 @@ from llm_cli.commands.advisor import advisor as advisor_cmd
 from llm_cli.commands.doctor import doctor_app
 from llm_cli.commands.settings_cmd import settings_app
 from llm_cli.commands.update_cmd import update as update_cmd
+from llm_cli.commands.dashboard_cmd import app as dashboard_app
 
 app = typer.Typer(
     name="llm",
@@ -97,6 +98,7 @@ app.command(
     help="List discovered runtimes, models, configs, and benchmarks.",
 )(list_cmd.list_entities)
 app.add_typer(config_cmd.config_app, name="config")
+app.add_typer(dashboard_app, name="dashboard")
 
 app.command(
     "advisor",

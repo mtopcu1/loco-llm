@@ -1,0 +1,117 @@
+import { createRouter, createRootRoute, createRoute, Outlet } from '@tanstack/react-router'
+import { Layout } from '@/components/Layout'
+import { OverviewPage } from '@/features/overview/OverviewPage'
+import { RuntimesPage } from '@/features/runtimes/RuntimesPage'
+import { RuntimeDetailPage } from '@/features/runtimes/RuntimeDetailPage'
+import { ModelsPage } from '@/features/models/ModelsPage'
+import { ModelDetailPage } from '@/features/models/ModelDetailPage'
+import { ConfigsPage } from '@/features/configs/ConfigsPage'
+import { ConfigDetailPage } from '@/features/configs/ConfigDetailPage'
+import { InstancePage } from '@/features/instance/InstancePage'
+import { DoctorPage } from '@/features/doctor/DoctorPage'
+import { DiskPage } from '@/features/disk/DiskPage'
+import { HistoryPage } from '@/features/history/HistoryPage'
+import { SettingsPage } from '@/features/settings/SettingsPage'
+
+const rootRoute = createRootRoute({
+  component: () => (
+    <Layout>
+      <Outlet />
+    </Layout>
+  ),
+})
+
+const overviewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/',
+  component: OverviewPage,
+})
+
+const runtimesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/runtimes',
+  component: RuntimesPage,
+})
+
+const runtimeDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/runtimes/$id',
+  component: RuntimeDetailPage,
+})
+
+const modelsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/models',
+  component: ModelsPage,
+})
+
+const modelDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/models/$id',
+  component: ModelDetailPage,
+})
+
+const configsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/configs',
+  component: ConfigsPage,
+})
+
+const configDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/configs/$id',
+  component: ConfigDetailPage,
+})
+
+const instanceRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/instance',
+  component: InstancePage,
+})
+
+const doctorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/doctor',
+  component: DoctorPage,
+})
+
+const diskRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/disk',
+  component: DiskPage,
+})
+
+const historyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/history',
+  component: HistoryPage,
+})
+
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/settings',
+  component: SettingsPage,
+})
+
+const routeTree = rootRoute.addChildren([
+  overviewRoute,
+  runtimesRoute,
+  runtimeDetailRoute,
+  modelsRoute,
+  modelDetailRoute,
+  configsRoute,
+  configDetailRoute,
+  instanceRoute,
+  doctorRoute,
+  diskRoute,
+  historyRoute,
+  settingsRoute,
+])
+
+export const router = createRouter({ routeTree })
+
+declare module '@tanstack/react-router' {
+  interface Register {
+    router: typeof router
+  }
+}

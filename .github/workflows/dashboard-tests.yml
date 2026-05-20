@@ -1,0 +1,29 @@
+name: dashboard-tests
+on:
+  pull_request:
+    paths:
+      - 'dashboard/**'
+      - 'src/llm_cli/webapi/**'
+      - 'src/llm_cli/core/dashboard.py'
+      - 'src/llm_cli/core/disk.py'
+      - 'src/llm_cli/commands/dashboard_cmd.py'
+      - 'pyproject.toml'
+      - '.github/workflows/dashboard-tests.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - uses: astral-sh/setup-uv@v3
+      - name: Set up Python
+        run: uv python install 3.11
+      - run: uv venv && uv pip install -e ".[dev,dashboard]"
+      - run: uv run pytest tests/webapi/ -m webapi -v
+      - run: uv run pytest tests/unit/test_core_dashboard.py tests/unit/test_core_disk.py tests/unit/test_cli_dashboard.py -v
+      - run: cd dashboard && npm ci
+      - run: cd dashboard && npm run typecheck
+      - run: cd dashboard && npm run test
+      - run: cd dashboard && npm run build

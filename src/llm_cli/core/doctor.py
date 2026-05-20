@@ -36,6 +36,7 @@ class Requirement:
     version_regex: str
     min_version: str | None
     install_hint: str
+    scope: str | None = None
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,13 @@ class RequirementResult:
     status: CheckStatus
     detected_version: str | None = None
     detail: str = ""
+
+
+@dataclass(frozen=True)
+class ScopeCheckResult:
+    name: str
+    status: str
+    message: str
 
 
 def load_requirements(path: Path) -> list[Requirement]:
@@ -68,6 +76,7 @@ def load_requirements(path: Path) -> list[Requirement]:
                 version_regex=str(verify["version_regex"]),
                 min_version=verify.get("min"),
                 install_hint=str(entry.get("install_hint", "")),
+                scope=entry.get("scope"),
             )
         )
     return out
@@ -125,6 +134,133 @@ def check_all(
     run_command: RunCommand = _real_run_command,
 ) -> list[RequirementResult]:
     return [check_requirement(r, run_command=run_command) for r in requirements]
+
+
+def _dashboard_scope_checks() -> list[ScopeCheckResult]:
+    from llm_cli.core import dashboard as dash
+    from llm_cli.core.versions import current_cli_version
+    import shutil
+
+    results: list[ScopeCheckResult] = []
+    node = shutil.which("node")
+    npm = shutil.which("npm")
+    record = dash.load_installed_record()
+
+    results.append(
+        ScopeCheckResult(
+            name="node",
+            status="error" if (node is None and record is not None) else "info" if node is None else "ok",
+            message="Node.js not found (install Node 20+)" if node is None else f"Found at {node}",
+        )
+    )
+    results.append(
+        ScopeCheckResult(
+            name="npm",
+            status="error" if (npm is None and record is not None) else "info" if npm is None else "ok",
+            message="npm not found" if npm is None else f"Found at {npm}",
+        )
+    )
+    results.append(
+        ScopeCheckResult(
+            name="dashboard installed",
+            status="info" if record is None else "ok",
+            message=(
+                "Not installed (run `llm dashboard install`)"
+                if record is None
+                else f"Installed for CLI {record.cli_version} at {record.installed_at}"
+            ),
+        )
+    )
+    if record is not None:
+        cur = current_cli_version()
+        results.append(
+            ScopeCheckResult(
+                name="dashboard version matches CLI",
+                status="ok" if record.cli_version == cur else "error",
+                message=(
+                    "Match"
+                    if record.cli_version == cur
+                    else f"Built for CLI {record.cli_version}, current is {cur}. "
+                    "Run `llm dashboard install --reset`."
+                ),
+            )
+        )
+        verdict, reason = dash.verify_installed(cur)
+        results.append(
+            ScopeCheckResult(
+                name="dashboard dist integrity",
+                status="ok" if verdict == "ok" else "warning",
+                message="OK" if verdict == "ok" else f"{verdict}: {reason}",
+            )
+        )
+
+    try:
+        pid = dash.read_server_pid()
+    except RuntimeError:
+        pid = None
+    if pid is not None:
+        alive = dash.is_server_alive(pid)
+        results.append(
+            ScopeCheckResult(
+                name="dashboard server pid alive",
+                status="ok" if alive else "warning",
+                message=(
+                    f"pid={pid} alive"
+                    if alive
+                    else f"Stale pid file (pid={pid}); run `llm dashboard stop`."
+                ),
+            )
+        )
+
+    return results
+
+
+def _requirement_results_to_scope_checks(
+    results: list[RequirementResult],
+) -> list[ScopeCheckResult]:
+    mapped: list[ScopeCheckResult] = []
+    for result in results:
+        if result.status == CheckStatus.OK:
+            status = "ok"
+        elif result.status in (CheckStatus.OUTDATED, CheckStatus.UNKNOWN):
+            status = "warning"
+        else:
+            status = "error"
+
+        message_bits: list[str] = []
+        if result.detected_version:
+            message_bits.append(f"detected={result.detected_version}")
+        if result.detail:
+            message_bits.append(result.detail)
+        if not message_bits:
+            message_bits.append("ok")
+
+        mapped.append(
+            ScopeCheckResult(
+                name=result.requirement.id,
+                status=status,
+                message="; ".join(message_bits),
+            )
+        )
+    return mapped
+
+
+def run_scope(scope: str) -> list[ScopeCheckResult]:
+    from llm_cli.core.scaffold import scaffold_root
+    from llm_cli.core.settings import load_settings, resolve
+
+    if scope == "default":
+        reqs = [req for req in load_requirements(scaffold_root() / "requirements.yaml") if req.scope is None]
+        return _requirement_results_to_scope_checks(check_all(reqs))
+    if scope == "runtime":
+        settings = resolve(load_settings())
+        reqs = requirements_for_all_runtimes(
+            scaffold_root(), settings.runtimes_dir, installed_only=True
+        )
+        return _requirement_results_to_scope_checks(check_all(reqs))
+    if scope == "dashboard":
+        return _dashboard_scope_checks()
+    raise ValueError(f"unknown doctor scope: {scope}")
 
 
 def _req_from_entry(entry: dict[str, Any], owner: str) -> Requirement | None:
@@ -285,11 +421,17 @@ def run_quick_checks() -> tuple[bool, str]:
 
 
 def render_requirements_md_grouped(
-    universal: list[Requirement], by_runtime: dict[str, list[Requirement]]
+    universal: list[Requirement],
+    by_runtime: dict[str, list[Requirement]],
+    *,
+    by_scope: dict[str, list[Requirement]] | None = None,
 ) -> str:
-    """Render universal requirements plus one table per runtime."""
+    """Render universal requirements plus optional scope and per-runtime sections."""
     lines: list[str] = [_REQ_HEADER.rstrip(), "", "## Universal", ""]
     lines.extend(_render_table(universal))
+    for scope_id in sorted(by_scope or {}):
+        lines.extend(["", f"## Scope: {scope_id}", ""])
+        lines.extend(_render_table(by_scope[scope_id]))
     for runtime_id in sorted(by_runtime):
         lines.extend(["", f"## Runtime: {runtime_id}", ""])
         lines.extend(_render_table(by_runtime[runtime_id]))

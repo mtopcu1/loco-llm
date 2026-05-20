@@ -1,0 +1,94 @@
+import { useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { api } from '@/api/client'
+import { Plan2Button } from '@/components/Plan2Button'
+import { ErrorCard } from '@/components/ErrorCard'
+import { StatusPill } from '@/components/StatusPill'
+import { Card } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useSSE } from '@/hooks/useSSE'
+import { LogsView } from './LogsView'
+
+type InstanceState = { running: boolean; config_id?: string; mode?: string }
+
+export function InstancePage() {
+  const queryClient = useQueryClient()
+  const instance = useQuery({
+    queryKey: ['instance'],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/instance')
+      if (error) throw new Error('Failed to load instance')
+      return data as InstanceState
+    },
+  })
+
+  const stream = useSSE<InstanceState>({
+    url: '/api/instance/stream',
+    enabled: true,
+  })
+
+  useEffect(() => {
+    if (stream.event) {
+      queryClient.setQueryData(['instance'], stream.event)
+    }
+  }, [stream.event, queryClient])
+
+  if (instance.isPending) return <Skeleton className="h-64 w-full" />
+  if (instance.isError) return <ErrorCard title="Failed to load instance" message={String(instance.error)} />
+
+  const state = (stream.event ?? instance.data)! as InstanceState
+
+  if (!state.running) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold">Instance</h1>
+        <Card className="p-6">
+          <p className="text-zinc-600">
+            Nothing is running. Start a config from the CLI (<code className="font-mono text-sm">llm serve &lt;config&gt;</code>)
+            — start/stop controls arrive in Plan 2.
+          </p>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Instance</h1>
+        <StatusPill instance={state} />
+      </div>
+
+      <Card className="p-4">
+        <dl className="text-sm space-y-2">
+          <div className="flex gap-4">
+            <dt className="font-mono text-zinc-500 w-32">config</dt>
+            <dd>{state.config_id}</dd>
+          </div>
+          <div className="flex gap-4">
+            <dt className="font-mono text-zinc-500 w-32">mode</dt>
+            <dd>{state.mode ?? '—'}</dd>
+          </div>
+        </dl>
+      </Card>
+
+      <Tabs defaultValue="logs">
+        <TabsList>
+          <TabsTrigger value="logs">Logs</TabsTrigger>
+          <TabsTrigger value="metrics">Metrics</TabsTrigger>
+          <TabsTrigger value="switch">Switch</TabsTrigger>
+        </TabsList>
+        <TabsContent value="logs">
+          <LogsView enabled={state.running} />
+        </TabsContent>
+        <TabsContent value="metrics">
+          <p className="text-zinc-500 text-sm">Live metrics arrive in Plan 4.</p>
+        </TabsContent>
+        <TabsContent value="switch">
+          <Plan2Button>Switch config</Plan2Button>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
