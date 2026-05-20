@@ -28,8 +28,8 @@ llm dashboard serve --port 8000        # custom port
 llm dashboard serve --no-open          # don't open browser
 ```
 
-Server binds to `127.0.0.1` by default. Non-localhost binding will require a
-`--insecure` flag (planned for a later release; currently refused).
+Server binds to `127.0.0.1` by default. To bind on a LAN or tailnet address,
+use the full insecure flow (see [Security](#security) below).
 
 ## Status / stop / uninstall
 
@@ -47,22 +47,37 @@ llm doctor dashboard
 ```
 
 Checks Node/npm availability, dashboard install state, dist integrity, server
-PID liveness.
+PID liveness, and whether the last startup used `--insecure`.
 
 ## Update
 
 When you run `llm update` and the dashboard is installed, it will be rebuilt
-automatically (best-effort; skipped if node/npm are unavailable).
+automatically (best-effort; skipped if node/npm are unavailable). The dashboard
+header also shows an **Update available** badge when a newer CLI release exists;
+click it to run `llm update --restart` from the UI.
 
-## Limitations of this release
+## Security
 
-This is the read-only release. The following arrive in subsequent releases:
+The dashboard has **no authentication** and defaults to **localhost-only**
+binding. That is intentional: any process on your machine can already invoke
+`llm` directly.
 
-- Mutations (create/edit/delete configs, install/uninstall runtimes, pull
-  models, start/stop instances) — next release
-- React param grid + new-config wizard
-- Live metrics charts
-- `--insecure` for LAN binding, with appropriate warnings
+If you must expose the dashboard beyond loopback, you need all three flags:
+
+```bash
+llm dashboard serve --insecure --i-understand \
+  --host <bind-address> \
+  --allowed-host <host:port> [--allowed-host ...]
+```
+
+The UI shows a persistent red banner when the server is started this way.
+`llm doctor dashboard` warns if the last `server.log` startup used
+`--insecure`.
+
+Read the full threat model, DNS rebinding defense, and safer alternatives
+(SSH port-forward, Tailscale, reverse proxy) in
+[`DASHBOARD-SECURITY.md`](DASHBOARD-SECURITY.md). The same doc is served at
+`/docs/dashboard-security` while the dashboard is running.
 
 For the full design, see
 [`docs/superpowers/specs/2026-05-20-web-dashboard-design.md`](superpowers/specs/2026-05-20-web-dashboard-design.md).

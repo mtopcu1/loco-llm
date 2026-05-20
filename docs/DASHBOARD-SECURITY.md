@@ -39,6 +39,8 @@ None of that is theoretical. Localhost-only means "any process that can
 ask the kernel to dial `127.0.0.1` has already proven it's running on
 this machine, which is the threshold for trusting it with any of this."
 
+<a id="risks"></a>
+
 ## The four risks of `--insecure`
 
 1. **No authentication.** Anyone on the bound interface can perform
@@ -89,6 +91,8 @@ allow-list, even from `127.0.0.1`.
 
 This is why `--insecure` requires `--allowed-host` — the allow-list is
 the source of truth for which hosts are legitimate.
+
+<a id="lockdown"></a>
 
 ## Self-audit checklist
 

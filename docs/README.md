@@ -12,7 +12,8 @@ Machine-local settings live at `~/.config/llm/config.yaml` and are managed with
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Install root, distribution, CLI layers |
 | [`DEVELOPMENT.md`](DEVELOPMENT.md) | Git clone + uv dev loop |
 | [`CI.md`](CI.md) | `ci.yml` + `release-please.yml`, branch protection |
-| [`DASHBOARD.md`](DASHBOARD.md) | Web dashboard install, serve, and limitations |
+| [`DASHBOARD.md`](DASHBOARD.md) | Web dashboard install, serve, and security |
+| [`DASHBOARD-SECURITY.md`](DASHBOARD-SECURITY.md) | Threat model, `--insecure` risks, safer remote access |
 | [`RELEASE_SETUP.md`](RELEASE_SETUP.md) | One-time GitHub Actions / protection setup |
 | [`wsl-setup.md`](wsl-setup.md) | One-time WSL2 + systemd + CUDA driver setup |
 | [`repo-conventions.md`](repo-conventions.md) | Layout, settings/config split, discovery, and commit boundaries |
