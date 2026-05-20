@@ -1,4 +1,4 @@
-"""`llm setup` — first-run interactive configurator."""
+"""`llm setup` — configure the data home (Hermes-style; paths seeded by install.sh)."""
 from __future__ import annotations
 
 import os
@@ -7,7 +7,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from llm_cli.core.scaffold import scaffold_root
+from llm_cli.core.scaffold import install_root, seed_configs_from_install
 from llm_cli.core.settings import (
     KEY_REGISTRY,
     ensure_data_dirs,
@@ -25,10 +25,11 @@ def _path_display(path: Path) -> str:
 
 
 def _default_data_root() -> str:
-    raw = os.environ.get(
-        "LLM_DEFAULT_DATA_ROOT", KEY_REGISTRY["data_root"]["default"]
-    )
-    return _path_display(Path(raw))
+    for key in ("LOCO_HOME", "LOCO_LLM_DATA", "LLM_DEFAULT_DATA_ROOT"):
+        raw = os.environ.get(key, "").strip()
+        if raw:
+            return _path_display(Path(raw))
+    return KEY_REGISTRY["data_root"]["default"]
 
 
 def _detect_dev_repo_root() -> Path | None:
@@ -39,36 +40,17 @@ def _detect_dev_repo_root() -> Path | None:
     return None
 
 
-def _maybe_bootstrap_scaffold_message() -> None:
-    root = scaffold_root()
-    if not root.is_dir():
-        console.print(
-            "[yellow]note:[/yellow] scaffold assets are not installed yet; "
-            "run `llm update --scaffold-only` after setup."
-        )
-        return
-    try:
-        has_assets = any(root.iterdir())
-    except OSError:
-        has_assets = False
-    if not has_assets:
-        console.print(
-            "[yellow]note:[/yellow] scaffold directory is empty; "
-            "run `llm update --scaffold-only` to fetch official assets."
-        )
-
-
 def setup(
     default: bool = typer.Option(
         False, "--default", help="Non-interactive: use defaults for every key."
     ),
 ) -> None:
-    """Configure machine-local settings (~/.config/llm/config.yaml)."""
+    """Write {data_home}/config.yaml and ensure directory layout."""
     cfg_path = settings_path()
     if cfg_path.is_file():
         if default:
             console.print(
-                f"[dim]note:[/dim] overwriting existing settings at {cfg_path}"
+                f"[dim]note:[/dim] refreshing settings at {cfg_path}"
             )
         elif not typer.confirm(
             f"Settings file already exists at {cfg_path}. Overwrite?",
@@ -78,10 +60,7 @@ def setup(
             raise typer.Exit(0)
 
     stored: dict[str, str] = {}
-
     dev_repo = _detect_dev_repo_root()
-    if dev_repo is not None:
-        stored["repo_root"] = str(dev_repo)
 
     if default:
         stored["data_root"] = _default_data_root()
@@ -97,51 +76,49 @@ def setup(
         if not granular:
             overrides = _prompt_dir_overrides(stored["data_root"])
             stored.update(overrides)
-            if not overrides:
-                console.print(
-                    "[dim]note:[/dim] no directory overrides set; "
-                    "using default layout under data_root."
-                )
         if dev_repo is not None and typer.confirm(
             f"Use this checkout as repo_root for development ({dev_repo})?",
             default=True,
         ):
             stored["repo_root"] = str(dev_repo)
-        elif "repo_root" in stored:
-            del stored["repo_root"]
 
     path = save_settings(stored)
     resolved = resolve(load_settings())
     ensure_data_dirs(resolved)
-    _maybe_bootstrap_scaffold_message()
+    try:
+        seeded = seed_configs_from_install()
+        if seeded:
+            console.print(
+                f"[dim]seeded {len(seeded)} config(s) into "
+                f"{resolved.data_root / 'configs'}[/dim]"
+            )
+    except RuntimeError:
+        console.print(
+            "[yellow]note:[/yellow] install root not found; "
+            "run install.sh or set LOCO_INSTALL before seeding example configs."
+        )
+
     console.print(f"[green]wrote[/green] {path}")
     console.print(f"[green]data_root[/green]: {_path_display(resolved.data_root)}")
+    try:
+        console.print(f"[green]install[/green]: {_path_display(install_root())}")
+    except RuntimeError:
+        console.print("[dim]install[/dim]: (not resolved — set LOCO_INSTALL)")
     console.print(
-        f"[green]runtimes_dir[/green]: {_path_display(resolved.runtimes_dir)}"
+        f"[green]configs[/green]: {_path_display(resolved.data_root / 'configs')}"
     )
-    console.print(f"[green]models_dir[/green]: {_path_display(resolved.models_dir)}")
-    console.print(f"[green]cache_dir[/green]: {_path_display(resolved.cache_dir)}")
     if resolved.repo_root is not None:
         console.print(f"[green]repo_root[/green]: {_path_display(resolved.repo_root)}")
     else:
-        console.print("[dim]repo_root[/dim]: (not set — using managed scaffold)")
-
-    if default:
-        console.print()
-        console.print("[bold]Recommended next steps:[/bold]")
-        console.print("  1. llm doctor                  # verify cross-cutting prereqs")
-        console.print("  2. llm runtime setup           # install or register a runtime")
-        console.print("  3. llm model pull <hf-url>     # download a model")
-        console.print("  4. llm config setup            # scaffold a config")
-        console.print("  5. llm serve <config-id>       # start a server")
-        return
+        console.print("[dim]repo_root[/dim]: (not set — managed install)")
 
     console.print()
-    from llm_cli.core.chain import run_setup_chain
-
-    rc = run_setup_chain()
-    if rc != 0:
-        raise typer.Exit(code=rc)
+    console.print("[bold]Recommended next steps:[/bold]")
+    console.print("  1. loco doctor")
+    console.print("  2. loco runtime setup")
+    console.print("  3. loco model pull <hf-url>")
+    console.print("  4. loco config setup")
+    console.print("  5. loco serve <config-id>")
 
 
 def _prompt_dir_overrides(data_root: str) -> dict[str, str]:

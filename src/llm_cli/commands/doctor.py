@@ -1,4 +1,4 @@
-"""`llm doctor` — verify external requirements; `llm doctor render-requirements` regenerates the markdown."""
+"""`loco doctor` — verify external requirements; `loco doctor render-requirements` regenerates the markdown."""
 from __future__ import annotations
 
 import subprocess
@@ -40,7 +40,7 @@ def _check_on_release_tag() -> tuple[str, str, str]:
         return (
             "install-channel",
             "warn",
-            "not on a release tag — run `llm update` to re-anchor to the latest stable tag",
+            "not on a release tag — run `loco update` to re-anchor to the latest stable tag",
         )
 
 

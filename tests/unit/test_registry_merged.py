@@ -33,11 +33,10 @@ def test_user_layer_wins_on_runtime_id_collision(tmp_path, monkeypatch) -> None:
     user = tmp_path / "data" / "user"
     _seed_runtime(scaffold, "rt-a")
     _seed_runtime(user, "rt-a")
-    cfg = tmp_path / "cfg" / "llm"
-    cfg.mkdir(parents=True)
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
-    monkeypatch.setenv("LOCO_LLM_HOME", str(scaffold))
-    save_settings({"data_root": str(tmp_path / "data")})
+    data = tmp_path / "data"
+    monkeypatch.setenv("LOCO_HOME", str(data))
+    monkeypatch.setenv("LOCO_INSTALL", str(scaffold))
+    save_settings({"data_root": data.resolve().as_posix()})
 
     merged = registry.discover_runtimes_merged()
     by_id = {r.id: r for r in merged}
@@ -45,32 +44,28 @@ def test_user_layer_wins_on_runtime_id_collision(tmp_path, monkeypatch) -> None:
     assert by_id["rt-a"].path == user / "runtimes" / "rt-a"
 
 
-def test_merged_includes_both_layers(tmp_path, monkeypatch) -> None:
+def test_merged_includes_both_runtime_layers(tmp_path, monkeypatch) -> None:
     scaffold = tmp_path / "scaffold"
     user = tmp_path / "data" / "user"
     _seed_runtime(scaffold, "official-rt")
     _seed_runtime(user, "custom-rt")
-    cfg = tmp_path / "cfg" / "llm"
-    cfg.mkdir(parents=True)
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
-    monkeypatch.setenv("LOCO_LLM_HOME", str(scaffold))
-    save_settings({"data_root": str(tmp_path / "data")})
+    data = tmp_path / "data"
+    monkeypatch.setenv("LOCO_HOME", str(data))
+    monkeypatch.setenv("LOCO_INSTALL", str(scaffold))
+    save_settings({"data_root": data.resolve().as_posix()})
 
     ids = {r.id for r in registry.discover_runtimes_merged()}
     assert ids == {"custom-rt", "official-rt"}
 
 
-def test_config_user_overrides_scaffold(tmp_path, monkeypatch) -> None:
-    scaffold = tmp_path / "scaffold"
-    user = tmp_path / "data" / "user"
-    _seed_config(scaffold, "cfg-a")
-    _seed_config(user, "cfg-a")
-    cfg = tmp_path / "cfg" / "llm"
-    cfg.mkdir(parents=True)
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
-    monkeypatch.setenv("LOCO_LLM_HOME", str(scaffold))
-    save_settings({"data_root": str(tmp_path / "data")})
+def test_configs_only_from_data_home(tmp_path, monkeypatch) -> None:
+    install = tmp_path / "install"
+    data = tmp_path / "data"
+    _seed_config(install, "from-install")
+    _seed_config(data, "from-data")
+    monkeypatch.setenv("LOCO_HOME", str(data))
+    monkeypatch.setenv("LOCO_INSTALL", str(install))
+    save_settings({"data_root": data.resolve().as_posix()})
 
     merged = registry.discover_configs_merged()
-    by_id = {c.id: c for c in merged}
-    assert by_id["cfg-a"].source == "user"
+    assert {c.id for c in merged} == {"from-data"}

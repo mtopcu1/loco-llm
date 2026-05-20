@@ -23,7 +23,7 @@ from llm_cli.core.param_grid_models import MetaField
 from llm_cli.core.params import validate_params
 from llm_cli.core.recommendations import recommend
 from llm_cli.core.repo import scaffold_root
-from llm_cli.core.scaffold import user_configs_dir
+from llm_cli.core.scaffold import configs_dir
 from llm_cli.core.settings import load_settings, resolve
 from llm_cli.core.specs import detect_all
 
@@ -98,8 +98,8 @@ def do_config_new(
         else f"{runtime_id}__{preset}"
     )
     cid = (config_id.strip() if config_id else derived)
-    configs_dir = user_configs_dir(settings)
-    out_path = configs_dir / f"{cid}.yaml"
+    cfg_root = configs_dir(settings)
+    out_path = cfg_root / f"{cid}.yaml"
     if out_path.exists() and not force:
         console.print(
             f"[red]error:[/red] {out_path} exists; pass --force to overwrite"
@@ -250,7 +250,7 @@ def do_config_setup(
             f"(differs from derived `{expected_id}`)"
         )
 
-    out_path = user_configs_dir(settings) / f"{config_id}.yaml"
+    out_path = configs_dir(settings) / f"{config_id}.yaml"
     doc: dict[str, Any] = {"id": config_id, "runtime": rid}
     if mid:
         doc["model"] = mid

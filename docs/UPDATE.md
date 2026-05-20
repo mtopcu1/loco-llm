@@ -1,11 +1,11 @@
 # Updating
 
-End-user upgrades run through **`llm update`**, which operates on the git checkout at `LOCO_LLM_HOME` (see [INSTALLATION.md](INSTALLATION.md)).
+End-user upgrades run through **`loco update`**, which operates on the git checkout at `LOCO_INSTALL` (see [INSTALLATION.md](INSTALLATION.md)).
 
 ## Default: latest stable tag
 
 ```bash
-llm update
+loco update
 ```
 
 1. `git fetch --tags --prune origin`
@@ -13,16 +13,16 @@ llm update
 3. If already on that tag, prints "already on latest stable" and exits.
 4. Stashes dirty working trees, checks out the tag, runs `uv pip install -e .` to sync deps.
 
-Bare `llm update` always returns you to the latest release tag — it does not leave you on `main` or a hotfix branch.
+Bare `loco update` always returns you to the latest release tag — it does not leave you on `main` or a hotfix branch.
 
 ## Flags
 
 | Command | Behavior |
 |---------|----------|
-| `llm update --check` | Print current vs. latest tag; exit **1** if behind (no changes) |
-| `llm update --branch <name>` | Checkout branch tip and `git pull --ff-only`; warns you are off stable |
-| `llm update --tag vX.Y.Z` | Pin to a specific tag (rollback or testing) |
-| `llm update --restart` | Stop a running service before update, re-serve afterward |
+| `loco update --check` | Print current vs. latest tag; exit **1** if behind (no changes) |
+| `loco update --branch <name>` | Checkout branch tip and `git pull --ff-only`; warns you are off stable |
+| `loco update --tag vX.Y.Z` | Pin to a specific tag (rollback or testing) |
+| `loco update --restart` | Stop a running service before update, re-serve afterward |
 
 `--branch`, `--tag`, and `--check` are mutually exclusive.
 
@@ -30,29 +30,29 @@ Bare `llm update` always returns you to the latest release tag — it does not l
 
 ```bash
 # Maintainer pushes hotfix/scaffold-perms
-llm update --branch hotfix/scaffold-perms
+loco update --branch hotfix/scaffold-perms
 # ... test ...
 
 # After release-please tags v0.4.2:
-llm update
+loco update
 # re-anchors to v0.4.2
 ```
 
 ## Service running
 
-If a config is served, `llm update` refuses unless you `llm stop` first or pass `--restart`.
+If a config is served, `loco update` refuses unless you `loco stop` first or pass `--restart`.
 
 ## Refusal cases
 
-- `LOCO_LLM_HOME` is not a git clone → reinstall via the [curl installer](INSTALLATION.md).
+- `LOCO_INSTALL` is not a git clone → reinstall via the [curl installer](INSTALLATION.md).
 - `origin` is not `github.com/mtopcu1/loco-llm` → intentional guard; fix remote or reinstall.
 - No semver tags on origin → use `--branch main` only if you intend to track untagged work.
 
 ## Visibility
 
-- `llm --version` — package version; appends `(branch: …)` or `(detached: …)` when HEAD is not an exact tag.
-- `llm doctor` — **install-channel** check warns when not on a release tag; run `llm update` to re-anchor.
+- `loco --version` — package version; appends `(branch: …)` or `(detached: …)` when HEAD is not an exact tag.
+- `llm doctor` — **install-channel** check warns when not on a release tag; run `loco update` to re-anchor.
 
 ## Developers
 
-Contributors working in a git clone use `git pull` and `uv pip install -e ".[dev]"` — not `llm update` against a separate `LOCO_LLM_HOME`. See [DEVELOPMENT.md](DEVELOPMENT.md).
+Contributors working in a git clone use `git pull` and `uv pip install -e ".[dev]"` — not `loco update` against a separate `LOCO_INSTALL`. See [DEVELOPMENT.md](DEVELOPMENT.md).

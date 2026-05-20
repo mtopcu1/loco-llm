@@ -11,7 +11,7 @@ import yaml
 
 from llm_cli.core.install_record import is_installed
 from llm_cli.core.params import ParamSpec, parse_schema, validate_params
-from llm_cli.core.scaffold import scaffold_root, user_configs_dir
+from llm_cli.core.scaffold import configs_dir, scaffold_root
 from llm_cli.core.settings import (
     MissingSettingError,
     UnknownSettingError,
@@ -151,17 +151,8 @@ def discover_runtimes_merged() -> list[RuntimeRecord]:
 
 
 def discover_configs_merged() -> list[ConfigRecord]:
-    from llm_cli.core.scaffold import scaffold_root, user_assets_root
-
     settings = resolve(load_settings())
-    scaffold = scaffold_root()
-    user = user_assets_root(settings)
-    by_id: dict[str, ConfigRecord] = {}
-    for rec in discover_configs(scaffold, source="scaffold"):
-        by_id[rec.id] = rec
-    for rec in discover_configs(user, source="user"):
-        by_id[rec.id] = rec
-    return [by_id[k] for k in sorted(by_id)]
+    return discover_configs(configs_dir(settings), source="user")
 
 
 def discover_benchmarks_merged() -> list[BenchmarkRecord]:
@@ -421,7 +412,7 @@ def write_config(data: dict[str, Any], *, overwrite: bool = False) -> ConfigReco
         raise ConfigAlreadyExistsError(f"config {config_id!r} already exists")
 
     settings = resolve_settings()
-    out_path = user_configs_dir(settings) / f"{config_id}.yaml"
+    out_path = configs_dir(settings) / f"{config_id}.yaml"
     doc = dict(data)
     doc["id"] = config_id
     cfg = ConfigRecord(id=config_id, path=out_path, data=doc, source="user")
@@ -446,7 +437,7 @@ def write_config(data: dict[str, Any], *, overwrite: bool = False) -> ConfigReco
 def delete_config(config_id: str) -> None:
     """Delete a user-layer config file."""
     settings = resolve_settings()
-    out_path = user_configs_dir(settings) / f"{config_id}.yaml"
+    out_path = configs_dir(settings) / f"{config_id}.yaml"
     if not out_path.is_file():
         raise ConfigNotFoundInUserLayerError(f"config {config_id!r} not found in user layer")
     out_path.unlink()

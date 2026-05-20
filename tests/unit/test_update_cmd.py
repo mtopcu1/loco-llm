@@ -62,7 +62,7 @@ def fake_clone(tmp_path, monkeypatch):
     root = tmp_path / "loco"
     root.mkdir()
     _init_repo(root, tags=["v0.4.0", "v0.4.1"])
-    monkeypatch.setenv("LOCO_LLM_HOME", str(root))
+    monkeypatch.setenv("LOCO_INSTALL", str(root))
     monkeypatch.setattr(
         "llm_cli.commands.update_cmd._sync_deps", lambda _root: None
     )
@@ -192,7 +192,7 @@ def test_sync_deps_targets_managed_venv_python(tmp_path, monkeypatch):
 def test_update_refuses_unmanaged_directory(tmp_path, monkeypatch):
     empty = tmp_path / "not-a-clone"
     empty.mkdir()
-    monkeypatch.setenv("LOCO_LLM_HOME", str(empty))
+    monkeypatch.setenv("LOCO_INSTALL", str(empty))
     result = runner.invoke(app, ["update"])
     assert result.exit_code != 0
     assert "not a managed install" in result.stdout.lower()
@@ -227,7 +227,7 @@ def test_update_fetch_missing_branch_prints_hint(monkeypatch, tmp_path):
     root = tmp_path / "loco"
     root.mkdir()
     _init_repo(root, tags=["v0.4.0"])
-    monkeypatch.setenv("LOCO_LLM_HOME", str(root))
+    monkeypatch.setenv("LOCO_INSTALL", str(root))
 
     def fail_fetch(_root, refspec=None):
         raise GitCommandError(

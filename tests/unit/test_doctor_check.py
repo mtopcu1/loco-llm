@@ -123,7 +123,7 @@ def test_install_channel_check_warns_when_not_on_tag(
 ) -> None:
     from llm_cli.commands.doctor import _check_on_release_tag
 
-    monkeypatch.setenv("LOCO_LLM_HOME", str(tmp_path))
+    monkeypatch.setenv("LOCO_INSTALL", str(tmp_path))
     cid, status, _ = _check_on_release_tag()
     assert cid == "install-channel"
     assert status in {"warn", "error"}

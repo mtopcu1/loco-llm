@@ -1,4 +1,4 @@
-"""`llm update` — pull the latest tag (or a chosen ref) into the git checkout."""
+"""`loco update` — pull the latest tag (or a chosen ref) into the git checkout."""
 from __future__ import annotations
 
 import json
@@ -215,7 +215,7 @@ def _sync_deps(root: Path) -> None:
     if uv is None:
         console.print(
             "[yellow]warning:[/yellow] `uv` not found on PATH; skipping dep sync. "
-            "Install uv and re-run `llm update` to pick up dependency changes."
+            "Install uv and re-run `loco update` to pick up dependency changes."
         )
         return
     venv_python = _venv_python(root)
@@ -390,7 +390,7 @@ def update(
             raise typer.Exit(code=1) from None
         console.print(
             f"[yellow]you are now on branch {branch} — not a stable release.[/yellow] "
-            "Run `llm update` to return to the latest stable tag."
+            "Run `loco update` to return to the latest stable tag."
         )
         return
 

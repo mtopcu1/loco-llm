@@ -1,11 +1,11 @@
 # LocalLLM
 
 Personal control plane for local LLM runtimes — manage runtime configurations,
-benchmark them, and **serve** a chosen config via `llm serve` (foreground, background, or systemd).
+benchmark them, and **serve** a chosen config via `loco serve` (foreground, background, or systemd).
 
 This repo contains **text only** — manifests, configs, scripts, benchmark
 results. Runtime source trees and model weights live in WSL2's native
-filesystem under `~/llm/` (configurable via `llm setup` / `llm settings ...`).
+filesystem under `~/.loco/` (configurable via `loco setup` / `loco settings ...`).
 
 ## Getting started (first time)
 
@@ -14,23 +14,23 @@ Inside WSL2 (or any Linux/macOS shell with `git` and Python 3.11+):
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mtopcu1/loco-llm/main/scripts/install.sh | bash
 export PATH="$HOME/.local/bin:$PATH"   # if not already
-llm setup
+loco doctor
 ```
 
-The installer clones the repo to `~/.loco-llm`, checks out the latest stable
-tag, creates a uv venv, and symlinks `llm`. Run `llm doctor` to verify.
-See [`docs/INSTALLATION.md`](docs/INSTALLATION.md) for options (`--dir`, `--tag`, `--branch`).
+The installer uses a Hermes-style layout: data at `~/.loco`, git checkout at
+`~/.loco/install`, seeds example configs, then runs `loco setup --default`.
+See [`docs/INSTALLATION.md`](docs/INSTALLATION.md) for options (`--data-home`, `--dir`, `--tag`, `--branch`).
 
 ### Updating
 
 ```bash
-llm update              # latest stable tag
-llm update --check      # report current vs. available, no changes
-llm update --branch X   # switch to a branch (hotfix testing)
-llm update --tag vX.Y.Z # pin to a specific tag (rollback)
+loco update              # latest stable tag
+loco update --check      # report current vs. available, no changes
+loco update --branch X   # switch to a branch (hotfix testing)
+loco update --tag vX.Y.Z # pin to a specific tag (rollback)
 ```
 
-Bare `llm update` always re-anchors to the latest tag, even if you were on a
+Bare `loco update` always re-anchors to the latest tag, even if you were on a
 branch. See [`docs/UPDATE.md`](docs/UPDATE.md).
 
 ### Upgrading from a prior pipx-based install
@@ -49,7 +49,7 @@ curl -fsSL https://raw.githubusercontent.com/mtopcu1/loco-llm/main/scripts/insta
 git clone https://github.com/mtopcu1/loco-llm.git
 cd loco-llm
 uv venv && uv pip install -e ".[dev]"
-export PATH="$HOME/.local/bin:$PATH"   # optional: uv run llm ...
+export PATH="$HOME/.local/bin:$PATH"   # optional: uv run loco ...
 ```
 
 See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -57,17 +57,17 @@ See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) and [`CONTRIBUTING.md`](CONTRIB
 For an existing setup, the granular commands still work as before:
 
 ```bash
-llm runtime setup       # interactive picker (preset or custom)
-llm runtime install llamacpp --yes      # non-interactive preset install
-llm model pull https://huggingface.co/Qwen/Qwen2.5-7B-Instruct
-llm config setup        # interactive
-llm config new --runtime llamacpp --model qwen2-7b --param gguf_path='${model_path}'
-llm serve llamacpp__qwen2-7b__default
+loco runtime setup       # interactive picker (preset or custom)
+loco runtime install llamacpp --yes      # non-interactive preset install
+loco model pull https://huggingface.co/Qwen/Qwen2.5-7B-Instruct
+loco config setup        # interactive
+loco config new --runtime llamacpp --model qwen2-7b --param gguf_path='${model_path}'
+loco serve llamacpp__qwen2-7b__default
 ```
 
-For a minimal smoke without llamacpp weights, use `llm runtime install stub-runtime --yes` and `llm serve stub-runtime__default` instead.
+For a minimal smoke without llamacpp weights, use `loco runtime install stub-runtime --yes` and `loco serve stub-runtime__default` instead.
 
-See [`docs/lifecycle.md`](docs/lifecycle.md) for modes, switching, and logs. See [`docs/runtime-lifecycle.md`](docs/runtime-lifecycle.md) for `llm runtime install` / `.installed`. User-facing wizard overview: [`docs/wizards.md`](docs/wizards.md).
+See [`docs/lifecycle.md`](docs/lifecycle.md) for modes, switching, and logs. See [`docs/runtime-lifecycle.md`](docs/runtime-lifecycle.md) for `loco runtime install` / `.installed`. User-facing wizard overview: [`docs/wizards.md`](docs/wizards.md).
 
 ## Layout
 
@@ -89,42 +89,42 @@ for the full design.
 
 | Command | Purpose |
 |---|---|
-| `llm setup` | Interactive first-time configurator. Writes `~/.config/llm/config.yaml`, creates data-root subdirectories, then optional Y/n chain (runtime / model / config / serve). |
-| `llm setup --default` | Non-interactive settings only; prints suggested next steps (no chain). |
-| `llm advisor` | VRAM-aware param hints (interactive, `--runtime`+`--model`, or `<config-id>`; `--json`). |
-| `llm runtime setup` | Wizard: preset official install or author a `kind: custom` runtime in-repo. |
-| `llm config new` | Non-interactive config YAML (`--runtime`, optional `--model`, `--param k=v`, `--force`). |
-| `llm config setup` | Interactive config YAML with recommendations + review. |
-| `llm settings show` | Print settings file path, stored contents, and resolved view. |
-| `llm settings env` | Print `export LLM_*=...` lines for `eval "$(llm settings env)"`. |
-| `llm settings edit <key>` | Interactive prompt to update one key. |
-| `llm settings edit <key> --default` | Reset key to its built-in default (`data_root`) or remove the override (`runtimes_dir`/`models_dir`/`cache_dir`). |
-| `llm specs` | Regenerate the auto block in `specs.md` |
-| `llm specs --check` | Exit nonzero if `specs.md` differs from current detection |
-| `llm specs --print` | Print detection without writing |
-| `llm update` | Pull latest stable tag into `LOCO_LLM_HOME` (`--branch`, `--tag`, `--check`, `--restart`) |
-| `llm doctor` | Run all checks from `requirements.yaml`; prints a **systemd-linger** advisory when `loginctl` reports `Linger=no` |
-| `llm doctor render-requirements` | Regenerate `requirements.md` from `requirements.yaml` |
-| `llm list` | List runtimes, models, configs, and benchmarks |
-| `llm config show <id>` | Print a single launch config (with `${data_root}` expanded in `serve.params` paths) |
-| `llm config validate` | Validate every `configs/*.yaml` against manifests and script layout |
-| `llm runtime list` | List discovered runtimes |
-| `llm runtime info <id>` | Show manifest path, install record, drift hints |
-| `llm runtime install <id>` | Build/install runtime; writes `$LLM_RUNTIMES/<id>/.installed` |
-| `llm runtime uninstall <id>` | Remove install marker (optional `--purge` deletes artifacts) |
-| `llm runtime rebuild <id>` | Re-run install; `--reset` drops stored build params |
-| `llm model list` | List models in `$LLM_MODELS/registry.json` |
-| `llm model info <id>` | Show the full registry entry |
-| `llm model pull <url-or-id>` | Pull from HF (URL) or refresh an existing id (`--format`, `--include`, `--exclude`, `--id`, `--force`) |
-| `llm model add <id> <path> --format <fmt>` | Register local weights via symlink (or copy fallback) |
-| `llm model uninstall <id> [--purge]` | Remove a registry entry (and optionally its files) |
-| `llm serve <config>` | Start a config (background by default; `--foreground`, `--systemd`) |
-| `llm switch <config>` | Stop current + start new config in the same mode |
-| `llm stop` | Stop the running service |
-| `llm status [--json]` | Show mode, config, port, uptime |
-| `llm logs [-f] [-n N]` | Tail logs (file or journalctl) |
+| `loco setup` | Configure `~/.loco/config.yaml` and data-home layout. |
+| `loco setup --default` | Non-interactive; refresh settings and print next steps. |
+| `loco advisor` | VRAM-aware param hints (interactive, `--runtime`+`--model`, or `<config-id>`; `--json`). |
+| `loco runtime setup` | Wizard: preset official install or author a `kind: custom` runtime in-repo. |
+| `loco config new` | Non-interactive config YAML (`--runtime`, optional `--model`, `--param k=v`, `--force`). |
+| `loco config setup` | Interactive config YAML with recommendations + review. |
+| `loco settings show` | Print settings file path, stored contents, and resolved view. |
+| `loco settings env` | Print `export LLM_*=...` lines for `eval "$(llm settings env)"`. |
+| `loco settings edit <key>` | Interactive prompt to update one key. |
+| `loco settings edit <key> --default` | Reset key to its built-in default (`data_root`) or remove the override (`runtimes_dir`/`models_dir`/`cache_dir`). |
+| `loco specs` | Regenerate the auto block in `specs.md` |
+| `loco specs --check` | Exit nonzero if `specs.md` differs from current detection |
+| `loco specs --print` | Print detection without writing |
+| `loco update` | Pull latest stable tag into `LOCO_INSTALL` (`--branch`, `--tag`, `--check`, `--restart`) |
+| `loco doctor` | Run all checks from `requirements.yaml`; prints a **systemd-linger** advisory when `loginctl` reports `Linger=no` |
+| `loco doctor render-requirements` | Regenerate `requirements.md` from `requirements.yaml` |
+| `loco list` | List runtimes, models, configs, and benchmarks |
+| `loco config show <id>` | Print a single launch config (with `${data_root}` expanded in `serve.params` paths) |
+| `loco config validate` | Validate every `configs/*.yaml` against manifests and script layout |
+| `loco runtime list` | List discovered runtimes |
+| `loco runtime info <id>` | Show manifest path, install record, drift hints |
+| `loco runtime install <id>` | Build/install runtime; writes `$LLM_RUNTIMES/<id>/.installed` |
+| `loco runtime uninstall <id>` | Remove install marker (optional `--purge` deletes artifacts) |
+| `loco runtime rebuild <id>` | Re-run install; `--reset` drops stored build params |
+| `loco model list` | List models in `$LLM_MODELS/registry.json` |
+| `loco model info <id>` | Show the full registry entry |
+| `loco model pull <url-or-id>` | Pull from HF (URL) or refresh an existing id (`--format`, `--include`, `--exclude`, `--id`, `--force`) |
+| `loco model add <id> <path> --format <fmt>` | Register local weights via symlink (or copy fallback) |
+| `loco model uninstall <id> [--purge]` | Remove a registry entry (and optionally its files) |
+| `loco serve <config>` | Start a config (background by default; `--foreground`, `--systemd`) |
+| `loco switch <config>` | Stop current + start new config in the same mode |
+| `loco stop` | Stop the running service |
+| `loco status [--json]` | Show mode, config, port, uptime |
+| `loco logs [-f] [-n N]` | Tail logs (file or journalctl) |
 
-Future milestones add `llm bench` / `llm results`.
+Future milestones add `loco bench` / `loco results`.
 
 ## Discipline
 

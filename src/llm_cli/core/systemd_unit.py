@@ -14,7 +14,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/llm serve {config_id} --foreground-from-supervisor
+ExecStart=%h/.local/bin/loco serve {config_id} --foreground-from-supervisor
 Restart=on-failure
 RestartSec=3
 

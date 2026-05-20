@@ -14,7 +14,7 @@ runner = CliRunner()
 
 def _write_settings(**kv: str) -> Path:
     cfg = settings_path()
-    cfg.parent.mkdir(parents=True)
+    cfg.parent.mkdir(parents=True, exist_ok=True)
     cfg.write_text(yaml.safe_dump(kv), encoding="utf-8")
     return cfg
 
@@ -60,7 +60,7 @@ def test_settings_env_shell_escapes_values(tmp_path) -> None:
 
 
 def test_settings_edit_updates_existing_key(tmp_path) -> None:
-    _write_settings(data_root="~/llm", repo_root=str(tmp_path / "r"))
+    _write_settings(data_root="~/.loco", repo_root=str(tmp_path / "r"))
     new_data_root = tmp_path / "new"
 
     result = runner.invoke(
@@ -76,7 +76,7 @@ def test_settings_edit_updates_existing_key(tmp_path) -> None:
 
 
 def test_settings_edit_unknown_key_errors(tmp_path) -> None:
-    _write_settings(data_root="~/llm", repo_root=str(tmp_path / "r"))
+    _write_settings(data_root="~/.loco", repo_root=str(tmp_path / "r"))
 
     result = runner.invoke(app, ["settings", "edit", "nope"], catch_exceptions=False)
 
@@ -95,7 +95,7 @@ def test_settings_edit_default_data_root_resets(tmp_path) -> None:
 
     assert result.exit_code == 0, result.stdout
     stored = yaml.safe_load(settings_path().read_text(encoding="utf-8"))
-    assert stored["data_root"] == "~/llm"
+    assert stored["data_root"] == "~/.loco"
 
 
 def test_settings_edit_default_runtimes_dir_removes_override(tmp_path) -> None:
@@ -115,7 +115,7 @@ def test_settings_edit_default_runtimes_dir_removes_override(tmp_path) -> None:
 
 
 def test_settings_edit_default_repo_root_clears_key(tmp_path) -> None:
-    _write_settings(data_root="~/llm", repo_root=str(tmp_path / "r"))
+    _write_settings(data_root="~/.loco", repo_root=str(tmp_path / "r"))
 
     result = runner.invoke(
         app, ["settings", "edit", "repo_root", "--default"], catch_exceptions=False
