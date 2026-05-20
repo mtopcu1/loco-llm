@@ -27,3 +27,4 @@ jobs:
       - run: cd dashboard && npm run typecheck
       - run: cd dashboard && npm run test
       - run: cd dashboard && npm run build
+      - run: node dashboard/scripts/check-bundle-size.mjs
