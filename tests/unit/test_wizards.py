@@ -95,20 +95,12 @@ def test_select_uses_questionary_on_tty(monkeypatch):
     q_select.assert_called_once()
 
 
-def test_confirm_plain_yes_default(monkeypatch):
-    monkeypatch.setattr(wizards, "use_plain_prompts", lambda: True)
-    with patch("llm_cli.core.wizards.Prompt.ask", return_value="") as ask:
-        out = wizards.confirm("ok?", default=True)
-    assert out is True
-    args, kwargs = ask.call_args
-    assert "[Y/n]" in args[0]
-
-
-def test_confirm_plain_no_input(monkeypatch):
-    monkeypatch.setattr(wizards, "use_plain_prompts", lambda: True)
-    with patch("llm_cli.core.wizards.Prompt.ask", return_value="n"):
-        out = wizards.confirm("ok?", default=True)
-    assert out is False
+def test_confirm_delegates_to_binary_buttons(monkeypatch):
+    monkeypatch.setattr(
+        "llm_cli.core.wizard_confirm.run_binary_confirm",
+        lambda prompt, default=True: default,
+    )
+    assert wizards.confirm("ok?", default=False) is False
 
 
 def test_checkbox_plain_parses_comma_indices(monkeypatch):

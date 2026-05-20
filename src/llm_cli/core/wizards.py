@@ -105,29 +105,11 @@ def text(
         _console.print(f"[red]error:[/red] {err}")
 
 
-def _confirm_plain(prompt: str, *, default: bool) -> bool:
-    suffix = "[Y/n]" if default else "[y/N]"
-    raw = Prompt.ask(f"{prompt} {suffix}", default="")
-    token = str(raw).strip().lower()
-    if token == "":
-        return default
-    if token in ("y", "yes"):
-        return True
-    if token in ("n", "no"):
-        return False
-    return default
-
-
 def confirm(prompt: str, *, default: bool = True) -> bool:
-    q = _get_questionary()
-    if use_plain_prompts() or q is None:
-        if q is None and not use_plain_prompts():
-            _maybe_tip_missing_questionary()
-        return _confirm_plain(prompt, default=default)
-    result = q.confirm(prompt, default=default).ask()
-    if result is None:
-        raise KeyboardInterrupt
-    return bool(result)
+    """Yes/No with wizard-style ``No`` / ``Yes`` buttons (←→, Y/N, Enter)."""
+    from llm_cli.core.wizard_confirm import run_binary_confirm
+
+    return run_binary_confirm(prompt, default=default)
 
 
 def select(

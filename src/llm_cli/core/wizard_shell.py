@@ -9,6 +9,7 @@ from prompt_toolkit.formatted_text import StyleAndTextTuples
 
 FocusZone = Literal["content", "footer"]
 FooterButton = Literal["back", "next"]
+BinaryButton = Literal["no", "yes"]
 
 
 @dataclass
@@ -88,4 +89,20 @@ def render_footer(
         (back_cls, back_label),
         ("class:text-dim", "  "),
         (next_cls, next_label),
+    ]
+
+
+def toggle_binary_button(focused: BinaryButton) -> BinaryButton:
+    return "yes" if focused == "no" else "no"
+
+
+def render_binary_buttons(*, focused: BinaryButton) -> StyleAndTextTuples:
+    """Render ``No  Yes`` choice buttons (same focus styling as wizard footers)."""
+    no_cls = "class:cell-focus" if focused == "no" else "class:text-dim"
+    yes_cls = "class:cell-focus" if focused == "yes" else "class:text-dim"
+    return [
+        ("class:text-dim", " "),
+        (no_cls, " No "),
+        ("class:text-dim", "  "),
+        (yes_cls, " Yes "),
     ]

@@ -631,7 +631,9 @@ def runtime_uninstall(
             if purge
             else f"Remove install marker for {runtime_id}?"
         )
-        if not typer.confirm(prompt, default=False):
+        from llm_cli.core import wizards as wiz
+
+        if not wiz.confirm(prompt, default=False):
             console.print("aborted")
             raise typer.Exit(code=1)
 

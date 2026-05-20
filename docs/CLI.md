@@ -8,7 +8,7 @@ Settings file: `{LOCO_HOME}/config.yaml` (default `~/.loco/config.yaml`). See [G
 
 | Command | Purpose |
 |---------|---------|
-| `loco setup` | First-run wizard chain: runtime → HF model URL → launch config → optional background serve → optional dashboard install. Requires install.sh bootstrap (`config.yaml` + `data_root`). |
+| `loco setup` | First-run wizard chain: runtime → HF model URL → launch config → optional background serve → optional dashboard install. Requires install.sh bootstrap (`config.yaml` + `data_root`). Yes/No steps use **No / Yes** buttons (←→, Y/N, Enter). |
 | `loco settings show` | Print settings path, stored YAML, and resolved directories. |
 | `loco settings edit <key>` | Interactive edit of one key (`data_root`, `repo_root`, `runtimes_dir`, …). |
 | `loco settings edit <key> --default` | Reset `data_root` to built-in default, or remove override for derived dir keys. |
