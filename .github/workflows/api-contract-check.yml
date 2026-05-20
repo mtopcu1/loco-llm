@@ -1,0 +1,21 @@
+name: api-contract-check
+on:
+  pull_request:
+    paths:
+      - 'src/llm_cli/webapi/**'
+      - 'dashboard/src/api/generated.ts'
+      - 'scripts/regen-api-client.sh'
+      - '.github/workflows/api-contract-check.yml'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - uses: astral-sh/setup-uv@v3
+        with: { enable-cache: true }
+      - run: uv venv && uv pip install -e ".[dev,dashboard]"
+      - run: cd dashboard && npm ci
+      - run: ./scripts/regen-api-client.sh --check
