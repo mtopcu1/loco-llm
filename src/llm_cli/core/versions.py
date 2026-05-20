@@ -4,6 +4,7 @@ Avoids depending on `packaging` for a tiny subset of needs.
 """
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError, version
 import re
 
 _NUM_RE = re.compile(r"\d+")
@@ -39,3 +40,13 @@ def compare_versions(a: str, b: str) -> int:
     if pa_padded > pb_padded:
         return 1
     return 0
+
+
+def current_cli_version() -> str:
+    """Return the installed CLI package version."""
+    try:
+        return version("loco-llm-cli")
+    except PackageNotFoundError:
+        from llm_cli import __version__
+
+        return __version__
