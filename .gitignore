@@ -37,6 +37,9 @@ dist/
 # Git worktrees (project-local; never committed)
 .worktrees/
 
+# Agent UX walkthrough scratch (isolated XDG_CONFIG_HOME / data_root)
+.ux-walkthrough/
+
 # Models now live in $LLM_MODELS (data root); keep the repo dir out of git.
 models/
 

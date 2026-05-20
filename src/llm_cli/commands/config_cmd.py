@@ -162,7 +162,7 @@ def do_config_setup(
         if not entries:
             console.print(
                 "[red]error:[/red] no compatible models in registry; "
-                "`llm model pull <hf-url>` first."
+                "`llm model pull <hf-url>` first, then `llm config setup`."
             )
             return None
         if mid is None:

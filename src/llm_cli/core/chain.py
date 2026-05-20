@@ -199,7 +199,13 @@ def run_setup_chain() -> int:
             console.print(f"[green]model[/green] {model_id}")
             steps.append("model-pull")
 
-    if _confirm("Create a launch config now?", default=True):
+    config_default = model_id is not None
+    if not config_default:
+        console.print(
+            "[dim]Tip:[/dim] pull a model first (`llm model pull <hf-url>`), "
+            "then run `llm config setup`."
+        )
+    if _confirm("Create a launch config now?", default=config_default):
         cid = _do_config_setup(
             runtime_id=runtime_id,
             model_id=model_id,

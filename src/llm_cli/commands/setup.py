@@ -14,15 +14,21 @@ from llm_cli.core.settings import (
     load_settings,
     resolve,
     save_settings,
+    settings_path,
 )
 
 console = Console()
 
 
+def _path_display(path: Path) -> str:
+    return path.expanduser().resolve().as_posix()
+
+
 def _default_data_root() -> str:
-    return os.environ.get(
+    raw = os.environ.get(
         "LLM_DEFAULT_DATA_ROOT", KEY_REGISTRY["data_root"]["default"]
     )
+    return _path_display(Path(raw))
 
 
 def _detect_dev_repo_root() -> Path | None:
@@ -58,6 +64,19 @@ def setup(
     ),
 ) -> None:
     """Configure machine-local settings (~/.config/llm/config.yaml)."""
+    cfg_path = settings_path()
+    if cfg_path.is_file():
+        if default:
+            console.print(
+                f"[dim]note:[/dim] overwriting existing settings at {cfg_path}"
+            )
+        elif not typer.confirm(
+            f"Settings file already exists at {cfg_path}. Overwrite?",
+            default=False,
+        ):
+            console.print("[yellow]setup cancelled[/yellow]")
+            raise typer.Exit(0)
+
     stored: dict[str, str] = {}
 
     dev_repo = _detect_dev_repo_root()
@@ -76,7 +95,13 @@ def setup(
             default=True,
         )
         if not granular:
-            stored.update(_prompt_dir_overrides(stored["data_root"]))
+            overrides = _prompt_dir_overrides(stored["data_root"])
+            stored.update(overrides)
+            if not overrides:
+                console.print(
+                    "[dim]note:[/dim] no directory overrides set; "
+                    "using default layout under data_root."
+                )
         if dev_repo is not None and typer.confirm(
             f"Use this checkout as repo_root for development ({dev_repo})?",
             default=True,
@@ -90,12 +115,14 @@ def setup(
     ensure_data_dirs(resolved)
     _maybe_bootstrap_scaffold_message()
     console.print(f"[green]wrote[/green] {path}")
-    console.print(f"[green]data_root[/green]: {resolved.data_root}")
-    console.print(f"[green]runtimes_dir[/green]: {resolved.runtimes_dir}")
-    console.print(f"[green]models_dir[/green]: {resolved.models_dir}")
-    console.print(f"[green]cache_dir[/green]: {resolved.cache_dir}")
+    console.print(f"[green]data_root[/green]: {_path_display(resolved.data_root)}")
+    console.print(
+        f"[green]runtimes_dir[/green]: {_path_display(resolved.runtimes_dir)}"
+    )
+    console.print(f"[green]models_dir[/green]: {_path_display(resolved.models_dir)}")
+    console.print(f"[green]cache_dir[/green]: {_path_display(resolved.cache_dir)}")
     if resolved.repo_root is not None:
-        console.print(f"[green]repo_root[/green]: {resolved.repo_root}")
+        console.print(f"[green]repo_root[/green]: {_path_display(resolved.repo_root)}")
     else:
         console.print("[dim]repo_root[/dim]: (not set — using managed scaffold)")
 

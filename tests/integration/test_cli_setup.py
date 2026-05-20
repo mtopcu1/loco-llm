@@ -29,7 +29,7 @@ def test_setup_default_writes_settings_and_creates_dirs(
     cfg = settings_path()
     assert cfg.is_file()
     stored = yaml.safe_load(cfg.read_text(encoding="utf-8"))
-    assert stored["data_root"] == str(data)
+    assert stored["data_root"] == data.resolve().as_posix()
     assert "repo_root" not in stored
     assert data.is_dir()
     assert (data / "runtimes").is_dir()
