@@ -137,6 +137,8 @@ def emit_lifecycle_event(repo: Path, event: dict[str, Any]) -> None:
     action = event.get("action")
     enriched: dict[str, Any] | None = None
     if action == "start":
+        if "config_id" not in event:
+            return
         rec = read_running(repo)
         cfg_id = str(event["config_id"])
         runtime_id: str | None = None
@@ -152,6 +154,8 @@ def emit_lifecycle_event(repo: Path, event: dict[str, Any]) -> None:
             "port": rec.port if rec else event.get("port"),
         }
     elif action == "stop":
+        if "config_id" not in event:
+            return
         enriched = {"action": "stop", "config_id": str(event["config_id"])}
     elif action == "switch":
         enriched = {
