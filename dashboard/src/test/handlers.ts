@@ -25,6 +25,13 @@ const runtimesList = [
     has_metrics: false,
   },
   {
+    id: 'stub-runtime',
+    kind: 'official',
+    installed: true,
+    installed_at: '2026-01-01T00:00:00Z',
+    has_metrics: false,
+  },
+  {
     id: 'llama.cpp',
     kind: 'official',
     installed: false,
@@ -32,6 +39,15 @@ const runtimesList = [
     has_metrics: false,
   },
 ]
+
+const stubRuntimeDetail = {
+  id: 'stub-runtime',
+  kind: 'official',
+  installed: true,
+  manifest: { id: 'stub-runtime', kind: 'official', accepts_formats: [] },
+  install_record: { installed_at: '2026-01-01T00:00:00Z', cli_version: '1.0.0' },
+  drift: null,
+}
 
 const runtimeDetail = {
   id: 'vllm',
@@ -67,7 +83,66 @@ const configDetail = {
 }
 
 const configParams = [
-  { key: 'port', label: 'Port', value: '8000', kind: 'string' },
+  {
+    key: 'host',
+    label: 'Host',
+    description: 'Bind host',
+    value: '127.0.0.1',
+    enabled: true,
+    locked: true,
+    readonly: false,
+    tier: 'common',
+    hint: null,
+    param_type: 'string',
+  },
+  {
+    key: 'port',
+    label: 'Port',
+    description: 'HTTP port',
+    value: '8000',
+    enabled: true,
+    locked: false,
+    readonly: false,
+    tier: 'common',
+    hint: null,
+    param_type: 'string',
+  },
+]
+
+const defaultParams = [
+  {
+    key: 'host',
+    label: 'Host',
+    description: 'Bind host',
+    value: '127.0.0.1',
+    enabled: true,
+    locked: true,
+    readonly: false,
+    tier: 'common',
+    hint: null,
+    param_type: 'string',
+  },
+  {
+    key: 'port',
+    label: 'Port',
+    description: 'HTTP port',
+    value: '',
+    enabled: false,
+    locked: false,
+    readonly: false,
+    tier: 'common',
+    hint: null,
+    param_type: 'string',
+  },
+]
+
+const recommendationsPayload = [
+  {
+    param_key: 'port',
+    suggested_value: '8080',
+    reason: 'Common alternate port',
+    confidence: 0.8,
+  },
 ]
 
 const doctorPayload = {
@@ -119,8 +194,18 @@ export const handlers = [
   http.get('http://localhost/api/runtimes', () => HttpResponse.json(runtimesList)),
   http.get('http://localhost/api/runtimes/:id', ({ params }) => {
     if (params.id === 'vllm') return HttpResponse.json(runtimeDetail)
+    if (params.id === 'stub-runtime') return HttpResponse.json(stubRuntimeDetail)
     return HttpResponse.json({ error: 'not found' }, { status: 404 })
   }),
+  http.get('http://localhost/api/runtimes/:id/default-params', ({ params }) => {
+    if (params.id === 'vllm' || params.id === 'stub-runtime') {
+      return HttpResponse.json(defaultParams)
+    }
+    return HttpResponse.json({ error: 'not found' }, { status: 404 })
+  }),
+  http.get('http://localhost/api/recommendations', () =>
+    HttpResponse.json(recommendationsPayload),
+  ),
   http.get('http://localhost/api/models', () => HttpResponse.json(modelsList)),
   http.get('http://localhost/api/models/:id', ({ params }) => {
     if (params.id === 'llama-3') return HttpResponse.json(modelDetail)

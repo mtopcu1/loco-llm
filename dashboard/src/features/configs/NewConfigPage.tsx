@@ -1,19 +1,16 @@
 import { Link } from '@tanstack/react-router'
-import { ConfigForm } from './ConfigForm'
+import { NewConfigWizard } from './wizard/NewConfigWizard'
 
 export function NewConfigPage() {
   return (
-    <div className="space-y-6 max-w-xl">
+    <div className="max-w-4xl mx-auto space-y-6">
       <div>
         <Link to="/configs" className="text-sm text-zinc-500 hover:underline">
           ← Configs
         </Link>
-        <h1 className="text-2xl font-semibold mt-1">New config</h1>
-        <p className="text-sm text-zinc-500">
-          Raw form for v1 — param grid wizard arrives in Plan 3.
-        </p>
+        <h1 className="text-2xl font-semibold mt-1">Create a new config</h1>
       </div>
-      <ConfigForm mode="create" />
+      <NewConfigWizard />
     </div>
   )
 }
