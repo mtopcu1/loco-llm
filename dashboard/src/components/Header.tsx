@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
+import { UpdateBadge } from './UpdateBadge'
 import { StatusPill, type InstanceStatus } from './StatusPill'
 
 export function Header() {
@@ -26,6 +27,7 @@ export function Header() {
       <span className="text-xs text-zinc-500">
         v{version.data?.cli_version ?? '…'}
       </span>
+      <UpdateBadge />
       <div className="flex-1" />
       <StatusPill instance={instance.data} />
     </header>

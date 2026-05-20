@@ -200,6 +200,15 @@ const settingsPayload = {
 export const handlers = [
   http.get('http://localhost/api/overview', () => HttpResponse.json(overviewPayload)),
   http.get('http://localhost/api/version', () => HttpResponse.json({ cli_version: '1.1.0' })),
+  http.get('http://localhost/api/update/check', () =>
+    HttpResponse.json({
+      current: '1.1.0',
+      latest: '1.1.0',
+      update_available: false,
+      release_url: null,
+    }),
+  ),
+  http.post('http://localhost/api/update', () => HttpResponse.json({ job_id: 'job-update' })),
   http.get('http://localhost/api/instance', () => HttpResponse.json({ running: false })),
   http.get('http://localhost/api/runtimes', () => HttpResponse.json(runtimesList)),
   http.get('http://localhost/api/runtimes/:id', ({ params }) => {
