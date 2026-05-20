@@ -1,37 +1,43 @@
-# LocalLLM Dashboard
+# LocalLLM Dashboard (React SPA)
 
-React SPA for the LocalLLM web dashboard. Built with Vite, React 19, TypeScript, Tailwind v4, and shadcn/ui.
+The web frontend for the LocalLLM CLI dashboard. Source code lives here; built
+output is committed to `.gitignore` and emitted by `npm run build` to `dist/`.
 
-## Development
+## Dev loop
 
 ```bash
-npm ci
-npm run dev
+# Terminal 1 — backend with auto-reload
+uv run uvicorn llm_cli.webapi.app:create_app --factory --reload --port 7878
+
+# Terminal 2 — frontend with HMR
+cd dashboard && npm run dev
+# Opens http://localhost:5173; /api/* proxied to :7878
 ```
 
-The dev server proxies `/api` to `http://127.0.0.1:7878` (start the backend with `llm dashboard serve`).
+## Regenerating the typed API client
 
-## Build
+After changing any FastAPI route or schema in `src/llm_cli/webapi/`:
 
 ```bash
-npm ci
-npm run build
+scripts/regen-api-client.sh
 ```
 
-## API client
+Commit the changes to `dashboard/src/api/generated.ts`. CI enforces sync via
+`scripts/regen-api-client.sh --check`.
 
-Regenerate the typed API client from the FastAPI OpenAPI schema:
+## Stack
+
+- React 19 + TypeScript
+- Vite + Tailwind CSS v4 + shadcn/ui
+- TanStack Router (type-safe routes) + TanStack Query (server state)
+- Zustand (cross-page client state)
+- sonner (toasts)
+- Vitest + Testing Library + msw (tests)
+
+## Running tests
 
 ```bash
-npm run regen-client
-# or from repo root:
-../scripts/regen-api-client.sh
-```
-
-The `--check` mode of `regen-api-client.sh` requires `npm ci` to have been run at least once locally.
-
-## Tests
-
-```bash
-npm run test
+npm run test          # one-shot
+npm run test:watch    # watch mode
+npm run typecheck     # tsc --noEmit
 ```
