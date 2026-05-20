@@ -1,6 +1,26 @@
 import { toast } from 'sonner'
 import { getApiError } from '@/lib/apiError'
 
+const HINT_RE = /^(GET|POST|PUT|DELETE)\s+(\/api\/.+)$/
+
+function parseFixHint(hint: string | null | undefined) {
+  if (!hint) return null
+  const m = HINT_RE.exec(hint)
+  if (!m) return null
+  return { method: m[1] as 'GET' | 'POST' | 'PUT' | 'DELETE', path: m[2] }
+}
+
+async function executeFixHint(parsed: { method: string; path: string }) {
+  if (parsed.method !== 'POST') return
+  try {
+    const r = await fetch(parsed.path, { method: 'POST' })
+    if (r.ok) toast.success('Fix applied')
+    else toast.error('Fix failed', { description: await r.text() })
+  } catch (e) {
+    toast.error('Fix failed', { description: String(e) })
+  }
+}
+
 const TITLES: Record<string, string> = {
   RUNTIME_ALREADY_INSTALLED: 'Runtime already installed',
   RUNTIME_IN_USE: 'Runtime in use',
@@ -30,11 +50,10 @@ const TITLES: Record<string, string> = {
 export function errorToToast(err: unknown) {
   const body = getApiError(err)
   if (body) {
+    const fix = parseFixHint(body.fix_hint)
     toast.error(TITLES[body.code] ?? body.code, {
       description: body.message,
-      action: body.fix_hint
-        ? { label: 'Fix', onClick: () => { /* Plan 5 */ } }
-        : undefined,
+      action: fix ? { label: 'Fix', onClick: () => void executeFixHint(fix) } : undefined,
     })
     return
   }
