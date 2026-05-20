@@ -268,15 +268,43 @@ def _allowed_hosts_for(host: str, port: int) -> set[str]:
     }
 
 
-def start_server_background(host: str, port: int) -> int:
+def _write_security_log_line(
+    host: str, port: int, *, allowed_hosts: set[str], insecure: bool
+) -> None:
+    log_path = server_log_path()
+    with log_path.open("ab") as f:
+        f.write(
+            f"[SECURITY] Started with --insecure={insecure} on {host}:{port}; "
+            f"allowed_hosts={sorted(allowed_hosts)}\n".encode()
+        )
+
+
+def _apply_server_env(
+    env: dict[str, str], *, allowed_hosts: set[str], insecure: bool
+) -> None:
+    env["LLM_DASHBOARD_ALLOWED_HOSTS"] = ",".join(sorted(allowed_hosts))
+    if insecure:
+        env["LLM_DASHBOARD_INSECURE"] = "1"
+
+
+def start_server_background(
+    host: str,
+    port: int,
+    *,
+    allowed_hosts: set[str] | None = None,
+    insecure: bool = False,
+) -> int:
     """Spawn uvicorn detached and wait until /api/health is ready."""
     if _port_in_use(host, port):
         raise RuntimeError(f"Port {port} already in use on {host}.")
 
+    allowed_hosts = allowed_hosts or _allowed_hosts_for(host, port)
+    _write_security_log_line(host, port, allowed_hosts=allowed_hosts, insecure=insecure)
+
     log_path = server_log_path()
     log_fd = log_path.open("ab")
     env = os.environ.copy()
-    env["LLM_DASHBOARD_ALLOWED_HOSTS"] = ",".join(sorted(_allowed_hosts_for(host, port)))
+    _apply_server_env(env, allowed_hosts=allowed_hosts, insecure=insecure)
 
     cmd = [
         sys.executable,
@@ -332,14 +360,21 @@ def start_server_background(host: str, port: int) -> int:
     )
 
 
-def run_server_foreground(host: str, port: int) -> None:
+def run_server_foreground(
+    host: str,
+    port: int,
+    *,
+    allowed_hosts: set[str] | None = None,
+    insecure: bool = False,
+) -> None:
     """Run uvicorn in-process and clean up pid file on exit."""
     import uvicorn
 
+    allowed_hosts = allowed_hosts or _allowed_hosts_for(host, port)
+    _write_security_log_line(host, port, allowed_hosts=allowed_hosts, insecure=insecure)
+
     server_pid_path().write_text(str(os.getpid()), encoding="utf-8")
-    os.environ["LLM_DASHBOARD_ALLOWED_HOSTS"] = ",".join(
-        sorted(_allowed_hosts_for(host, port))
-    )
+    _apply_server_env(os.environ, allowed_hosts=allowed_hosts, insecure=insecure)
     try:
         uvicorn.run(
             "llm_cli.webapi.app:create_app",

@@ -6,8 +6,10 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 
 from llm_cli.core import dashboard as dash
+from llm_cli.core.settings import resolve_settings
 from llm_cli.webapi.errors import install_exception_handlers
 from llm_cli.webapi.middleware import (
     HostHeaderMiddleware,
@@ -28,6 +30,7 @@ from llm_cli.webapi.routes import (
     recommendations,
     runtimes,
     settings,
+    update,
     version,
 )
 from llm_cli.webapi.static import mount_spa
@@ -63,7 +66,8 @@ def create_app(
 
     install_exception_handlers(app)
 
-    app.add_middleware(SecurityHeadersMiddleware)
+    insecure = os.environ.get("LLM_DASHBOARD_INSECURE") == "1"
+    app.add_middleware(SecurityHeadersMiddleware, insecure=insecure)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins or [],
@@ -89,8 +93,17 @@ def create_app(
     api.include_router(recommendations.router)
     api.include_router(runtimes.router)
     api.include_router(settings.router)
+    api.include_router(update.router)
     api.include_router(version.router)
     app.mount("/api", api)
+
+    @app.get("/docs/dashboard-security", include_in_schema=False)
+    def dashboard_security_doc():
+        settings = resolve_settings()
+        if settings.repo_root is None:
+            return PlainTextResponse("repo_root not configured", status_code=503)
+        doc_path = settings.repo_root / "docs" / "DASHBOARD-SECURITY.md"
+        return PlainTextResponse(doc_path.read_text(encoding="utf-8"))
 
     @app.on_event("startup")
     async def _startup_metrics() -> None:

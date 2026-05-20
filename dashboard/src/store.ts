@@ -7,6 +7,8 @@ interface AppStore {
   setJobsTrayOpen: (open: boolean) => void
   selectedJobId: string | null
   setSelectedJobId: (id: string | null) => void
+  insecure: boolean
+  setInsecure: (insecure: boolean) => void
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -16,4 +18,8 @@ export const useAppStore = create<AppStore>((set) => ({
   setJobsTrayOpen: (open) => set({ jobsTrayOpen: open }),
   selectedJobId: null,
   setSelectedJobId: (id) => set({ selectedJobId: id }),
+  insecure: false,
+  setInsecure: (insecure) => set({ insecure }),
 }))
+
+export const useInsecure = () => useAppStore((s) => s.insecure)

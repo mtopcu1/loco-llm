@@ -11,6 +11,32 @@ from llm_cli.core.versions import current_cli_version
 app = typer.Typer(help="Manage the LocalLLM web dashboard.")
 _LOCALHOST_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
+_INSECURE_REFUSAL = """
+
+═══════════════════════════════════════════════════════════════════════
+  REFUSING TO START: --insecure exposes the dashboard on the network.
+═══════════════════════════════════════════════════════════════════════
+
+What --insecure means:
+  • Anyone reachable on this interface can manage your LocalLLM install.
+  • That includes pulling arbitrary models, starting runtimes, viewing
+    your config files, and reading runtime stdout/stderr (which may
+    contain prompts).
+  • There is no authentication. There is no audit log.
+  • This is unsafe on shared networks (coffee shops, conferences, dorms).
+  • This is unsafe on cloud VMs without firewall rules.
+
+If you actually need remote access, prefer:
+  • SSH port-forward:    ssh -L 7878:127.0.0.1:7878 user@host
+  • Tailscale + bind to the tailnet IP only
+  • A reverse proxy with TLS and auth in front (out of scope for v1)
+
+If you understand and accept the risk, re-run with --i-understand:
+  llm dashboard serve --insecure --i-understand --allowed-host <host:port>
+
+See: docs/DASHBOARD-SECURITY.md
+"""
+
 
 @app.callback(invoke_without_command=True)
 def _default(ctx: typer.Context) -> None:
@@ -49,16 +75,36 @@ def serve(
     host: Annotated[str, typer.Option("--host")] = "127.0.0.1",
     foreground: Annotated[bool, typer.Option("--foreground")] = False,
     no_open: Annotated[bool, typer.Option("--no-open")] = False,
+    insecure: Annotated[bool, typer.Option("--insecure")] = False,
+    i_understand: Annotated[bool, typer.Option("--i-understand")] = False,
+    allowed_host: Annotated[list[str], typer.Option("--allowed-host")] = [],
 ) -> None:
     """Start the dashboard server."""
-    if host not in _LOCALHOST_HOSTS:
+    if insecure and not i_understand:
+        typer.secho(_INSECURE_REFUSAL, fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=78)
+
+    if insecure and i_understand and not allowed_host:
         typer.secho(
-            f"Refusing to bind to {host}. Non-localhost binding requires --insecure "
-            "(planned for a later security hardening release).",
+            "Refusing to start: --insecure --i-understand requires at least one "
+            "--allowed-host HOST:PORT (DNS rebinding defense). See docs/DASHBOARD-SECURITY.md.",
             fg=typer.colors.RED,
             err=True,
         )
         raise typer.Exit(code=78)
+
+    if not insecure and host not in _LOCALHOST_HOSTS:
+        typer.secho(
+            f"Refusing to bind to {host}. Non-localhost binding requires "
+            "--insecure --i-understand --allowed-host HOST:PORT.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=78)
+
+    if insecure and i_understand:
+        typer.secho(_INSECURE_REFUSAL.rstrip(), fg=typer.colors.YELLOW, err=True)
+        typer.echo("")
 
     verdict, reason = dash.verify_installed(current_cli_version())
     if verdict != "ok":
@@ -71,17 +117,25 @@ def serve(
         )
         raise typer.Exit(code=78)
 
+    allowed_hosts: set[str] = {f"127.0.0.1:{port}", f"localhost:{port}"}
+    if insecure:
+        allowed_hosts.update(allowed_host)
+
     if foreground:
         typer.echo(
             f"Starting dashboard on http://{host}:{port}/ (foreground; Ctrl-C to stop)"
         )
         if not no_open:
             dash.open_browser(host, port)
-        dash.run_server_foreground(host, port)
+        dash.run_server_foreground(
+            host, port, allowed_hosts=allowed_hosts, insecure=insecure
+        )
         return
 
     try:
-        pid = dash.start_server_background(host, port)
+        pid = dash.start_server_background(
+            host, port, allowed_hosts=allowed_hosts, insecure=insecure
+        )
     except RuntimeError as exc:
         typer.secho(str(exc), fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from exc
