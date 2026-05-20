@@ -219,7 +219,14 @@ def _dashboard_scope_checks() -> list[ScopeCheckResult]:
 def _check_insecure_in_recent_log() -> ScopeCheckResult:
     from llm_cli.core import dashboard as dash
 
-    log = dash.server_log_path()
+    try:
+        log = dash.server_log_path()
+    except RuntimeError:
+        return ScopeCheckResult(
+            name="dashboard last startup not --insecure",
+            status="info",
+            message="repo_root not configured; cannot read server.log.",
+        )
     if not log.is_file():
         return ScopeCheckResult(
             name="dashboard last startup not --insecure",
