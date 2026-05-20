@@ -6,6 +6,7 @@ from typing import Annotated
 import typer
 
 from llm_cli.core import dashboard as dash
+from llm_cli.core.versions import current_cli_version
 
 app = typer.Typer(help="Manage the LocalLLM web dashboard.")
 
@@ -24,8 +25,21 @@ def install(
     skip_python: Annotated[bool, typer.Option("--skip-python")] = False,
 ) -> None:
     """Install Python deps + Node deps + build the frontend."""
-    typer.secho("`llm dashboard install` not yet implemented (Plan 1, Task 13).", fg=typer.colors.YELLOW)
-    raise typer.Exit(code=2)
+    try:
+        record = dash.run_install(
+            cli_version=current_cli_version(),
+            skip_python=skip_python,
+            skip_frontend=skip_frontend,
+            reset=reset,
+        )
+    except RuntimeError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=78) from exc
+    typer.secho(
+        f"Dashboard installed (CLI {record.cli_version}, node {record.node_version}, "
+        f"npm {record.npm_version}).",
+        fg=typer.colors.GREEN,
+    )
 
 
 @app.command()

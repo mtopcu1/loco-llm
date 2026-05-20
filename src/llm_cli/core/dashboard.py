@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import hashlib
 import os
+import shutil
+import subprocess
 from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -136,3 +139,107 @@ def is_server_alive(pid: int) -> bool:
         return True
     except OSError:
         return False
+
+
+def _probe_node_version() -> str:
+    try:
+        out = subprocess.check_output(["node", "--version"], text=True).strip()
+        return out.lstrip("v")
+    except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+        raise RuntimeError(
+            "`node` not found. Install Node.js 20+ (https://nodejs.org) and retry."
+        ) from exc
+
+
+def _probe_npm_version() -> str:
+    try:
+        return subprocess.check_output(["npm", "--version"], text=True).strip()
+    except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+        raise RuntimeError(
+            "`npm` not found. Install Node.js 20+ (includes npm) and retry."
+        ) from exc
+
+
+def _check_node_minimum(version: str, minimum: tuple[int, int] = (20, 0)) -> None:
+    major_minor = tuple(int(part) for part in version.split(".")[:2])
+    if major_minor < minimum:
+        need = ".".join(str(part) for part in minimum)
+        raise RuntimeError(f"Node.js {need}+ required; found {version}.")
+
+
+def _managed_venv_python(root: Path) -> Path | None:
+    candidates = (
+        root.parent / ".venv" / "Scripts" / "python.exe",
+        root.parent / ".venv" / "bin" / "python",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def run_install(
+    *,
+    cli_version: str,
+    skip_python: bool,
+    skip_frontend: bool,
+    reset: bool,
+) -> InstalledRecord:
+    """Run dashboard dependency + frontend install and write .installed marker."""
+    root = dashboard_root()
+
+    if not skip_python:
+        uv = shutil.which("uv")
+        if uv is None:
+            raise RuntimeError("`uv` not found. Install uv and retry `llm dashboard install`.")
+        venv_python = _managed_venv_python(root)
+        if venv_python is None:
+            raise RuntimeError(
+                f"managed venv not found at {root.parent / '.venv'}; rerun install.sh first."
+            )
+        subprocess.check_call(
+            [
+                uv,
+                "pip",
+                "install",
+                "--python",
+                str(venv_python),
+                "fastapi>=0.115,<1.0",
+                "uvicorn[standard]>=0.30,<1.0",
+                "sse-starlette>=2.1,<3.0",
+            ]
+        )
+
+    if not skip_frontend:
+        node_v = _probe_node_version()
+        _check_node_minimum(node_v)
+        npm_v = _probe_npm_version()
+        if reset:
+            shutil.rmtree(root / "node_modules", ignore_errors=True)
+        subprocess.check_call(["npm", "ci"], cwd=root)
+        subprocess.check_call(["npm", "run", "build"], cwd=root)
+    else:
+        try:
+            node_v = _probe_node_version()
+        except RuntimeError:
+            node_v = "skipped"
+        try:
+            npm_v = _probe_npm_version()
+        except RuntimeError:
+            npm_v = "skipped"
+
+    d = dist_dir()
+    if not (d / "index.html").is_file():
+        raise RuntimeError(
+            "dashboard/dist/index.html missing. Run without --skip-frontend or build first."
+        )
+
+    record = InstalledRecord(
+        installed_at=datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        cli_version=cli_version,
+        node_version=node_v,
+        npm_version=npm_v,
+        dist_hash=compute_dist_hash(d),
+    )
+    write_installed_record(record)
+    return record
