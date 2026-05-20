@@ -95,3 +95,32 @@ export function toServeParams(cells: ParamCell[]): Record<string, unknown> {
 export function cloneCells(cells: ParamCell[]): ParamCell[] {
   return cells.map((c) => ({ ...c }))
 }
+
+/** Attach default snapshots for reset/diff helpers. */
+export function withDefaults(cells: ParamCell[]): ParamCell[] {
+  return cells.map((c) => ({ ...c, default: c.default ?? c.value }))
+}
+
+export function proposeConfigId(runtimeId: string, modelId: string | null): string {
+  const model = modelId ?? 'nomodel'
+  return `${runtimeId}__${model}__default`
+}
+
+export function buildConfigBody(args: {
+  configId: string
+  runtimeId: string
+  modelId: string | null
+  params: ParamCell[]
+}) {
+  return {
+    id: args.configId,
+    runtime: args.runtimeId,
+    model: args.modelId || undefined,
+    serve: {
+      host: '127.0.0.1',
+      port: 8000,
+      params: toServeParams(args.params),
+    },
+    readiness: { timeout_seconds: 600 },
+  }
+}
