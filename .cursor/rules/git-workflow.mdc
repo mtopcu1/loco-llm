@@ -1,0 +1,62 @@
+---
+description: Branch-first Git workflow — never commit on main
+alwaysApply: true
+---
+
+# Git workflow
+
+## Never commit on `main`
+
+- **`main` is protected** — do not commit, push, or implement directly on it.
+- Before any code or doc changes, create and switch to a topic branch from up-to-date `main`.
+- Merge only via PR; commits land on `main` after review/merge, not from local direct work.
+
+## When to create a branch
+
+Create a topic branch **before** the first commit when:
+
+- Using **superpowers** (brainstorming, writing-plans, executing-plans, subagent-driven development, etc.)
+- The task spans **multiple files**, **multiple commits**, or is a **feature/fix/refactor**
+- The user asks for a PR or release-related work
+
+Small one-off fixes still get a branch (`fix/…`), not `main`.
+
+## Branch naming
+
+Use lowercase kebab-case: `<type>/<short-topic>`
+
+| Prefix | Use for |
+|--------|---------|
+| `feat/` | New behavior, user-facing capability |
+| `fix/` | Bug fixes |
+| `refactor/` | Internal restructuring, no behavior change |
+| `docs/` | Documentation-only |
+| `chore/` | Tooling, cleanup, deps |
+| `ci/` | GitHub Actions, release plumbing |
+| `test/` | Test-only changes |
+
+**Examples**
+
+```text
+feat/param-omit-defaults
+fix/update-sync-deps-venv
+docs/git-tag-distribution-spec
+chore/cursor-conventional-commits-rule
+```
+
+Keep names short (2–4 words), descriptive, and aligned with the PR title.
+
+## Workflow checklist
+
+1. `git fetch origin main && git checkout -b feat/my-topic origin/main`
+2. Implement and commit on the branch (see `conventional-commits.mdc` for messages)
+3. Push branch and open PR → `main`
+4. After merge, delete the remote branch if cleanup is part of the task
+
+## Avoid
+
+```text
+git checkout main && git commit          # forbidden
+feat/my-topic-with-very-long-name-…      # too vague or too long
+my-feature                               # missing type prefix
+```
