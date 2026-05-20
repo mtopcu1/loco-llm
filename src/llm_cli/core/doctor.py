@@ -212,7 +212,43 @@ def _dashboard_scope_checks() -> list[ScopeCheckResult]:
             )
         )
 
+    results.append(_check_insecure_in_recent_log())
     return results
+
+
+def _check_insecure_in_recent_log() -> ScopeCheckResult:
+    from llm_cli.core import dashboard as dash
+
+    log = dash.server_log_path()
+    if not log.is_file():
+        return ScopeCheckResult(
+            name="dashboard last startup not --insecure",
+            status="ok",
+            message="No server.log present.",
+        )
+    tail = log.read_text(encoding="utf-8")[-4096:]
+    matches = re.findall(r"\[SECURITY\].*", tail)
+    if not matches:
+        return ScopeCheckResult(
+            name="dashboard last startup not --insecure",
+            status="ok",
+            message="No --insecure in recent startups.",
+        )
+    last = matches[-1]
+    if "--insecure=True" in last:
+        return ScopeCheckResult(
+            name="dashboard last startup not --insecure",
+            status="warning",
+            message=(
+                f"Last dashboard startup used --insecure: {last.strip()}. "
+                "If unintentional, restart without --insecure."
+            ),
+        )
+    return ScopeCheckResult(
+        name="dashboard last startup not --insecure",
+        status="ok",
+        message="Last startup was localhost-only.",
+    )
 
 
 def _requirement_results_to_scope_checks(
