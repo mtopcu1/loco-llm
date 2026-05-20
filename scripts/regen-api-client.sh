@@ -12,7 +12,7 @@ TMP_SCHEMA=$(mktemp)
 TMP_OUT=$(mktemp)
 trap 'rm -f "$TMP_SCHEMA" "$TMP_OUT"' EXIT
 
-python -m llm_cli.webapi.export_openapi > "$TMP_SCHEMA"
+uv run python -m llm_cli.webapi.export_openapi > "$TMP_SCHEMA"
 
 if ! command -v npx >/dev/null 2>&1; then
   echo "regen-api-client: npx not found; install Node.js 20+." >&2
