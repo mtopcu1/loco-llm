@@ -13,6 +13,22 @@ class Recommendation:
     reason: str
 
 
+@dataclass(frozen=True)
+class AdvisorHint:
+    param_key: str
+    suggested_value: str
+    reason: str
+    confidence: float | None = None
+
+    def as_dict(self) -> dict[str, str | float | None]:
+        return {
+            "param_key": self.param_key,
+            "suggested_value": self.suggested_value,
+            "reason": self.reason,
+            "confidence": self.confidence,
+        }
+
+
 _HEADROOM_BYTES = 1 << 30
 _KV_BYTES_PER_TOKEN = 2 << 20
 _LAYERS_ASSUMED = 60
@@ -94,3 +110,42 @@ def recommend(
         )
 
     return None
+
+
+def compute(runtime_id: str, *, model_id: str | None = None) -> list[AdvisorHint]:
+    """REST-friendly advisor hints for (runtime_id, model_id), mirroring ``llm advisor``."""
+    from llm_cli.core import registry
+    from llm_cli.core.model_registry import get_entry
+    from llm_cli.core.scaffold import scaffold_root
+    from llm_cli.core.settings import load_settings, resolve
+    from llm_cli.core.specs import detect_all
+
+    if not model_id:
+        return []
+
+    rt_manifest = registry.get_runtime_manifest_merged(runtime_id)
+    if rt_manifest is None:
+        return []
+
+    settings = resolve(load_settings())
+    model = get_entry(settings.models_dir, model_id)
+    if model is None:
+        return []
+
+    specs = detect_all(
+        repo_root=scaffold_root().as_posix(),
+        data_root=settings.data_root.as_posix(),
+    )
+    out: list[AdvisorHint] = []
+    for spec in rt_manifest.serve_schema:
+        rec = recommend(runtime_id, spec.key, model=model, specs=specs)
+        if rec is None:
+            continue
+        out.append(
+            AdvisorHint(
+                param_key=spec.key,
+                suggested_value=rec.value,
+                reason=rec.reason,
+            )
+        )
+    return out
