@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSSE } from '@/hooks/useSSE'
+import { MetricsTab } from '@/features/metrics/MetricsTab'
 import { InstanceControls } from './InstanceControls'
 import { LogsView } from './LogsView'
 
@@ -72,7 +73,7 @@ export function InstancePage() {
               <LogsView enabled={state.running} />
             </TabsContent>
             <TabsContent value="metrics">
-              <p className="text-zinc-500 text-sm">Live metrics arrive in Plan 4.</p>
+              <MetricsTab configId={state.config_id!} />
             </TabsContent>
           </Tabs>
         </>
