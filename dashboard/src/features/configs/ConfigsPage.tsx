@@ -1,8 +1,10 @@
-import { useQuery } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { toast } from 'sonner'
 import { api } from '@/api/client'
-import { Plan2Button } from '@/components/Plan2Button'
+import { errorToToast } from '@/lib/errorToToast'
 import { ErrorCard } from '@/components/ErrorCard'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -15,6 +17,7 @@ import {
 
 export function ConfigsPage() {
   const navigate = useNavigate()
+  const qc = useQueryClient()
   const configs = useQuery({
     queryKey: ['configs'],
     queryFn: async () => {
@@ -24,6 +27,20 @@ export function ConfigsPage() {
     },
   })
 
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await api.DELETE('/configs/{config_id}', {
+        params: { path: { config_id: id } },
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('Config deleted')
+      void qc.invalidateQueries({ queryKey: ['configs'] })
+    },
+    onError: errorToToast,
+  })
+
   if (configs.isPending) return <Skeleton className="h-64 w-full" />
   if (configs.isError) return <ErrorCard title="Failed to load configs" message={String(configs.error)} />
 
@@ -31,7 +48,9 @@ export function ConfigsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Configs</h1>
-        <Plan2Button size="sm">New config</Plan2Button>
+        <Link to="/configs/new">
+          <Button size="sm">New config</Button>
+        </Link>
       </div>
 
       <Table>
@@ -52,7 +71,16 @@ export function ConfigsPage() {
               <TableCell className="font-mono">{cfg.id}</TableCell>
               <TableCell>{cfg.source ?? '—'}</TableCell>
               <TableCell onClick={(e) => e.stopPropagation()}>
-                <Plan2Button size="xs" variant="outline">Delete</Plan2Button>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() => {
+                    if (!window.confirm(`Delete config "${cfg.id}"?`)) return
+                    remove.mutate(cfg.id)
+                  }}
+                >
+                  Delete
+                </Button>
               </TableCell>
             </TableRow>
           ))}
