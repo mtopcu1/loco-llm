@@ -39,3 +39,13 @@ dist/
 
 # Models now live in $LLM_MODELS (data root); keep the repo dir out of git.
 models/
+
+# Dashboard
+dashboard/node_modules/
+dashboard/dist/
+dashboard/.installed
+
+# Dashboard server / job / metrics state
+state/dashboard/
+state/jobs/
+state/metrics/
