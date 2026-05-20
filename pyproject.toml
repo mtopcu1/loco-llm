@@ -41,6 +41,7 @@ Issues = "https://github.com/mtopcu1/local-llm-scaffold/issues"
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+    "pytest-asyncio>=0.23",
     "pytest-mock>=3.12",
     "pexpect>=4.9; sys_platform != 'win32'",
     "build>=1.0",
@@ -60,6 +61,7 @@ packages = ["src/llm_cli"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra -q"
+asyncio_mode = "auto"
 markers = [
     "tui: PTY-driven TUI integration tests (Unix only)",
     "webapi: FastAPI dashboard backend tests",
