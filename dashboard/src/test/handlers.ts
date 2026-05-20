@@ -22,7 +22,7 @@ const runtimesList = [
     kind: 'official',
     installed: true,
     installed_at: '2026-01-01T00:00:00Z',
-    has_metrics: false,
+    has_metrics: true,
   },
   {
     id: 'stub-runtime',
@@ -53,7 +53,17 @@ const runtimeDetail = {
   id: 'vllm',
   kind: 'official',
   installed: true,
-  manifest: { id: 'vllm', kind: 'official', version: '1.0' },
+  manifest: {
+    id: 'vllm',
+    kind: 'official',
+    version: '1.0',
+    metrics: {
+      fields: {
+        tps_decode: { label: 'Decode TPS', unit: 'tok/s' },
+        ttft_ms: { label: 'TTFT', unit: 'ms' },
+      },
+    },
+  },
   install_record: { installed_at: '2026-01-01T00:00:00Z', cli_version: '1.0.0' },
   drift: null,
 }
@@ -222,6 +232,16 @@ export const handlers = [
   }),
   http.get('http://localhost/api/configs/:id/validate', ({ params }) => {
     if (params.id === 'default') return HttpResponse.json({ valid: true, errors: [] })
+    return HttpResponse.json({ error: 'not found' }, { status: 404 })
+  }),
+  http.get('http://localhost/api/configs/:id/metrics/aggregate', ({ params }) => {
+    if (params.id === 'default') {
+      return HttpResponse.json({ samples: 0, total_uptime_seconds: 0 })
+    }
+    return HttpResponse.json({ error: 'not found' }, { status: 404 })
+  }),
+  http.get('http://localhost/api/configs/:id/metrics/sparkline', ({ params }) => {
+    if (params.id === 'default') return HttpResponse.json([])
     return HttpResponse.json({ error: 'not found' }, { status: 404 })
   }),
   http.get('http://localhost/api/doctor', () => HttpResponse.json(doctorPayload)),

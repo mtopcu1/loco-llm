@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ConfigForm } from './ConfigForm'
 import { ParamsView } from './ParamsView'
+import { PerformanceMetricsCard } from '@/features/metrics/PerformanceMetricsCard'
 
 export function ConfigDetailPage() {
   const { id } = useParams({ from: '/configs/$id' })
@@ -109,9 +110,12 @@ export function ConfigDetailPage() {
               onCancel={() => setEditing(false)}
             />
           ) : (
-            <pre className="text-sm bg-zinc-50 p-3 rounded border overflow-x-auto">
-              {JSON.stringify(cfg.resolved ?? cfg.raw, null, 2)}
-            </pre>
+            <div className="space-y-4">
+              <PerformanceMetricsCard configId={id} />
+              <pre className="text-sm bg-zinc-50 p-3 rounded border overflow-x-auto">
+                {JSON.stringify(cfg.resolved ?? cfg.raw, null, 2)}
+              </pre>
+            </div>
           )}
         </TabsContent>
         <TabsContent value="params">
