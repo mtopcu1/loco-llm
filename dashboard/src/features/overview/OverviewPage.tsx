@@ -3,6 +3,8 @@ import { api } from '@/api/client'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ErrorCard } from '@/components/ErrorCard'
+import { formatMetricValue } from '@/features/metrics/MetricsCards'
+import { useMetricsStream } from '@/hooks/useMetricsStream'
 
 type OverviewData = {
   instance: { running: boolean; config_id?: string }
@@ -24,10 +26,23 @@ export function OverviewPage() {
     },
   })
 
+  const running = overview.data?.instance.running ?? false
+  const metrics = useMetricsStream(running)
+
   if (overview.isPending) return <Skeleton className="h-96 w-full" />
   if (overview.isError) return <ErrorCard title="Failed to load" message={String(overview.error)} />
 
   const o = overview.data!
+
+  const liveTps =
+    metrics.latest && typeof metrics.latest.tps_decode === 'number'
+      ? formatMetricValue(metrics.latest.tps_decode)
+      : '—'
+  const liveTtft =
+    metrics.latest && typeof metrics.latest.ttft_ms === 'number'
+      ? formatMetricValue(metrics.latest.ttft_ms)
+      : '—'
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Overview</h1>
@@ -38,6 +53,16 @@ export function OverviewPage() {
           <p className="text-lg">
             {o.instance.running ? `Running: ${o.instance.config_id}` : 'idle'}
           </p>
+          {o.instance.running ? (
+            <div className="mt-2 flex gap-3 text-sm">
+              <span className="rounded bg-blue-50 px-2 py-0.5 text-blue-800 tabular-nums">
+                TPS {liveTps}
+              </span>
+              <span className="rounded bg-blue-50 px-2 py-0.5 text-blue-800 tabular-nums">
+                TTFT {liveTtft} ms
+              </span>
+            </div>
+          ) : null}
         </Card>
         <Card className="p-4">
           <h3 className="text-sm text-zinc-500">Catalog</h3>

@@ -1,9 +1,11 @@
 """Runtime-lifecycle state: running.json, history.jsonl, PID liveness, reconcile."""
 from __future__ import annotations
 
+import asyncio
 import json
 import os as _os
 import subprocess as _subprocess
+from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -97,6 +99,72 @@ def append_history(repo: Path, event: dict[str, Any]) -> None:
     line.setdefault("ts", _utc_now_iso())
     with history_path(repo).open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(line, sort_keys=True) + "\n")
+    if line.get("action") in ("start", "stop", "switch"):
+        emit_lifecycle_event(repo, line)
+
+
+_LifecycleHandler = Callable[[dict[str, Any]], Awaitable[None]]
+
+
+class _LifecycleEventBus:
+    def __init__(self) -> None:
+        self._handlers: list[_LifecycleHandler] = []
+
+    def subscribe_async(self, handler: _LifecycleHandler) -> None:
+        self._handlers.append(handler)
+
+    def publish(self, event: dict[str, Any]) -> None:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        for handler in self._handlers:
+            loop.create_task(handler(event))
+
+
+_LIFECYCLE_BUS: _LifecycleEventBus | None = None
+
+
+def event_bus() -> _LifecycleEventBus:
+    global _LIFECYCLE_BUS
+    if _LIFECYCLE_BUS is None:
+        _LIFECYCLE_BUS = _LifecycleEventBus()
+    return _LIFECYCLE_BUS
+
+
+def emit_lifecycle_event(repo: Path, event: dict[str, Any]) -> None:
+    """Publish start/stop/switch events for dashboard subscribers."""
+    action = event.get("action")
+    enriched: dict[str, Any] | None = None
+    if action == "start":
+        if "config_id" not in event:
+            return
+        rec = read_running(repo)
+        cfg_id = str(event["config_id"])
+        runtime_id: str | None = None
+        from llm_cli.core import registry
+
+        cfg = registry.get_config_merged(cfg_id)
+        if cfg and isinstance(cfg.data.get("runtime"), str):
+            runtime_id = cfg.data["runtime"]
+        enriched = {
+            "action": "start",
+            "config_id": cfg_id,
+            "runtime_id": runtime_id,
+            "port": rec.port if rec else event.get("port"),
+        }
+    elif action == "stop":
+        if "config_id" not in event:
+            return
+        enriched = {"action": "stop", "config_id": str(event["config_id"])}
+    elif action == "switch":
+        enriched = {
+            "action": "switch",
+            "from": event.get("from"),
+            "to": event.get("to"),
+        }
+    if enriched is not None:
+        event_bus().publish(enriched)
 
 
 def read_history(repo: Path) -> list[dict[str, Any]]:

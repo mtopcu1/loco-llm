@@ -6,3 +6,5 @@ description: >
   layout validation. Replace with a real inference server (vLLM, llama.cpp, ...).
 accepts_formats: []
 build: {}
+
+metrics: null

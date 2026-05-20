@@ -9,6 +9,7 @@ from typing import Any, AsyncIterator, Literal
 from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sse_starlette.sse import EventSourceResponse
 
 from llm_cli.core import jobs as jobs_module, lifecycle, registry
 from llm_cli.core.settings import resolve_settings
@@ -77,6 +78,39 @@ async def stream_instance(once: bool = Query(default=False)):
                 yield _sse_data(last_payload)
 
     return StreamingResponse(_events(), media_type="text/event-stream")
+
+
+@router.get("/instance/metrics/stream", tags=["instance"])
+async def instance_metrics_stream():
+    from llm_cli.core import lifecycle_status, metrics, registry
+
+    cur = lifecycle_status.current()
+    if not cur.get("running"):
+        raise ApiError(
+            ErrorCode.INSTANCE_NOT_RUNNING,
+            "Nothing running",
+            status_code=409,
+        )
+    runtime_id = cur.get("runtime_id")
+    rt = registry.get_runtime_merged(runtime_id) if runtime_id else None
+    manifest_metrics = rt.manifest.get("metrics") if rt else None
+    if not manifest_metrics:
+        async def _no_metrics():
+            yield {"event": "error", "data": json.dumps({"reason": "no_metrics"})}
+
+        return EventSourceResponse(_no_metrics())
+
+    hub = metrics.scheduler().hub_for(str(cur["config_id"]))
+    sub = hub.subscribe()
+
+    async def _gen():
+        try:
+            async for ev in sub.events():
+                yield {"event": "snapshot", "data": json.dumps(ev, sort_keys=True)}
+        finally:
+            sub.close()
+
+    return EventSourceResponse(_gen())
 
 
 @router.get("/instance/logs/stream", tags=["instance"])

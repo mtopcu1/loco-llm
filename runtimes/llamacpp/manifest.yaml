@@ -65,3 +65,22 @@ build:
     type: bool
     tier: advanced
     prompt: "Delete the CMake build directory before configuring"
+
+metrics:
+  endpoint: /metrics
+  format: prometheus
+  fields:
+    tps_decode:
+      promql_metric: llamacpp:tokens_per_second_per_request
+      label: "Decode TPS"
+      unit: "tok/s"
+    ttft_ms:
+      promql_metric: llamacpp:time_to_first_token_seconds
+      multiplier: 1000
+      label: "TTFT"
+      unit: "ms"
+    kv_cache_pct:
+      promql_metric: llamacpp:kv_cache_usage_ratio
+      multiplier: 100
+      label: "KV cache"
+      unit: "%"
