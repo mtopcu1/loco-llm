@@ -152,7 +152,7 @@ def discover_runtimes_merged() -> list[RuntimeRecord]:
 
 def discover_configs_merged() -> list[ConfigRecord]:
     settings = resolve(load_settings())
-    return discover_configs(configs_dir(settings), source="user")
+    return discover_configs(settings.data_root, source="user")
 
 
 def discover_benchmarks_merged() -> list[BenchmarkRecord]:

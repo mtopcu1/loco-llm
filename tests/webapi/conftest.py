@@ -34,16 +34,24 @@ def client(error_app) -> TestClient:
 
 
 @pytest.fixture
-def webapi_repo(tmp_path):
+def webapi_repo(tmp_path, monkeypatch):
     repo_root = tmp_path / "repo"
     repo_root.mkdir(parents=True, exist_ok=True)
-    for dirname in ("runtimes", "configs", "benchmarks", "state"):
+    for dirname in ("runtimes", "benchmarks"):
         (repo_root / dirname).mkdir(parents=True, exist_ok=True)
     (repo_root / "requirements.yaml").write_text("[]\n", encoding="utf-8")
 
     data_root = tmp_path / "data"
+    for dirname in ("configs", "state", "models", "runtimes", "cache", "user"):
+        (data_root / dirname).mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("LOCO_HOME", str(data_root))
+    monkeypatch.setenv("LOCO_INSTALL", str(repo_root))
     save_settings({"data_root": str(data_root), "repo_root": str(repo_root)})
-    return {"repo_root": repo_root, "data_root": data_root}
+    return {
+        "repo_root": repo_root,
+        "data_root": data_root,
+        "configs_dir": data_root / "configs",
+    }
 
 
 @pytest.fixture
@@ -81,7 +89,8 @@ def seed_model(webapi_repo):
 
 
 @pytest.fixture
-def test_client(tmp_path, monkeypatch) -> TestClient:
+def test_client(webapi_repo, tmp_path, monkeypatch) -> TestClient:
+    del webapi_repo
     monkeypatch.setattr("llm_cli.webapi.app._dist_dir", lambda: tmp_path / "empty-dist")
     app = create_app(allowed_hosts={"testserver"})
     return TestClient(app)

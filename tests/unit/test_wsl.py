@@ -56,9 +56,14 @@ def test_run_repo_bash_exports_llm_env_in_script(tmp_path: Path) -> None:
 
 
 def test_run_runtime_bash_windows_exports_wsl_paths(tmp_path: Path) -> None:
-    settings = _fake_settings(tmp_path)
-    runtime_path = tmp_path / "scaffold" / "runtimes" / "stub-runtime"
-    runtime_path.mkdir(parents=True)
+    settings = Settings(
+        data_root=Path("C:/data"),
+        repo_root=Path("C:/repo"),
+        runtimes_dir=Path("C:/data/runtimes"),
+        models_dir=Path("C:/data/models"),
+        cache_dir=Path("C:/data/cache"),
+    )
+    runtime_path = Path("C:/scaffold/runtimes/stub-runtime")
     captured_cmd: list[str] = []
 
     def fake_call(cmd, env=None):
@@ -66,7 +71,7 @@ def test_run_runtime_bash_windows_exports_wsl_paths(tmp_path: Path) -> None:
         return 0
 
     with patch.object(wsl, "is_windows", return_value=True):
-        with patch.object(wsl, "scaffold_root", return_value=tmp_path / "scaffold"):
+        with patch.object(wsl, "scaffold_root", return_value=Path("C:/scaffold")):
             with patch.object(wsl.subprocess, "call", side_effect=fake_call):
                 rc = wsl.run_runtime_bash(settings, runtime_path, "build.sh")
 

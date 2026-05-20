@@ -61,10 +61,10 @@ def test_merged_includes_both_runtime_layers(tmp_path, monkeypatch) -> None:
 def test_configs_only_from_data_home(tmp_path, monkeypatch) -> None:
     install = tmp_path / "install"
     data = tmp_path / "data"
-    _seed_config(install, "from-install")
-    _seed_config(data, "from-data")
     monkeypatch.setenv("LOCO_HOME", str(data))
     monkeypatch.setenv("LOCO_INSTALL", str(install))
+    _seed_config(install, "from-install")
+    _seed_config(data, "from-data")
     save_settings({"data_root": data.resolve().as_posix()})
 
     merged = registry.discover_configs_merged()

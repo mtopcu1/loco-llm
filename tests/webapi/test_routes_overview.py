@@ -25,7 +25,7 @@ def test_get_overview_returns_aggregate_payload(test_client, webapi_repo):
     for script_name in ("build.sh", "serve.sh", "healthcheck.sh"):
         (runtime_dir / script_name).write_text("#!/usr/bin/env bash\n", encoding="utf-8")
 
-    (repo_root / "configs" / "cfg-overview.yaml").write_text(
+    (webapi_repo["configs_dir"] / "cfg-overview.yaml").write_text(
         yaml.safe_dump(
             {
                 "id": "cfg-overview",

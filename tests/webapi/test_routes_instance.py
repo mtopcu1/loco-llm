@@ -41,10 +41,30 @@ def test_instance_logs_stream_returns_error_when_not_running(test_client):
 
 @pytest.mark.webapi
 def test_instance_endpoint_returns_running_payload(test_client, webapi_repo):
+    import yaml
+
     settings = resolve_settings()
-    state_root = webapi_repo["repo_root"] if settings.repo_root else settings.data_root
+    rt_dir = webapi_repo["repo_root"] / "runtimes" / "stub-runtime"
+    rt_dir.mkdir(parents=True, exist_ok=True)
+    (rt_dir / "manifest.yaml").write_text(
+        "id: stub-runtime\ndisplay_name: stub\naccepts_formats: []\n",
+        encoding="utf-8",
+    )
+    for name in ("build.sh", "serve.sh", "healthcheck.sh"):
+        (rt_dir / name).write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    (webapi_repo["configs_dir"] / "cfg-1.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "id": "cfg-1",
+                "runtime": "stub-runtime",
+                "serve": {"host": "127.0.0.1", "port": 8080, "params": {}},
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
     write_running(
-        state_root,
+        settings.data_root,
         LifecycleRecord(
             mode="background",
             config_id="cfg-1",

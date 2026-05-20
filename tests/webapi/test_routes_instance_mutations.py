@@ -35,7 +35,7 @@ def seed_config(webapi_repo):
         "runtime": runtime_id,
         "serve": {"host": "127.0.0.1", "port": 8080, "params": {}},
     }
-    (repo_root / "configs" / f"{config_id}.yaml").write_text(
+    (webapi_repo["configs_dir"] / f"{config_id}.yaml").write_text(
         yaml.safe_dump(config_doc, sort_keys=False),
         encoding="utf-8",
     )
@@ -85,7 +85,7 @@ def test_stop_instance_ok(test_client, monkeypatch):
 @pytest.mark.webapi
 def test_stop_instance_refuses_foreground(test_client, webapi_repo, seed_config, monkeypatch):
     settings = resolve_settings()
-    state_root = settings.repo_root or settings.data_root
+    state_root = settings.data_root
     write_running(
         state_root,
         LifecycleRecord(
@@ -129,7 +129,7 @@ def test_switch_instance_refuses_foreground(
     test_client, webapi_repo, seed_config, monkeypatch
 ):
     settings = resolve_settings()
-    state_root = settings.repo_root or settings.data_root
+    state_root = settings.data_root
     write_running(
         state_root,
         LifecycleRecord(
