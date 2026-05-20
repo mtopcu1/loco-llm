@@ -416,6 +416,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/recommendations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recommendations */
+        get: operations["recommendations_recommendations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/runtimes": {
         parameters: {
             query?: never;
@@ -446,6 +463,23 @@ export interface paths {
         post?: never;
         /** Uninstall Runtime Route */
         delete: operations["uninstall_runtime_route_runtimes__runtime_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runtimes/{runtime_id}/default-params": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Default Params */
+        get: operations["default_params_runtimes__runtime_id__default_params_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1432,6 +1466,38 @@ export interface operations {
             };
         };
     };
+    recommendations_recommendations_get: {
+        parameters: {
+            query: {
+                runtime_id: string;
+                model_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_runtimes_runtimes_get: {
         parameters: {
             query?: never;
@@ -1487,6 +1553,39 @@ export interface operations {
         parameters: {
             query?: {
                 purge?: boolean;
+            };
+            header?: never;
+            path: {
+                runtime_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    default_params_runtimes__runtime_id__default_params_get: {
+        parameters: {
+            query?: {
+                model_id?: string | null;
             };
             header?: never;
             path: {
