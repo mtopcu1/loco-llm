@@ -188,6 +188,27 @@ serve:
     ctx: 8192
 ```
 
+## Metrics (optional)
+
+Runtimes may expose a Prometheus text endpoint for the dashboard live-metrics pipeline. The block is **optional**; omit it or set `metrics: null` when the server has no `/metrics` scrape target.
+
+```yaml
+metrics:
+  endpoint: /metrics          # path on the serve host:port
+  format: prometheus          # only prometheus in v1
+  fields:
+    tps_decode:
+      promql_metric: myruntime:tokens_per_second{phase="decode"}
+      label: "Decode TPS"     # UI label
+      unit: "tok/s"
+      multiplier: 1           # optional scale (e.g. 1000 for seconds→ms)
+```
+
+- **`promql_metric`** — metric name, optionally with `{label="value"}` selectors. The dashboard parser matches exported Prometheus samples by name and labels (not full PromQL).
+- **Finding names** — run the server, `curl http://127.0.0.1:<port>/metrics`, and grep for counters/gauges you care about (throughput, TTFT, queue depth).
+- **llama.cpp** — enable with serve param `metrics: true` (`--metrics`); metric names vary by build; adjust the manifest to match your `llama-server` output.
+- **Stub / custom runtimes** — use `metrics: null` so the UI shows the “no live metrics” state.
+
 ## 6. Verification commands
 
 ```bash

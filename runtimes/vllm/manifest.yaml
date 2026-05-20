@@ -25,3 +25,25 @@ build:
     type: bool
     tier: advanced
     prompt: "Force reinstall packages"
+
+metrics:
+  endpoint: /metrics
+  format: prometheus
+  fields:
+    tps_decode:
+      promql_metric: vllm:tokens_per_second{phase="decode"}
+      label: "Decode TPS"
+      unit: "tok/s"
+    tps_prompt:
+      promql_metric: vllm:tokens_per_second{phase="prompt"}
+      label: "Prompt TPS"
+      unit: "tok/s"
+    ttft_ms:
+      promql_metric: vllm:time_to_first_token_seconds
+      multiplier: 1000
+      label: "TTFT"
+      unit: "ms"
+    requests_in_flight:
+      promql_metric: vllm:num_requests_running
+      label: "In-flight"
+      unit: "req"
