@@ -3,9 +3,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
+
+from llm_cli.core.lifecycle import append_history, state_root
+from llm_cli.core.settings import load_settings, resolve
 
 
 @dataclass(frozen=True)
@@ -87,3 +91,21 @@ def schema_hash(schema: dict[str, Any] | None) -> str:
     """
     payload = json.dumps(schema or {}, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def uninstall_runtime(runtime_id: str, *, purge: bool = False) -> None:
+    """Remove a runtime install marker and optionally its artifact directory."""
+    settings = resolve(load_settings())
+    runtime_dir = settings.runtimes_dir / runtime_id
+
+    if not is_installed(settings.runtimes_dir, runtime_id):
+        if not purge or not runtime_dir.exists():
+            return
+
+    clear_record(settings.runtimes_dir, runtime_id)
+    if purge and runtime_dir.exists():
+        shutil.rmtree(runtime_dir)
+    append_history(
+        state_root(settings),
+        {"action": "runtime-uninstall", "id": runtime_id, "purge": purge},
+    )
