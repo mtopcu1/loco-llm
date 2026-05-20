@@ -90,5 +90,26 @@ def create_app(
     api.include_router(version.router)
     app.mount("/api", api)
 
+    @app.on_event("startup")
+    async def _startup_metrics() -> None:
+        from llm_cli.core import lifecycle_status, metrics
+        from llm_cli.core.lifecycle import event_bus
+
+        cur = lifecycle_status.current()
+        if cur.get("running") and cur.get("runtime_id"):
+            await metrics.scheduler().on_instance_started(
+                config_id=str(cur["config_id"]),
+                runtime_id=str(cur["runtime_id"]),
+                host="127.0.0.1",
+                port=int(cur.get("port", 8000)),
+            )
+        event_bus().subscribe_async(metrics.handle_lifecycle_event)
+
+    @app.on_event("shutdown")
+    async def _shutdown_metrics() -> None:
+        from llm_cli.core import metrics
+
+        await metrics.scheduler().stop_all()
+
     mount_spa(app, _dist_dir())
     return app

@@ -209,3 +209,177 @@ def sparkline(config_id: str, *, bucket: str = "5m", window: str = "24h") -> lis
             point[f] = sum(vals) / len(vals) if vals else None
         out.append(point)
     return out
+
+
+# --- Scrape task + scheduler -------------------------------------------------
+
+import asyncio
+import logging
+
+import httpx
+
+logger = logging.getLogger("llm_cli.core.metrics")
+
+
+def _now_iso() -> str:
+    return datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+class MetricsScrapeTask:
+    def __init__(
+        self,
+        *,
+        config_id: str,
+        runtime_id: str,
+        manifest_metrics: dict,
+        host: str,
+        port: int,
+        hub,
+        interval_seconds: float = 5.0,
+    ) -> None:
+        self.config_id = config_id
+        self.runtime_id = runtime_id
+        self.manifest_metrics = manifest_metrics
+        self.host = host
+        self.port = port
+        self.hub = hub
+        self.interval_seconds = interval_seconds
+        self._task: asyncio.Task | None = None
+        self._consec_errors = 0
+
+    def start(self) -> None:
+        if self._task is not None:
+            return
+        loop = asyncio.get_running_loop()
+        self._task = loop.create_task(self._run())
+
+    async def stop(self) -> None:
+        if self._task is None:
+            return
+        self._task.cancel()
+        try:
+            await self._task
+        except (asyncio.CancelledError, Exception):
+            pass
+        self._task = None
+
+    async def _run(self) -> None:
+        url = f"http://{self.host}:{self.port}{self.manifest_metrics['endpoint']}"
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            while True:
+                try:
+                    r = await client.get(url, headers={"Host": f"{self.host}:{self.port}"})
+                    if r.status_code >= 400:
+                        snap = {"ts": _now_iso(), "error": f"http_{r.status_code}"}
+                        append_snapshot(self.config_id, snap)
+                        self.hub.publish(snap)
+                        self._consec_errors += 1
+                    else:
+                        parsed = parse_prometheus(r.text, self.manifest_metrics["fields"])
+                        snap = {"ts": _now_iso(), **parsed}
+                        append_snapshot(self.config_id, snap)
+                        self.hub.publish(snap)
+                        self._consec_errors = 0
+                except httpx.TimeoutException:
+                    snap = {"ts": _now_iso(), "error": "timeout"}
+                    append_snapshot(self.config_id, snap)
+                    self.hub.publish(snap)
+                    self._consec_errors += 1
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    logger.warning("metrics parse error for %s: %s", self.config_id, e)
+                    snap = {"ts": _now_iso(), "error": "parse"}
+                    append_snapshot(self.config_id, snap)
+                    self.hub.publish(snap)
+                    self._consec_errors += 1
+
+                if self._consec_errors >= 3:
+                    await asyncio.sleep(60.0)
+                    self._consec_errors = 0
+                else:
+                    await asyncio.sleep(self.interval_seconds)
+
+
+class MetricsScheduler:
+    def __init__(self) -> None:
+        self._tasks: dict[str, MetricsScrapeTask] = {}
+        self._hubs: dict[str, object] = {}
+
+    def hub_for(self, config_id: str):
+        from llm_cli.webapi.streams import EventHub
+
+        h = self._hubs.get(config_id)
+        if h is None:
+            h = EventHub[dict]()
+            self._hubs[config_id] = h
+        return h
+
+    async def on_instance_started(
+        self, config_id: str, runtime_id: str, host: str, port: int
+    ) -> None:
+        from llm_cli.core import registry
+
+        rt = registry.get_runtime_merged(runtime_id)
+        if rt is None:
+            return
+        manifest_metrics = rt.manifest.get("metrics")
+        if not manifest_metrics:
+            return
+        if config_id in self._tasks:
+            await self._tasks[config_id].stop()
+        task = MetricsScrapeTask(
+            config_id=config_id,
+            runtime_id=runtime_id,
+            manifest_metrics=manifest_metrics,
+            host=host,
+            port=port,
+            hub=self.hub_for(config_id),
+        )
+        task.start()
+        self._tasks[config_id] = task
+
+    async def on_instance_stopped(self, config_id: str) -> None:
+        task = self._tasks.pop(config_id, None)
+        if task:
+            await task.stop()
+
+    async def stop_all(self) -> None:
+        for task in list(self._tasks.values()):
+            await task.stop()
+        self._tasks.clear()
+
+
+_SCHEDULER: MetricsScheduler | None = None
+
+
+def scheduler() -> MetricsScheduler:
+    global _SCHEDULER
+    if _SCHEDULER is None:
+        _SCHEDULER = MetricsScheduler()
+    return _SCHEDULER
+
+
+async def handle_lifecycle_event(ev: dict) -> None:
+    """Start/stop scrape tasks in response to lifecycle bus events."""
+    action = ev.get("action")
+    if action == "start":
+        runtime_id = ev.get("runtime_id")
+        port = ev.get("port")
+        config_id = ev.get("config_id")
+        if not config_id or not runtime_id or port is None:
+            return
+        await scheduler().on_instance_started(
+            config_id=str(config_id),
+            runtime_id=str(runtime_id),
+            host="127.0.0.1",
+            port=int(port),
+        )
+    elif action == "stop":
+        config_id = ev.get("config_id")
+        if config_id:
+            await scheduler().on_instance_stopped(str(config_id))
+    elif action == "switch":
+        old_id = ev.get("from")
+        if old_id:
+            await scheduler().on_instance_stopped(str(old_id))
