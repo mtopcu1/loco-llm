@@ -3,12 +3,12 @@
 The LocalLLM dashboard is an optional, locally-hosted web UI for managing your
 LocalLLM installation: viewing runtimes, models, configs, the currently-running
 instance, logs, doctor results, disk usage, and history. It is **opt-in** —
-default `llm` installs do not include it.
+default `loco` installs do not include it.
 
 ## Install
 
 ```bash
-llm dashboard install
+loco dashboard install
 ```
 
 This:
@@ -22,10 +22,10 @@ Skip flags: `--skip-python`, `--skip-frontend`, `--reset` (wipe node_modules).
 ## Serve
 
 ```bash
-llm dashboard serve                    # background, auto-opens browser
-llm dashboard serve --foreground       # attached to terminal
-llm dashboard serve --port 8000        # custom port
-llm dashboard serve --no-open          # don't open browser
+loco dashboard serve                    # background, auto-opens browser
+loco dashboard serve --foreground       # attached to terminal
+loco dashboard serve --port 8000        # custom port
+loco dashboard serve --no-open          # don't open browser
 ```
 
 Server binds to `127.0.0.1` by default. To bind on a LAN or tailnet address,
@@ -34,10 +34,10 @@ use the full insecure flow (see [Security](#security) below).
 ## Status / stop / uninstall
 
 ```bash
-llm dashboard status     # install state + server pid
-llm dashboard stop       # SIGTERM the server, escalate to SIGKILL after 10s
-llm dashboard uninstall  # remove .installed
-llm dashboard uninstall --purge  # also delete dist/ and node_modules/
+loco dashboard status     # install state + server pid
+loco dashboard stop       # SIGTERM the server, escalate to SIGKILL after 10s
+loco dashboard uninstall  # remove .installed
+loco dashboard uninstall --purge  # also delete dist/ and node_modules/
 ```
 
 ## Health checks
@@ -65,7 +65,7 @@ binding. That is intentional: any process on your machine can already invoke
 If you must expose the dashboard beyond loopback, you need all three flags:
 
 ```bash
-llm dashboard serve --insecure --i-understand \
+loco dashboard serve --insecure --i-understand \
   --host <bind-address> \
   --allowed-host <host:port> [--allowed-host ...]
 ```
@@ -86,7 +86,7 @@ For the full design, see
 
 - SPA static files are served from `dashboard/dist/` via `mount_spa()` in
   `src/llm_cli/webapi/app.py`. If `dist/` is missing, `/` returns HTTP 503 with
-  `DASHBOARD_NOT_BUILT` and a fix hint to run `llm dashboard install`.
-- `llm dashboard` commands require `repo_root` (from `llm setup` or
+  `DASHBOARD_NOT_BUILT` and a fix hint to run `loco dashboard install`.
+- `loco dashboard` commands require `repo_root` (from `llm setup` or
   `llm settings edit repo_root`). Use the dev loop in `dashboard/README.md` when
   iterating on the UI without a full CLI install.

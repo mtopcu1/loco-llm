@@ -61,8 +61,19 @@ uv run pytest
 ```
 
 No separate `install-dev.sh`. To use this checkout as your runtime install,
-set `LOCO_LLM_HOME=$(pwd)` or configure `repo_root` in `llm settings`.
+set `LOCO_INSTALL=$(pwd)` or configure `repo_root` in `loco settings`.
 
 See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for PR branches, tests, and workflow.
 
-End users install via the curl one-liner in [docs/INSTALLATION.md](docs/INSTALLATION.md) and upgrade with `llm update` — do not use `git pull` in `~/.loco-llm` unless you know you are off the supported update path.
+End users install via the curl one-liner in [docs/INSTALLATION.md](docs/INSTALLATION.md) and upgrade with `loco update` — do not use `git pull` in `~/.loco/install` unless you know you are off the supported update path.
+
+## Documentation discipline
+
+When you change behavior users rely on:
+
+1. Update the matching HOWTO under `docs/add-a-*.md` **in the same PR** (or immediately after).
+2. If you add or change an external dependency, edit `requirements.yaml` and run `loco doctor render-requirements`; commit `requirements.md` together.
+3. User-facing CLI changes belong in [docs/CLI.md](docs/CLI.md); new terms get a line in [docs/GLOSSARY.md](docs/GLOSSARY.md).
+4. Keep the root [README.md](README.md) short — link out instead of duplicating full command tables.
+
+A HOWTO more than two weeks stale relative to actual CLI behavior is a bug. See the [documentation index](docs/README.md).

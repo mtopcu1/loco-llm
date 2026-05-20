@@ -86,7 +86,10 @@ def root(
     """LocalLLM CLI — manage runtimes, models, configs, and benchmarks."""
 
 
-app.command("setup", help="Configure machine-local settings.")(setup_cmd.setup)
+app.command(
+    "setup",
+    help="First-run wizard: runtime, model, launch config, optional serve.",
+)(setup_cmd.setup)
 app.command("update", help="Upgrade CLI and scaffold assets.")(update_cmd)
 app.command("specs", help="Regenerate the auto block in specs.md.")(specs_cmd.specs_command)
 app.add_typer(doctor_app, name="doctor")

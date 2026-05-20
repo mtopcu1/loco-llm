@@ -46,9 +46,9 @@ End users get a single mental model: **`loco`** is the command, **`~/.loco`** is
 3. Symlink `~/.local/bin/loco`.
 4. `mkdir` data-home dirs; write `config.yaml` if missing (`data_root: <LOCO_HOME>`).
 5. Seed `configs/*.yaml` from install (skip existing).
-6. Run `loco setup --default` when TTY available (`< /dev/tty` for piped curl).
+6. Print next steps: `loco setup`, `loco doctor` (user runs wizard when ready).
 
-Flags: `--data-home`, `--dir` (install), `--tag`, `--branch`, `--skip-setup`.
+Flags: `--data-home`, `--dir` (install), `--tag`, `--branch`.
 
 ## 5. Runtime resolution
 
@@ -63,10 +63,9 @@ Flags: `--data-home`, `--dir` (install), `--tag`, `--branch`, `--skip-setup`.
 
 ## 6. Setup (`loco setup`)
 
-- Writes/refreshes `config.yaml`; `ensure_data_dirs()`; optional `seed_configs_from_install()`.
-- **No** post-setup chain (runtime → model → config → serve).
-- `--default`: non-interactive; honors `LOCO_HOME` when set (installer/tests).
-- Interactive: data_root prompt only; optional dev `repo_root` when cwd is a git checkout.
+- **Onboarding chain only** (`run_setup_chain`): runtime → model → config → optional serve → optional dashboard.
+- **No** path/layout prompts (use `loco settings`; bootstrap is `install.sh` only).
+- Prerequisite: `{LOCO_HOME}/config.yaml` with `data_root` (created by installer).
 
 ## 7. Update (`loco update`)
 

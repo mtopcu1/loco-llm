@@ -1,89 +1,71 @@
-"""Integration tests for `llm setup`."""
+"""Integration tests for `loco setup` (onboarding chain entry)."""
 from __future__ import annotations
-
-from pathlib import Path
 
 import yaml
 from typer.testing import CliRunner
 
-from llm_cli.core.settings import settings_path
+from llm_cli.core.settings import save_settings
 from llm_cli.main import app
 
 runner = CliRunner()
 
 
-def test_setup_default_writes_settings_and_creates_dirs(
-    tmp_path, monkeypatch
-) -> None:
-    data = tmp_path / "data"
-    monkeypatch.setenv("LOCO_HOME", str(data))
-    monkeypatch.delenv("LOCO_INSTALL", raising=False)
+def test_setup_requires_initialized_data_home(loco_data_isolated) -> None:
+    result = runner.invoke(app, ["setup"], catch_exceptions=False)
 
-    result = runner.invoke(app, ["setup", "--default"], catch_exceptions=False)
+    assert result.exit_code == 1, result.stdout
+    assert "installer" in result.stdout.lower()
+    assert "loco settings edit data_root" in result.stdout
+
+
+def test_setup_requires_data_root_in_config(loco_data_isolated) -> None:
+    cfg = loco_data_isolated / "config.yaml"
+    cfg.write_text("{}\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["setup"], catch_exceptions=False)
+
+    assert result.exit_code == 1
+    assert "installer" in result.stdout.lower()
+
+
+def test_setup_invokes_chain_when_prerequisites_met(loco_data_isolated, monkeypatch) -> None:
+    save_settings({"data_root": str(loco_data_isolated)})
+
+    invoked: list[int] = []
+    import llm_cli.commands.setup as setup_cmd
+
+    monkeypatch.setattr(setup_cmd, "run_setup_chain", lambda: invoked.append(1) or 0)
+
+    result = runner.invoke(app, ["setup"], catch_exceptions=False)
+
     assert result.exit_code == 0, result.stdout
-
-    cfg = settings_path()
-    assert cfg == data / "config.yaml"
-    assert cfg.is_file()
-    stored = yaml.safe_load(cfg.read_text(encoding="utf-8"))
-    assert stored["data_root"] == data.resolve().as_posix()
-    assert "repo_root" not in stored
-    assert (data / "configs").is_dir()
-    assert (data / "state").is_dir()
-    assert (data / "runtimes").is_dir()
+    assert invoked == [1]
 
 
-def test_setup_interactive_default_layout(tmp_path, monkeypatch) -> None:
-    data = tmp_path / "mydata"
-    monkeypatch.setenv("LOCO_HOME", str(tmp_path / "isolated"))
-    monkeypatch.chdir(tmp_path)
+def test_setup_chain_exit_code_propagates(loco_data_isolated, monkeypatch) -> None:
+    save_settings({"data_root": str(loco_data_isolated)})
 
-    user_input = f"{data.resolve().as_posix()}\ny\n"
-    result = runner.invoke(app, ["setup"], input=user_input, catch_exceptions=False)
-    assert result.exit_code == 0, result.stdout
+    import llm_cli.commands.setup as setup_cmd
 
-    cfg = settings_path()
-    stored = yaml.safe_load(cfg.read_text(encoding="utf-8"))
-    assert stored["data_root"] == data.resolve().as_posix()
-    assert (data / "runtimes").is_dir()
-    assert (data / "configs").is_dir()
+    monkeypatch.setattr(setup_cmd, "run_setup_chain", lambda: 2)
+
+    result = runner.invoke(app, ["setup"], catch_exceptions=False)
+
+    assert result.exit_code == 2
 
 
-def test_setup_interactive_granular_layout(tmp_path, monkeypatch) -> None:
-    data = tmp_path / "dr"
-    rt_override = tmp_path / "rtcustom"
-    monkeypatch.setenv("LOCO_HOME", str(tmp_path / "isolated"))
-    monkeypatch.chdir(tmp_path)
+def test_setup_ensures_data_dirs(loco_data_isolated, monkeypatch) -> None:
+    save_settings({"data_root": str(loco_data_isolated)})
 
-    user_input = (
-        f"{data.resolve().as_posix()}\n"
-        "n\n"
-        f"{rt_override.resolve().as_posix()}\n"
-        "\n"
-        "\n"
-        "n\n"
-    )
-    result = runner.invoke(app, ["setup"], input=user_input, catch_exceptions=False)
-    assert result.exit_code == 0, result.stdout
+    import llm_cli.commands.setup as setup_cmd
 
-    cfg = settings_path()
-    stored = yaml.safe_load(cfg.read_text(encoding="utf-8"))
-    assert stored["data_root"] == data.resolve().as_posix()
-    assert "repo_root" not in stored
-    assert stored["runtimes_dir"] == rt_override.resolve().as_posix()
-    assert "models_dir" not in stored
-    assert "cache_dir" not in stored
-    assert rt_override.is_dir()
-    assert (data / "models").is_dir()
+    monkeypatch.setattr(setup_cmd, "run_setup_chain", lambda: 0)
 
+    runner.invoke(app, ["setup"], catch_exceptions=False)
 
-def test_setup_prints_next_steps_panel(tmp_path, monkeypatch) -> None:
-    monkeypatch.setenv("LOCO_HOME", str(tmp_path / "data"))
+    assert (loco_data_isolated / "configs").is_dir()
+    assert (loco_data_isolated / "state").is_dir()
+    stored = yaml.safe_load((loco_data_isolated / "config.yaml").read_text(encoding="utf-8"))
+    from pathlib import Path
 
-    result = runner.invoke(app, ["setup", "--default"], catch_exceptions=False)
-
-    assert result.exit_code == 0
-    assert "Recommended next steps" in result.stdout
-    assert "loco runtime setup" in result.stdout
-    assert "loco model pull" in result.stdout
-    assert "loco serve" in result.stdout
+    assert Path(stored["data_root"]).resolve() == loco_data_isolated.resolve()

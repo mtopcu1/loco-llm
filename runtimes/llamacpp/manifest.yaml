@@ -13,14 +13,19 @@ requires:
       cmd: cmake --version
       version_regex: 'cmake version ([\d.]+)'
       min: "3.16"
-    install_hint: "apt install cmake"
+    install_hint: |
+      pip install -U "cmake>=3.16"
+      Debian/Ubuntu: sudo apt install cmake
+      https://cmake.org/download/
   - id: nvcc
     when: { build.flavor: cuda }
     verify:
       cmd: nvcc --version
       version_regex: 'release ([\d.]+)'
       min: "12.0"
-    install_hint: "Install CUDA toolkit; see NVIDIA docs."
+    install_hint: |
+      NVIDIA CUDA Toolkit (nvcc) — install a version matching your driver.
+      https://developer.nvidia.com/cuda-downloads
 
 build:
   flavor:
