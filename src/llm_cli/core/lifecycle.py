@@ -186,3 +186,97 @@ def reconcile(repo: Path) -> None:
             )
             clear_running(repo)
         return
+
+
+class LifecycleError(Exception):
+    """Raised when a lifecycle operation fails."""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+        super().__init__(message)
+
+
+def stop_instance() -> None:
+    """Stop whatever is running (idempotent). Raises LifecycleError on failure."""
+    import signal
+    import time
+
+    from llm_cli.core.settings import load_settings, resolve
+    from llm_cli.core.systemd_unit import stop_unit
+
+    _SIGKILL = int(getattr(signal, "SIGKILL", 9))
+
+    def _wait_pid_gone(pid: int, timeout_s: float = 10.0, poll_s: float = 0.2) -> bool:
+        deadline = time.monotonic() + timeout_s
+        while is_alive(pid):
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(poll_s)
+        return True
+
+    settings = resolve(load_settings())
+    state_base = state_root(settings)
+    reconcile(state_base)
+    rec = read_running(state_base)
+    if rec is None:
+        return
+    if rec.mode in ("foreground", "background"):
+        if rec.pid is None:
+            clear_running(state_base)
+            return
+        try:
+            _os.kill(rec.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        if not _wait_pid_gone(rec.pid, timeout_s=10.0):
+            try:
+                _os.kill(rec.pid, _SIGKILL)
+            except ProcessLookupError:
+                pass
+            _wait_pid_gone(rec.pid, timeout_s=2.0)
+        clear_running(state_base)
+        append_history(
+            state_base, {"action": "stop", "mode": rec.mode, "config_id": rec.config_id}
+        )
+        return
+    if rec.mode == "systemd":
+        try:
+            stop_unit("llm.service")
+        except RuntimeError as exc:
+            raise LifecycleError(f"systemctl stop failed: {exc}") from exc
+        clear_running(state_base)
+        append_history(
+            state_base, {"action": "stop", "mode": "systemd", "config_id": rec.config_id}
+        )
+        return
+    raise LifecycleError(f"unknown mode {rec.mode!r}")
+
+
+def serve_instance(config_id: str, *, mode: str) -> None:
+    """Start a config in background or systemd mode."""
+    import typer
+
+    from llm_cli.commands.serve import serve_dispatch
+
+    if mode not in ("background", "systemd"):
+        raise LifecycleError(f"unsupported mode {mode!r}")
+    try:
+        serve_dispatch(
+            config_id,
+            foreground=False,
+            systemd=(mode == "systemd"),
+        )
+    except typer.Exit as exc:
+        raise LifecycleError(f"serve exited with code {exc.exit_code}") from exc
+
+
+def switch_instance(config_id: str) -> None:
+    """Switch the running service to another config."""
+    import typer
+
+    from llm_cli.commands.serve import switch as switch_cmd
+
+    try:
+        switch_cmd(config_id)
+    except typer.Exit as exc:
+        raise LifecycleError(f"switch exited with code {exc.exit_code}") from exc

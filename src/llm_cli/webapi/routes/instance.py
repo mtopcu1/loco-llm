@@ -4,15 +4,26 @@ import asyncio
 import json
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Literal
 
 from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
-from llm_cli.core import lifecycle
+from llm_cli.core import jobs as jobs_module, lifecycle, registry
 from llm_cli.core.settings import resolve_settings
+from llm_cli.webapi.errors import ApiError, ErrorCode
 
 router = APIRouter()
+
+
+class StartInstanceBody(BaseModel):
+    config_id: str
+    mode: Literal["background", "systemd"] = "background"
+
+
+class SwitchInstanceBody(BaseModel):
+    config_id: str
 
 
 def _state_root() -> Path:
@@ -95,3 +106,88 @@ async def stream_instance_logs():
                 await asyncio.sleep(0.25)
 
     return StreamingResponse(_events(), media_type="text/event-stream")
+
+
+def _read_running_mode() -> str | None:
+    root = _state_root()
+    lifecycle.reconcile(root)
+    rec = lifecycle.read_running(root)
+    return rec.mode if rec is not None else None
+
+
+async def _instance_start_coro(
+    config_id: str,
+    mode: str,
+    report,
+) -> None:
+    await report({"stage": "starting"})
+    await asyncio.to_thread(lifecycle.serve_instance, config_id, mode=mode)
+    await report({"stage": "ready"})
+
+
+async def _instance_switch_coro(config_id: str, report) -> None:
+    await report({"stage": "switching"})
+    await asyncio.to_thread(lifecycle.switch_instance, config_id)
+    await report({"stage": "ready"})
+
+
+@router.post("/instance/start", tags=["instance"])
+def start_instance(body: StartInstanceBody):
+    if registry.get_config_merged(body.config_id) is None:
+        raise ApiError(
+            ErrorCode.CONFIG_NOT_FOUND,
+            f"Config '{body.config_id}' not found",
+            details={"config_id": body.config_id},
+            status_code=404,
+        )
+
+    async def factory(report):
+        await _instance_start_coro(body.config_id, body.mode, report)
+
+    job_id = jobs_module.registry().start_async(
+        kind="instance_start_wait",
+        context={"config_id": body.config_id, "mode": body.mode},
+        coro_factory=factory,
+    )
+    return {"job_id": job_id}
+
+
+@router.post("/instance/stop", tags=["instance"])
+def stop_instance_route():
+    mode = _read_running_mode()
+    if mode == "foreground":
+        raise ApiError(
+            ErrorCode.INSTANCE_FOREGROUND_NOT_STOPPABLE,
+            "Foreground instance cannot be stopped via the dashboard; use Ctrl-C in the terminal",
+            status_code=409,
+        )
+    lifecycle.stop_instance()
+    return {"ok": True}
+
+
+@router.post("/instance/switch", tags=["instance"])
+def switch_instance_route(body: SwitchInstanceBody):
+    mode = _read_running_mode()
+    if mode == "foreground":
+        raise ApiError(
+            ErrorCode.INSTANCE_FOREGROUND_NOT_SWITCHABLE,
+            "Foreground instance cannot be switched via the dashboard",
+            status_code=409,
+        )
+    if registry.get_config_merged(body.config_id) is None:
+        raise ApiError(
+            ErrorCode.CONFIG_NOT_FOUND,
+            f"Config '{body.config_id}' not found",
+            details={"config_id": body.config_id},
+            status_code=404,
+        )
+
+    async def factory(report):
+        await _instance_switch_coro(body.config_id, report)
+
+    job_id = jobs_module.registry().start_async(
+        kind="instance_start_wait",
+        context={"config_id": body.config_id, "action": "switch"},
+        coro_factory=factory,
+    )
+    return {"job_id": job_id}
