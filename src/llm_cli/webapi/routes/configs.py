@@ -7,6 +7,7 @@ from fastapi import APIRouter
 
 from llm_cli.core import registry
 from llm_cli.core.config_resolve import resolve_config_for_display
+from llm_cli.core.lifecycle import read_running, reconcile, state_root
 from llm_cli.core.param_grid_build import cells_from_specs
 from llm_cli.core.scaffold import scaffold_root
 from llm_cli.core.settings import resolve_settings
@@ -70,3 +71,77 @@ def validate_config(config_id: str):
     cfg = _get_config_or_404(config_id)
     errors, _warnings = registry.validate_config_v2(scaffold_root(), cfg)
     return {"valid": len(errors) == 0, "errors": errors}
+
+
+def _running_config_id() -> str | None:
+    settings = resolve_settings()
+    root = state_root(settings)
+    reconcile(root)
+    rec = read_running(root)
+    return rec.config_id if rec is not None else None
+
+
+@router.post("/configs", tags=["configs"])
+def create_config(body: dict[str, Any]):
+    try:
+        cfg = registry.write_config(body, overwrite=False)
+    except registry.ConfigAlreadyExistsError as exc:
+        raise ApiError(
+            ErrorCode.CONFIG_ALREADY_EXISTS,
+            str(exc),
+            details={"config_id": str(body.get("id", ""))},
+            status_code=409,
+        ) from exc
+    except registry.ConfigValidationError as exc:
+        raise ApiError(
+            ErrorCode.CONFIG_INVALID,
+            "Configuration validation failed",
+            details={"config_id": str(body.get("id", "")), "errors": exc.errors},
+            status_code=400,
+        ) from exc
+    return {"id": cfg.id, "source": cfg.source, "data": cfg.data}
+
+
+@router.put("/configs/{config_id}", tags=["configs"])
+def update_config(config_id: str, body: dict[str, Any]):
+    if registry.get_config_merged(config_id) is None:
+        raise ApiError(
+            ErrorCode.CONFIG_NOT_FOUND,
+            f"Config '{config_id}' not found",
+            details={"config_id": config_id},
+            status_code=404,
+        )
+    payload = dict(body)
+    payload["id"] = config_id
+    try:
+        cfg = registry.write_config(payload, overwrite=True)
+    except registry.ConfigValidationError as exc:
+        raise ApiError(
+            ErrorCode.CONFIG_INVALID,
+            "Configuration validation failed",
+            details={"config_id": config_id, "errors": exc.errors},
+            status_code=400,
+        ) from exc
+    return {"id": cfg.id, "source": cfg.source, "data": cfg.data}
+
+
+@router.delete("/configs/{config_id}", tags=["configs"])
+def delete_config_route(config_id: str):
+    running_id = _running_config_id()
+    if running_id == config_id:
+        raise ApiError(
+            ErrorCode.CONFIG_IN_USE,
+            f"Config '{config_id}' is currently running",
+            details={"config_id": config_id},
+            status_code=409,
+        )
+    try:
+        registry.delete_config(config_id)
+    except registry.ConfigNotFoundInUserLayerError as exc:
+        raise ApiError(
+            ErrorCode.CONFIG_NOT_FOUND,
+            str(exc),
+            details={"config_id": config_id},
+            status_code=404,
+        ) from exc
+    return {"ok": True}

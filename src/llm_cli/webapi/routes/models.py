@@ -1,14 +1,20 @@
 from __future__ import annotations
 
+import sys
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
+from pydantic import BaseModel, Field
 
-from llm_cli.core import model_registry
+from llm_cli.core import jobs as jobs_module, model_registry
 from llm_cli.core.settings import resolve_settings
 from llm_cli.webapi.errors import ApiError, ErrorCode
 
 router = APIRouter()
+
+
+def _llm_argv(*args: str) -> list[str]:
+    return [sys.executable, "-m", "llm_cli", *args]
 
 
 def _entry_payload(entry: model_registry.RegistryEntry) -> dict[str, Any]:
@@ -34,3 +40,83 @@ def get_model(model_id: str):
             status_code=404,
         )
     return _entry_payload(entry)
+
+
+class PullModelBody(BaseModel):
+    url: str
+    id: str | None = None
+    format: str | None = None
+    include: list[str] = Field(default_factory=list)
+    exclude: list[str] = Field(default_factory=list)
+    force: bool = False
+
+
+class AddLocalModelBody(BaseModel):
+    id: str
+    path: str
+    format: str
+
+
+@router.post("/models/pull", tags=["models"])
+def pull_model(body: PullModelBody):
+    argv = _llm_argv("model", "pull", body.url)
+    if body.format:
+        argv.extend(["--format", body.format])
+    for pat in body.include:
+        argv.extend(["--include", pat])
+    for pat in body.exclude:
+        argv.extend(["--exclude", pat])
+    if body.id:
+        argv.extend(["--id", body.id])
+    if body.force:
+        argv.append("--force")
+    job_id = jobs_module.registry().start_subprocess(
+        kind="model_pull",
+        context={"url": body.url, "id": body.id},
+        argv=argv,
+    )
+    return {"job_id": job_id}
+
+
+@router.post("/models/add", tags=["models"])
+def add_local_model(body: AddLocalModelBody):
+    settings = resolve_settings()
+    from pathlib import Path
+
+    try:
+        entry = model_registry.add_local(
+            settings.models_dir,
+            body.id,
+            Path(body.path),
+            body.format,
+        )
+    except model_registry.ModelAlreadyRegisteredError as exc:
+        raise ApiError(
+            ErrorCode.MODEL_ALREADY_REGISTERED,
+            str(exc),
+            details={"model_id": body.id},
+            status_code=409,
+        ) from exc
+    except model_registry.ModelRegistryError as exc:
+        raise ApiError(
+            ErrorCode.VALIDATION_ERROR,
+            str(exc),
+            details={"model_id": body.id},
+            status_code=400,
+        ) from exc
+    return _entry_payload(entry)
+
+
+@router.delete("/models/{model_id}", tags=["models"])
+def uninstall_model(model_id: str, purge: bool = Query(default=False)):
+    settings = resolve_settings()
+    try:
+        model_registry.uninstall(settings.models_dir, model_id, purge=purge)
+    except model_registry.ModelNotFoundError as exc:
+        raise ApiError(
+            ErrorCode.MODEL_NOT_FOUND,
+            str(exc),
+            details={"model_id": model_id},
+            status_code=404,
+        ) from exc
+    return {"ok": True}

@@ -1,14 +1,26 @@
 from __future__ import annotations
 
 from fastapi import APIRouter
+from pydantic import BaseModel
 
-from llm_cli.core.settings import KEY_REGISTRY, load_settings, resolve_settings
+from llm_cli.core.settings import (
+    KEY_REGISTRY,
+    SettingsValidationError,
+    UnknownSettingError,
+    load_settings,
+    resolve_settings,
+    set as set_setting,
+)
+from llm_cli.webapi.errors import ApiError, ErrorCode
 
 router = APIRouter()
 
 
-@router.get("/settings", tags=["settings"])
-def get_settings():
+class SettingUpdateBody(BaseModel):
+    value: str | None
+
+
+def _settings_payload() -> dict:
     resolved = resolve_settings()
     return {
         "stored": load_settings(),
@@ -24,3 +36,29 @@ def get_settings():
             for key, value in KEY_REGISTRY.items()
         ],
     }
+
+
+@router.get("/settings", tags=["settings"])
+def get_settings():
+    return _settings_payload()
+
+
+@router.put("/settings/{key}", tags=["settings"])
+def update_setting(key: str, body: SettingUpdateBody):
+    try:
+        set_setting(key, body.value)
+    except UnknownSettingError as exc:
+        raise ApiError(
+            ErrorCode.SETTINGS_UNKNOWN_KEY,
+            str(exc),
+            details={"key": key},
+            status_code=404,
+        ) from exc
+    except SettingsValidationError as exc:
+        raise ApiError(
+            ErrorCode.SETTINGS_VALIDATION_FAILED,
+            str(exc),
+            details={"key": key},
+            status_code=400,
+        ) from exc
+    return _settings_payload()

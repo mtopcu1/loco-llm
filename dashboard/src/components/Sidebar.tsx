@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { JobsTray } from '@/features/jobs/JobsTray'
 import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
 
@@ -17,23 +18,26 @@ const NAV = [
 export function Sidebar() {
   const collapsed = useAppStore((s) => s.sidebarCollapsed)
   return (
-    <nav className={cn(
-      "border-r bg-white shrink-0 transition-all",
-      collapsed ? "w-12" : "w-56",
-    )}>
-      <ul className="p-2 space-y-1">
+    <nav
+      className={cn(
+        'border-r bg-white shrink-0 transition-all flex flex-col',
+        collapsed ? 'w-12' : 'w-56',
+      )}
+    >
+      <ul className="p-2 space-y-1 flex-1">
         {NAV.map((item) => (
           <li key={item.to}>
             <Link
               to={item.to}
               className="block rounded px-3 py-1.5 text-sm hover:bg-zinc-100"
-              activeProps={{ className: "bg-zinc-100 font-medium" }}
+              activeProps={{ className: 'bg-zinc-100 font-medium' }}
             >
               {!collapsed && item.label}
             </Link>
           </li>
         ))}
       </ul>
+      <JobsTray />
     </nav>
   )
 }

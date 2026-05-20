@@ -7,6 +7,7 @@ import { ModelsPage } from '@/features/models/ModelsPage'
 import { ModelDetailPage } from '@/features/models/ModelDetailPage'
 import { ConfigsPage } from '@/features/configs/ConfigsPage'
 import { ConfigDetailPage } from '@/features/configs/ConfigDetailPage'
+import { NewConfigPage } from '@/features/configs/NewConfigPage'
 import { InstancePage } from '@/features/instance/InstancePage'
 import { DoctorPage } from '@/features/doctor/DoctorPage'
 import { DiskPage } from '@/features/disk/DiskPage'
@@ -63,6 +64,12 @@ const configDetailRoute = createRoute({
   component: ConfigDetailPage,
 })
 
+const newConfigRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/configs/new',
+  component: NewConfigPage,
+})
+
 const instanceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/instance',
@@ -100,6 +107,7 @@ const routeTree = rootRoute.addChildren([
   modelsRoute,
   modelDetailRoute,
   configsRoute,
+  newConfigRoute,
   configDetailRoute,
   instanceRoute,
   doctorRoute,

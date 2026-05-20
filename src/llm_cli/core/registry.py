@@ -1,6 +1,8 @@
 """Discover and load runtimes, models, configs, and benchmarks from the repo layout."""
 from __future__ import annotations
 
+import os
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -9,11 +11,13 @@ import yaml
 
 from llm_cli.core.install_record import is_installed
 from llm_cli.core.params import ParamSpec, parse_schema, validate_params
+from llm_cli.core.scaffold import scaffold_root, user_configs_dir
 from llm_cli.core.settings import (
     MissingSettingError,
     UnknownSettingError,
     load_settings,
     resolve,
+    resolve_settings,
 )
 
 
@@ -378,3 +382,77 @@ def validate_config_v2(repo: Path, cfg: ConfigRecord) -> tuple[list[str], list[s
 def validate_config(repo: Path, cfg: ConfigRecord) -> list[str]:
     errors, _ = validate_config_v2(repo, cfg)
     return errors
+
+
+class ConfigAlreadyExistsError(ValueError):
+    pass
+
+
+class ConfigValidationError(ValueError):
+    def __init__(self, errors: list[str]) -> None:
+        self.errors = errors
+        super().__init__("; ".join(errors))
+
+
+class ConfigNotFoundInUserLayerError(ValueError):
+    pass
+
+
+def _atomic_write_yaml(path: Path, doc: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(prefix=".cfg-", suffix=".yaml", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            yaml.safe_dump(doc, fh, sort_keys=False, allow_unicode=True)
+        os.replace(tmp_name, path)
+    except Exception:
+        if os.path.exists(tmp_name):
+            os.unlink(tmp_name)
+        raise
+
+
+def write_config(data: dict[str, Any], *, overwrite: bool = False) -> ConfigRecord:
+    """Write a config to the user layer after validation."""
+    config_id = str(data.get("id", "")).strip()
+    if not config_id:
+        raise ConfigValidationError(["id is required"])
+
+    if get_config_merged(config_id) is not None and not overwrite:
+        raise ConfigAlreadyExistsError(f"config {config_id!r} already exists")
+
+    settings = resolve_settings()
+    out_path = user_configs_dir(settings) / f"{config_id}.yaml"
+    doc = dict(data)
+    doc["id"] = config_id
+    cfg = ConfigRecord(id=config_id, path=out_path, data=doc, source="user")
+    errors, _warnings = validate_config_v2(scaffold_root(), cfg)
+    if errors:
+        raise ConfigValidationError(errors)
+
+    _atomic_write_yaml(out_path, doc)
+    from llm_cli.core.lifecycle import append_history, state_root
+
+    append_history(
+        state_root(settings),
+        {
+            "action": "config-create" if not overwrite else "config-update",
+            "id": config_id,
+            "via": "dashboard",
+        },
+    )
+    return cfg
+
+
+def delete_config(config_id: str) -> None:
+    """Delete a user-layer config file."""
+    settings = resolve_settings()
+    out_path = user_configs_dir(settings) / f"{config_id}.yaml"
+    if not out_path.is_file():
+        raise ConfigNotFoundInUserLayerError(f"config {config_id!r} not found in user layer")
+    out_path.unlink()
+    from llm_cli.core.lifecycle import append_history, state_root
+
+    append_history(
+        state_root(settings),
+        {"action": "config-delete", "id": config_id, "via": "dashboard"},
+    )

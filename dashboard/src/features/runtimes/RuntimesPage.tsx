@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { api } from '@/api/client'
-import { Plan2Button } from '@/components/Plan2Button'
 import { ErrorCard } from '@/components/ErrorCard'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -13,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { RuntimeActions } from './RuntimeActions'
 
 export function RuntimesPage() {
   const navigate = useNavigate()
@@ -30,10 +30,7 @@ export function RuntimesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Runtimes</h1>
-        <Plan2Button size="sm">Install runtime</Plan2Button>
-      </div>
+      <h1 className="text-2xl font-semibold">Runtimes</h1>
 
       <Table>
         <TableHeader>
@@ -60,12 +57,8 @@ export function RuntimesPage() {
                   <Badge variant="secondary">not installed</Badge>
                 )}
               </TableCell>
-              <TableCell onClick={(e) => e.stopPropagation()}>
-                <div className="flex gap-2">
-                  <Plan2Button size="xs" variant="outline">Install</Plan2Button>
-                  <Plan2Button size="xs" variant="outline">Rebuild</Plan2Button>
-                  <Plan2Button size="xs" variant="outline">Uninstall</Plan2Button>
-                </div>
+              <TableCell>
+                <RuntimeActions runtimeId={rt.id} installed={!!rt.installed} />
               </TableCell>
             </TableRow>
           ))}

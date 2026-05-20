@@ -1,15 +1,22 @@
-import { useQuery } from '@tanstack/react-query'
-import { Link, useParams } from '@tanstack/react-router'
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useNavigate, useParams } from '@tanstack/react-router'
+import { toast } from 'sonner'
 import { api } from '@/api/client'
-import { Plan2Button } from '@/components/Plan2Button'
+import { errorToToast } from '@/lib/errorToToast'
 import { ErrorCard } from '@/components/ErrorCard'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ConfigForm } from './ConfigForm'
 import { ParamsView } from './ParamsView'
 
 export function ConfigDetailPage() {
   const { id } = useParams({ from: '/configs/$id' })
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const [editing, setEditing] = useState(false)
+
   const config = useQuery({
     queryKey: ['configs', id],
     queryFn: async () => {
@@ -33,10 +40,27 @@ export function ConfigDetailPage() {
     enabled: false,
   })
 
+  const remove = useMutation({
+    mutationFn: async () => {
+      const { error } = await api.DELETE('/configs/{config_id}', {
+        params: { path: { config_id: id } },
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      toast.success('Config deleted')
+      void navigate({ to: '/configs' })
+      void qc.invalidateQueries({ queryKey: ['configs'] })
+    },
+    onError: errorToToast,
+  })
+
   if (config.isPending) return <Skeleton className="h-64 w-full" />
   if (config.isError) return <ErrorCard title="Failed to load config" message={String(config.error)} />
 
   const cfg = config.data!
+  const raw = (cfg.raw ?? cfg.resolved) as Record<string, unknown>
+  const serve = raw.serve as { params?: Record<string, unknown> } | undefined
 
   return (
     <div className="space-y-6">
@@ -48,7 +72,21 @@ export function ConfigDetailPage() {
           <h1 className="text-2xl font-semibold font-mono mt-1">{String(cfg.id)}</h1>
           <p className="text-sm text-zinc-500">source: {String(cfg.source ?? '—')}</p>
         </div>
-        <Plan2Button size="sm">Edit</Plan2Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setEditing((e) => !e)}>
+            {editing ? 'Cancel edit' : 'Edit'}
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => {
+              if (!window.confirm(`Delete config "${id}"?`)) return
+              remove.mutate()
+            }}
+          >
+            Delete
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="overview">
@@ -59,9 +97,22 @@ export function ConfigDetailPage() {
           <TabsTrigger value="raw">Raw YAML</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
-          <pre className="text-sm bg-zinc-50 p-3 rounded border overflow-x-auto">
-            {JSON.stringify(cfg.resolved ?? cfg.raw, null, 2)}
-          </pre>
+          {editing ? (
+            <ConfigForm
+              mode="update"
+              initial={{
+                id: String(cfg.id),
+                runtime: String(raw.runtime ?? ''),
+                model: raw.model ? String(raw.model) : undefined,
+                serve,
+              }}
+              onCancel={() => setEditing(false)}
+            />
+          ) : (
+            <pre className="text-sm bg-zinc-50 p-3 rounded border overflow-x-auto">
+              {JSON.stringify(cfg.resolved ?? cfg.raw, null, 2)}
+            </pre>
+          )}
         </TabsContent>
         <TabsContent value="params">
           <ParamsView configId={id} />
@@ -87,9 +138,22 @@ export function ConfigDetailPage() {
           )}
         </TabsContent>
         <TabsContent value="raw">
-          <pre className="text-sm bg-zinc-50 p-3 rounded border overflow-x-auto">
-            {JSON.stringify(cfg.raw, null, 2)}
-          </pre>
+          {editing ? (
+            <ConfigForm
+              mode="update"
+              initial={{
+                id: String(cfg.id),
+                runtime: String(raw.runtime ?? ''),
+                model: raw.model ? String(raw.model) : undefined,
+                serve,
+              }}
+              onCancel={() => setEditing(false)}
+            />
+          ) : (
+            <pre className="text-sm bg-zinc-50 p-3 rounded border overflow-x-auto">
+              {JSON.stringify(cfg.raw, null, 2)}
+            </pre>
+          )}
         </TabsContent>
       </Tabs>
     </div>
