@@ -1,3 +1,4 @@
+import React from 'react'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
@@ -50,6 +51,6 @@ describe('UpdateBadge', () => {
     expect(screen.getByRole('heading', { name: /update available/i })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Update now' }))
     await waitFor(() => expect(postSpy).toHaveBeenCalled())
-    expect(String(postSpy.mock.calls[0][0])).toContain('restart_dashboard=true')
+    expect(String(postSpy.mock.calls[0][0])).toContain('/update')
   })
 })

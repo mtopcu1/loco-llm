@@ -14,10 +14,7 @@ export function UpdateDialog({ open, onOpenChange, info }: Props) {
   if (!open) return null
 
   const onUpdate = () => {
-    startJob.mutate(
-      { path: '/update', params: { query: { restart_dashboard: true } } },
-      { onSuccess: () => onOpenChange(false) },
-    )
+    startJob.mutate({ path: '/update' }, { onSuccess: () => onOpenChange(false) })
   }
 
   return (
