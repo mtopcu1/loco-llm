@@ -70,3 +70,21 @@ def test_serve_refuses_non_localhost_host():
     result = runner.invoke(app, ["dashboard", "serve", "--host", "0.0.0.0"])
     assert result.exit_code != 0
     assert "--insecure" in (result.stdout + (result.stderr or ""))
+
+
+def test_stop_when_no_server_running(monkeypatch):
+    monkeypatch.setattr("llm_cli.core.dashboard.stop_server", lambda: False)
+    result = runner.invoke(app, ["dashboard", "stop"])
+    assert result.exit_code == 0
+    assert "no dashboard server is running" in result.stdout.lower()
+
+
+def test_uninstall_removes_marker(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    dashboard = repo / "dashboard"
+    dashboard.mkdir(parents=True)
+    (dashboard / ".installed").write_text("cli_version: '1.1.0'\n", encoding="utf-8")
+    monkeypatch.setattr("llm_cli.core.dashboard.dashboard_root", lambda: dashboard)
+    result = runner.invoke(app, ["dashboard", "uninstall"])
+    assert result.exit_code == 0
+    assert not (dashboard / ".installed").exists()

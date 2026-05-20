@@ -113,8 +113,10 @@ def status() -> None:
 @app.command()
 def stop() -> None:
     """Stop the dashboard server."""
-    typer.secho("`llm dashboard stop` not yet implemented (Plan 1, Task 15).", fg=typer.colors.YELLOW)
-    raise typer.Exit(code=2)
+    if dash.stop_server():
+        typer.echo("Dashboard stopped.")
+    else:
+        typer.echo("No dashboard server is running.")
 
 
 @app.command()
@@ -122,5 +124,14 @@ def uninstall(
     purge: Annotated[bool, typer.Option("--purge", help="Delete dashboard/dist and dashboard/node_modules.")] = False,
 ) -> None:
     """Remove the .installed marker (and optionally build artifacts)."""
-    typer.secho("`llm dashboard uninstall` not yet implemented (Plan 1, Task 15).", fg=typer.colors.YELLOW)
-    raise typer.Exit(code=2)
+    marker = dash.installed_marker_path()
+    if marker.exists():
+        marker.unlink()
+    if purge:
+        import shutil
+
+        shutil.rmtree(dash.dist_dir(), ignore_errors=True)
+        shutil.rmtree(dash.dashboard_root() / "node_modules", ignore_errors=True)
+        typer.echo("Removed .installed, dist/, and node_modules/.")
+    else:
+        typer.echo("Removed .installed (use --purge to also delete dist/ and node_modules/).")
