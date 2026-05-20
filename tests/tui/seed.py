@@ -34,6 +34,11 @@ class RepoFixture:
         env["TERM"] = "xterm-256color"
         env["COLUMNS"] = "100"
         env["LINES"] = "30"
+        # GitHub Actions sets CI=true, which forces plain numbered menus; TUI tests
+        # drive questionary arrow-key UX.
+        env.pop("CI", None)
+        env.pop("GITHUB_ACTIONS", None)
+        env.pop("CURSOR_AGENT", None)
         return env
 
 
@@ -58,6 +63,8 @@ def seed_repo(
 
     shutil.copytree(_workspace_root() / "runtimes", repo_root / "runtimes")
     data_root = tmp_path / "data"
+    monkeypatch.setenv("LOCO_HOME", str(data_root))
+    monkeypatch.setenv("LOCO_INSTALL", str(repo_root))
     save_settings(
         {
             "data_root": str(data_root),

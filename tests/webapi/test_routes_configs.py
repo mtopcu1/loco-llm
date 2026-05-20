@@ -7,6 +7,7 @@ import yaml
 @pytest.fixture
 def seed_runtime_and_config(webapi_repo):
     repo_root = webapi_repo["repo_root"]
+    configs_dir = webapi_repo["configs_dir"]
 
     def _seed(config_id: str, *, valid: bool = True) -> None:
         runtime_id = "rt-config"
@@ -44,7 +45,7 @@ def seed_runtime_and_config(webapi_repo):
         if not valid:
             del config_doc["serve"]["port"]
 
-        config_path = repo_root / "configs" / f"{config_id}.yaml"
+        config_path = webapi_repo["configs_dir"] / f"{config_id}.yaml"
         config_path.write_text(yaml.safe_dump(config_doc, sort_keys=False), encoding="utf-8")
 
     return _seed

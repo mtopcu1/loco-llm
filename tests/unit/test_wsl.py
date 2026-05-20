@@ -31,26 +31,54 @@ def _fake_settings(tmp_path: Path) -> Settings:
     )
 
 
-def test_run_repo_bash_injects_env_from_settings(tmp_path: Path) -> None:
+def test_run_repo_bash_exports_llm_env_in_script(tmp_path: Path) -> None:
     settings = _fake_settings(tmp_path)
     scaffold = tmp_path / "scaffold"
     scaffold.mkdir()
-    captured: dict[str, str] = {}
+    captured_cmd: list[str] = []
 
     def fake_call(cmd, env=None):
-        captured.update(env or {})
+        captured_cmd.extend(cmd)
         return 0
 
-    with patch.object(wsl, "scaffold_root", return_value=scaffold):
-        with patch.object(wsl.subprocess, "call", side_effect=fake_call):
-            rc = wsl.run_repo_bash(settings, "runtimes/x/build.sh")
+    with patch.object(wsl, "is_windows", return_value=False):
+        with patch.object(wsl, "scaffold_root", return_value=scaffold):
+            with patch.object(wsl.subprocess, "call", side_effect=fake_call):
+                rc = wsl.run_repo_bash(settings, "runtimes/x/build.sh")
 
     assert rc == 0
-    assert captured["LLM_DATA_ROOT"] == (tmp_path / "d").as_posix()
-    assert captured["LLM_REPO_ROOT"] == scaffold.resolve().as_posix()
-    assert captured["LLM_RUNTIMES"] == (tmp_path / "d" / "runtimes").as_posix()
-    assert captured["LLM_MODELS"] == (tmp_path / "d" / "models").as_posix()
-    assert captured["LLM_CACHE"] == (tmp_path / "d" / "cache").as_posix()
+    joined = " ".join(captured_cmd)
+    data = (tmp_path / "d").as_posix()
+    assert "export LLM_DATA_ROOT=" in joined
+    assert data in joined
+    assert "export LLM_REPO_ROOT=" in joined
+    assert "export LLM_RUNTIMES=" in joined
+
+
+def test_run_runtime_bash_windows_exports_wsl_paths(tmp_path: Path) -> None:
+    settings = Settings(
+        data_root=Path("C:/data"),
+        repo_root=Path("C:/repo"),
+        runtimes_dir=Path("C:/data/runtimes"),
+        models_dir=Path("C:/data/models"),
+        cache_dir=Path("C:/data/cache"),
+    )
+    runtime_path = Path("C:/scaffold/runtimes/stub-runtime")
+    captured_cmd: list[str] = []
+
+    def fake_call(cmd, env=None):
+        captured_cmd.extend(cmd)
+        return 0
+
+    with patch.object(wsl, "is_windows", return_value=True):
+        with patch.object(wsl, "scaffold_root", return_value=Path("C:/scaffold")):
+            with patch.object(wsl.subprocess, "call", side_effect=fake_call):
+                rc = wsl.run_runtime_bash(settings, runtime_path, "build.sh")
+
+    assert rc == 0
+    joined = " ".join(captured_cmd)
+    assert "export LLM_DATA_ROOT=" in joined
+    assert "/mnt/" in joined
 
 
 def test_run_repo_bash_no_longer_sources_llm_env(tmp_path: Path) -> None:

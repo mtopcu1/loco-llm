@@ -110,7 +110,7 @@ def test_config_new_vllm_injects_model_path(monkeypatch, tmp_path) -> None:
     )
 
     assert result.exit_code == 0, result.output
-    out_path = tmp_path / "data" / "user" / "configs" / "vllm__qwen-sf__default.yaml"
+    out_path = tmp_path / "data" / "configs" / "vllm__qwen-sf__default.yaml"
     assert out_path.is_file()
     text = out_path.read_text(encoding="utf-8")
     assert "runtime: vllm" in text

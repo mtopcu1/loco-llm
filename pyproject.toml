@@ -54,7 +54,7 @@ dashboard = [
 ]
 
 [project.scripts]
-llm = "llm_cli.main:app"
+loco = "llm_cli.main:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/llm_cli"]

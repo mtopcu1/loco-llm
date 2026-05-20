@@ -101,7 +101,7 @@ def test_delete_config_refuses_when_in_use(test_client, seed_runtime, webapi_rep
     test_client.post("/api/configs", headers={"Host": "testserver"}, json=body)
 
     settings = resolve_settings()
-    state_root = settings.repo_root or settings.data_root
+    state_root = settings.data_root
     write_running(
         state_root,
         LifecycleRecord(

@@ -42,6 +42,20 @@ uv run llm doctor
 
 Use `git pull` + `uv pip install -e ".[dev]"` while iterating — **not** `llm update` (that targets `LOCO_LLM_HOME` managed installs).
 
+### Git worktrees
+
+If you use `git worktree add` for parallel branches, **remove the worktree before deleting its directory**, then reinstall the editable CLI from the checkout you keep:
+
+```bash
+git worktree remove .worktrees/my-branch
+pip install -e ".[dev]"   # or: uv pip install -e ".[dev]"
+llm doctor --quick
+```
+
+`llm doctor` reports a broken editable target when pip still points at a missing path (common after deleting a worktree folder without reinstalling).
+
+For arrow-key wizards in automation or MCP terminals, use numbered prompts (default on Windows consoles without Windows Terminal) or set `LLM_PLAIN_WIZARDS=1`. Set `LLM_FORCE_QUESTIONARY=1` to force arrow menus.
+
 ## Running the CLI
 
 ```bash

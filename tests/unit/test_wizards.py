@@ -29,7 +29,30 @@ def test_use_plain_prompts_returns_true_when_term_is_dumb(monkeypatch):
 def test_use_plain_prompts_returns_false_on_real_tty(monkeypatch):
     monkeypatch.setattr("sys.stdout.isatty", lambda: True)
     monkeypatch.setenv("TERM", "xterm-256color")
-    assert wizards.use_plain_prompts() is False
+    monkeypatch.delenv("LLM_PLAIN_WIZARDS", raising=False)
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("CURSOR_AGENT", raising=False)
+    monkeypatch.setenv("WT_SESSION", "1")
+    with patch.object(wizards.os, "name", "posix"):
+        assert wizards.use_plain_prompts() is False
+
+
+def test_use_plain_prompts_plain_on_windows_without_windows_terminal(monkeypatch):
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    monkeypatch.setenv("TERM", "xterm-256color")
+    monkeypatch.delenv("WT_SESSION", raising=False)
+    monkeypatch.delenv("LLM_FORCE_QUESTIONARY", raising=False)
+    with patch.object(wizards.os, "name", "nt"):
+        assert wizards.use_plain_prompts() is True
+
+
+def test_use_plain_prompts_honors_llm_plain_wizards(monkeypatch):
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    monkeypatch.setenv("TERM", "xterm-256color")
+    monkeypatch.setenv("WT_SESSION", "1")
+    monkeypatch.setenv("LLM_PLAIN_WIZARDS", "1")
+    with patch.object(wizards.os, "name", "posix"):
+        assert wizards.use_plain_prompts() is True
 
 
 def test_text_returns_default_when_user_hits_enter(monkeypatch):

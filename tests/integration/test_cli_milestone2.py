@@ -8,12 +8,13 @@ from typer.testing import CliRunner
 
 from llm_cli.core.settings import save_settings
 from llm_cli.main import app
+from tests.cli_helpers import data_root_path
 
 runner = CliRunner()
 
 
 def _configure(tmp_path: Path, repo: Path) -> None:
-    save_settings({"data_root": str(tmp_path / "data"), "repo_root": str(repo)})
+    save_settings({"data_root": str(data_root_path(tmp_path)), "repo_root": str(repo)})
 
 
 def _make_repo(root: Path) -> Path:
@@ -58,8 +59,9 @@ def _make_repo(root: Path) -> Path:
         ),
     )
 
-    (repo / "configs").mkdir()
-    (repo / "configs" / "cfg-one.yaml").write_text(
+    configs = root / "data" / "configs"
+    configs.mkdir(parents=True, exist_ok=True)
+    (configs / "cfg-one.yaml").write_text(
         "id: cfg-one\n"
         "runtime: rt-a\n"
         "model: md-a\n"

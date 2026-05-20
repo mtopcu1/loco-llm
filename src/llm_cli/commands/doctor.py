@@ -1,4 +1,4 @@
-"""`llm doctor` — verify external requirements; `llm doctor render-requirements` regenerates the markdown."""
+"""`loco doctor` — verify external requirements; `loco doctor render-requirements` regenerates the markdown."""
 from __future__ import annotations
 
 import subprocess
@@ -40,7 +40,7 @@ def _check_on_release_tag() -> tuple[str, str, str]:
         return (
             "install-channel",
             "warn",
-            "not on a release tag — run `llm update` to re-anchor to the latest stable tag",
+            "not on a release tag — run `loco update` to re-anchor to the latest stable tag",
         )
 
 
@@ -52,6 +52,17 @@ def _print_install_channel_check() -> None:
         console.print(f"[yellow]warning ({cid}):[/yellow] {detail}")
         return
     console.print(f"[red]error ({cid}):[/red] {detail}")
+
+
+def _print_editable_install_check() -> None:
+    from llm_cli.core.editable_install import check_editable_install
+
+    cid, status, detail = check_editable_install()
+    if status in ("ok", "info"):
+        return
+    if status == "error":
+        console.print(f"[red]error ({cid}):[/red] {detail}")
+        raise typer.Exit(code=1)
 doctor_app = typer.Typer(
     name="doctor",
     help="Verify external requirements (CUDA driver, Python, hf CLI, ...).",
@@ -103,6 +114,7 @@ def doctor(
 
     if quick:
         ok, detail = run_quick_checks()
+        _print_editable_install_check()
         _print_install_channel_check()
         if ok:
             console.print("[green]quick checks passed[/green]")
@@ -140,6 +152,7 @@ def doctor(
             raise typer.Exit(code=1)
         return
 
+    _print_editable_install_check()
     repo = scaffold_root()
     universal = load_requirements(_requirements_yaml(repo))
 

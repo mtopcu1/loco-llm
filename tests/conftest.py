@@ -1,4 +1,4 @@
-"""Shared test setup: src/ on path; isolate XDG_CONFIG_HOME for every test."""
+"""Shared test setup: src/ on path; isolate LOCO_HOME for every test."""
 import sys
 from pathlib import Path
 
@@ -24,11 +24,14 @@ def tui_repo_with_model(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def xdg_isolated(tmp_path_factory, monkeypatch):
-    """Redirect $XDG_CONFIG_HOME so tests never touch real user settings."""
-    cfg = tmp_path_factory.mktemp("xdg")
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(cfg))
-    return cfg
+def loco_data_isolated(tmp_path_factory, monkeypatch):
+    """Redirect LOCO_HOME so tests never touch ~/.loco."""
+    data = tmp_path_factory.mktemp("loco-data")
+    monkeypatch.setenv("LOCO_HOME", str(data))
+    monkeypatch.delenv("LOCO_INSTALL", raising=False)
+    monkeypatch.delenv("LOCO_LLM_DATA", raising=False)
+    monkeypatch.delenv("LOCO_LLM_HOME", raising=False)
+    return data
 
 
 @pytest.fixture(autouse=True)

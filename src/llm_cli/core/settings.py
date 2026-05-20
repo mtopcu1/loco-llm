@@ -1,4 +1,4 @@
-"""User-level settings stored at ~/.config/llm/config.yaml."""
+"""Machine settings stored at {data_home}/config.yaml (Hermes-style layout)."""
 from __future__ import annotations
 
 import os
@@ -7,6 +7,24 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+DEFAULT_DATA_HOME_NAME = ".loco"
+
+
+def _data_home_from_env() -> Path | None:
+    for key in ("LOCO_HOME", "LOCO_LLM_DATA"):
+        raw = os.environ.get(key, "").strip()
+        if raw:
+            return Path(raw).expanduser().resolve()
+    return None
+
+
+def default_data_home() -> Path:
+    """Default Hermes-style data home (~/.loco)."""
+    env = _data_home_from_env()
+    if env is not None:
+        return env
+    return (Path.home() / DEFAULT_DATA_HOME_NAME).resolve()
 
 
 @dataclass(frozen=True)
@@ -20,15 +38,15 @@ class Settings:
 
 KEY_REGISTRY: dict[str, dict[str, Any]] = {
     "data_root": {
-        "default": "~/llm",
+        "default": "~/.loco",
         "required": True,
-        "prompt": "Where should LocalLLM store runtimes, models, and cache?",
+        "prompt": "Where should loco-llm store configs, models, and runtime builds?",
         "kind": "path",
     },
     "repo_root": {
         "default": None,
         "required": False,
-        "prompt": "Path to the LocalLLM repo clone (dev/editable installs only)",
+        "prompt": "Path to a development git checkout (editable installs only)",
         "kind": "path",
     },
     "runtimes_dir": {
@@ -59,15 +77,13 @@ KEY_REGISTRY: dict[str, dict[str, Any]] = {
 
 
 def default_settings() -> dict[str, str]:
-    """The minimum stored dict; repo_root is filled in by `llm setup`."""
+    """Minimum stored dict for a fresh data home."""
     return {"data_root": KEY_REGISTRY["data_root"]["default"]}
 
 
 def settings_path() -> Path:
-    """Resolve the settings file path honoring $XDG_CONFIG_HOME."""
-    xdg = os.environ.get("XDG_CONFIG_HOME")
-    base = Path(xdg) if xdg else Path.home() / ".config"
-    return base / "llm" / "config.yaml"
+    """{LOCO_HOME or ~/.loco}/config.yaml — not XDG."""
+    return default_data_home() / "config.yaml"
 
 
 class UnknownSettingError(ValueError):
@@ -102,7 +118,7 @@ def save_settings(values: dict[str, str]) -> Path:
             f"Valid keys: {', '.join(sorted(KEY_REGISTRY))}"
         )
     path = settings_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(parents=True, exist_ok=True)  # noqa: PTH103 — data home root
     ordered = {k: values[k] for k in KEY_REGISTRY if k in values}
     path.write_text(
         yaml.safe_dump(ordered, sort_keys=False, allow_unicode=True),
@@ -146,17 +162,21 @@ def resolve(values: dict[str, str]) -> Settings:
 
 
 def ensure_data_dirs(settings: Settings) -> None:
-    """Create data_root + resolved data subdirectories and user asset dirs."""
+    """Create data home layout (configs, artifacts, state, user overrides)."""
     for target in (
         settings.data_root,
+        settings.data_root / "configs",
+        settings.data_root / "state",
         settings.runtimes_dir,
         settings.models_dir,
         settings.cache_dir,
     ):
         target.mkdir(parents=True, exist_ok=True)
     user_root = settings.data_root / "user"
-    for sub in ("runtimes", "configs", "benchmarks"):
+    for sub in ("runtimes", "benchmarks"):
         (user_root / sub).mkdir(parents=True, exist_ok=True)
+    install_slot = settings.data_root / "install"
+    install_slot.mkdir(parents=True, exist_ok=True)
 
 
 class SettingsValidationError(ValueError):

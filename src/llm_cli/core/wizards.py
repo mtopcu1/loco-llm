@@ -61,13 +61,29 @@ def force_plain(flag: bool) -> None:
     _FORCE_PLAIN = flag
 
 
+def _env_truthy(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def use_plain_prompts() -> bool:
     if _FORCE_PLAIN:
+        return True
+    if _env_truthy("LLM_PLAIN_WIZARDS"):
         return True
     if not sys.stdout.isatty():
         return True
     term = os.environ.get("TERM", "").strip().lower()
-    return term in ("", "dumb")
+    if term in ("", "dumb"):
+        return True
+    # Questionary arrow menus break under many automation PTYs (MCP, CI, etc.).
+    if _env_truthy("CI") or _env_truthy("CURSOR_AGENT"):
+        return True
+    if _env_truthy("LLM_FORCE_QUESTIONARY"):
+        return False
+    # Windows Terminal sets WT_SESSION; most other Windows consoles do not.
+    if os.name == "nt" and not os.environ.get("WT_SESSION"):
+        return True
+    return False
 
 
 def text(

@@ -1,4 +1,4 @@
-"""`llm update` — pull the latest tag (or a chosen ref) into the git checkout."""
+"""`loco update` — pull the latest tag (or a chosen ref) into the git checkout."""
 from __future__ import annotations
 
 import json
@@ -25,13 +25,81 @@ _SEMVER_TAG = re.compile(r"^v\d+\.\d+\.\d+$")
 _EXPECTED_REMOTE_HOSTS = ("github.com/mtopcu1/loco-llm",)
 
 
+class GitCommandError(RuntimeError):
+    """Raised when a git subprocess exits non-zero."""
+
+    def __init__(
+        self,
+        cmd: list[str],
+        returncode: int,
+        stdout: str,
+        stderr: str,
+    ) -> None:
+        self.cmd = cmd
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+        super().__init__(self.detail())
+
+    def detail(self) -> str:
+        return (self.stderr or self.stdout or "").strip()
+
+
 def _run_git(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["git", "-C", str(root), *args],
+    cmd = ["git", "-C", str(root), *args]
+    completed = subprocess.run(
+        cmd,
         capture_output=True,
         text=True,
-        check=check,
+        check=False,
     )
+    if check and completed.returncode != 0:
+        raise GitCommandError(
+            cmd,
+            completed.returncode,
+            completed.stdout,
+            completed.stderr,
+        )
+    return completed
+
+
+def _report_git_error(
+    exc: GitCommandError,
+    *,
+    action: str,
+    branch: str | None = None,
+    tag: str | None = None,
+) -> None:
+    """Print a short, actionable message instead of a Python traceback."""
+    console.print(f"[red]error:[/red] git {action} failed (exit {exc.returncode}).")
+    detail = exc.detail()
+    if detail:
+        for line in detail.splitlines():
+            console.print(f"  {line}")
+    lowered = detail.lower()
+    if branch is not None:
+        if (
+            "couldn't find remote ref" in lowered
+            or "not found in upstream origin" in lowered
+            or "invalid refspec" in lowered
+            or exc.returncode == 128
+        ):
+            console.print(
+                f"[yellow]hint:[/yellow] branch {branch!r} is not on origin yet. "
+                f"Push it from your dev machine, then retry:\n"
+                f"  git push -u origin {branch}\n"
+                f"  llm update --branch {branch}"
+            )
+        else:
+            console.print(
+                f"[dim]While updating to branch {branch!r}. "
+                "Check network access and `git remote -v` in the install root.[/dim]"
+            )
+    elif tag is not None:
+        console.print(
+            f"[yellow]hint:[/yellow] tag {tag!r} may not exist on origin "
+            "(run `git fetch --tags` locally to verify)."
+        )
 
 
 def _is_git_clone(root: Path) -> bool:
@@ -39,7 +107,7 @@ def _is_git_clone(root: Path) -> bool:
         return False
     try:
         _run_git(root, "rev-parse", "--is-inside-work-tree")
-    except subprocess.CalledProcessError:
+    except GitCommandError:
         return False
     return True
 
@@ -47,7 +115,7 @@ def _is_git_clone(root: Path) -> bool:
 def _remote_matches_expected(root: Path) -> bool:
     try:
         out = _run_git(root, "remote", "get-url", "origin")
-    except subprocess.CalledProcessError:
+    except GitCommandError:
         return False
     url = out.stdout.strip()
     return any(host in url for host in _EXPECTED_REMOTE_HOSTS)
@@ -86,7 +154,7 @@ def _current_state(root: Path) -> dict[str, str | None]:
         tag = _run_git(root, "describe", "--tags", "--exact-match", "HEAD").stdout.strip()
         if tag:
             return {"kind": "tag", "ref": tag, "sha": sha}
-    except subprocess.CalledProcessError:
+    except GitCommandError:
         pass
     return {"kind": "detached", "ref": None, "sha": sha}
 
@@ -98,6 +166,38 @@ def _working_tree_dirty(root: Path) -> bool:
 
 def _checkout(root: Path, ref: str) -> None:
     _run_git(root, "checkout", ref)
+
+
+def _checkout_branch(root: Path, branch: str) -> None:
+    """Check out a branch, creating a local branch from origin/<branch> if needed."""
+    local = _run_git(
+        root,
+        "show-ref",
+        "--verify",
+        "--quiet",
+        f"refs/heads/{branch}",
+        check=False,
+    )
+    if local.returncode == 0:
+        _run_git(root, "checkout", branch)
+        return
+    remote = _run_git(
+        root,
+        "show-ref",
+        "--verify",
+        "--quiet",
+        f"refs/remotes/origin/{branch}",
+        check=False,
+    )
+    if remote.returncode == 0:
+        _run_git(root, "checkout", "-B", branch, f"origin/{branch}")
+        return
+    raise GitCommandError(
+        ["git", "-C", str(root), "checkout", branch],
+        1,
+        "",
+        f"branch {branch!r} not found locally or as origin/{branch}",
+    )
 
 
 def _ff_pull(root: Path, branch: str) -> None:
@@ -115,7 +215,7 @@ def _sync_deps(root: Path) -> None:
     if uv is None:
         console.print(
             "[yellow]warning:[/yellow] `uv` not found on PATH; skipping dep sync. "
-            "Install uv and re-run `llm update` to pick up dependency changes."
+            "Install uv and re-run `loco update` to pick up dependency changes."
         )
         return
     venv_python = _venv_python(root)
@@ -246,9 +346,17 @@ def update(
         )
         raise typer.Exit(code=1)
 
-    _fetch_remote(root, refspec=branch)
+    try:
+        _fetch_remote(root, refspec=branch)
+    except GitCommandError as exc:
+        _report_git_error(exc, action="fetch", branch=branch, tag=tag)
+        raise typer.Exit(code=1) from None
 
-    state = _current_state(root)
+    try:
+        state = _current_state(root)
+    except GitCommandError as exc:
+        _report_git_error(exc, action="inspect", branch=branch, tag=tag)
+        raise typer.Exit(code=1) from None
 
     if check:
         if json_output:
@@ -267,30 +375,38 @@ def update(
         raise typer.Exit(code=1)
 
     if branch is not None:
-        saved = _maybe_restart_around_update(restart)
-        if _working_tree_dirty(root):
-            _run_git(root, "stash", "push", "-u", "-m", "llm-update")
-            console.print("[yellow]stashed local changes[/yellow]")
-        _checkout(root, branch)
-        _ff_pull(root, branch)
-        _sync_deps(root)
-        _restore_service(saved)
-        _post_update_hooks()
+        try:
+            saved = _maybe_restart_around_update(restart)
+            if _working_tree_dirty(root):
+                _run_git(root, "stash", "push", "-u", "-m", "llm-update")
+                console.print("[yellow]stashed local changes[/yellow]")
+            _checkout_branch(root, branch)
+            _ff_pull(root, branch)
+            _sync_deps(root)
+            _restore_service(saved)
+            _post_update_hooks()
+        except GitCommandError as exc:
+            _report_git_error(exc, action="update", branch=branch)
+            raise typer.Exit(code=1) from None
         console.print(
             f"[yellow]you are now on branch {branch} — not a stable release.[/yellow] "
-            "Run `llm update` to return to the latest stable tag."
+            "Run `loco update` to return to the latest stable tag."
         )
         return
 
     if tag is not None:
-        saved = _maybe_restart_around_update(restart)
-        if _working_tree_dirty(root):
-            _run_git(root, "stash", "push", "-u", "-m", "llm-update")
-            console.print("[yellow]stashed local changes[/yellow]")
-        _checkout(root, tag)
-        _sync_deps(root)
-        _restore_service(saved)
-        _post_update_hooks()
+        try:
+            saved = _maybe_restart_around_update(restart)
+            if _working_tree_dirty(root):
+                _run_git(root, "stash", "push", "-u", "-m", "llm-update")
+                console.print("[yellow]stashed local changes[/yellow]")
+            _checkout(root, tag)
+            _sync_deps(root)
+            _restore_service(saved)
+            _post_update_hooks()
+        except GitCommandError as exc:
+            _report_git_error(exc, action="update", tag=tag)
+            raise typer.Exit(code=1) from None
         console.print(f"[green]pinned to {tag}.[/green]")
         return
 
@@ -311,12 +427,16 @@ def update(
         console.print(f"Already on latest stable ({latest}).")
         return
 
-    saved = _maybe_restart_around_update(restart)
-    if _working_tree_dirty(root):
-        _run_git(root, "stash", "push", "-u", "-m", "llm-update")
-        console.print("[yellow]stashed local changes[/yellow]")
-    _checkout(root, latest)
-    _sync_deps(root)
-    _restore_service(saved)
-    _post_update_hooks()
+    try:
+        saved = _maybe_restart_around_update(restart)
+        if _working_tree_dirty(root):
+            _run_git(root, "stash", "push", "-u", "-m", "llm-update")
+            console.print("[yellow]stashed local changes[/yellow]")
+        _checkout(root, latest)
+        _sync_deps(root)
+        _restore_service(saved)
+        _post_update_hooks()
+    except GitCommandError as exc:
+        _report_git_error(exc, action="update")
+        raise typer.Exit(code=1) from None
     console.print(f"[green]updated to {latest}.[/green]")

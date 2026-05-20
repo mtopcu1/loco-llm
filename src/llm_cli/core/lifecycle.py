@@ -29,9 +29,7 @@ class LifecycleRecord:
 
 
 def state_root(settings: "Settings") -> Path:
-    """Base directory for state/ (dev checkout or data_root for bundle installs)."""
-    if settings.repo_root is not None:
-        return settings.repo_root
+    """Base directory for state/ (always under data_root)."""
     return settings.data_root
 
 

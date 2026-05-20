@@ -1,53 +1,51 @@
 # Architecture
 
-High-level shape of LocalLLM. For scaffolding design (runtimes, configs, lifecycle), see
+High-level shape of loco-llm. For scaffolding design (runtimes, configs, lifecycle), see
 [`docs/superpowers/specs/2026-05-15-localllm-scaffolding-design.md`](superpowers/specs/2026-05-15-localllm-scaffolding-design.md).
 
-## Distribution
+Branding and layout: [`docs/superpowers/specs/2026-05-20-hermes-layout-and-branding-design.md`](superpowers/specs/2026-05-20-hermes-layout-and-branding-design.md).
 
-The product ships as a **single git checkout** — not a PyPI wheel plus a separate asset bundle.
+## Distribution (Hermes-style nested layout)
 
-```
-~/.loco-llm/                      ← LOCO_LLM_HOME (default)
-├── .git/                         ← origin: github.com/mtopcu1/loco-llm
-├── .venv/                        ← uv venv, editable install
-│   └── bin/llm
-├── src/llm_cli/                  ← Typer CLI
-├── runtimes/ configs/ benchmarks/ ← ship with the tag; no side channel
-└── pyproject.toml
+```text
+~/.loco/                          ← LOCO_HOME (default)
+├── config.yaml                   ← machine settings (paths)
+├── configs/*.yaml                ← launch units (canonical)
+├── models/ runtimes/ cache/ state/
+└── install/                      ← LOCO_INSTALL (git clone)
+    ├── .git/ .venv/ src/
+    ├── runtimes/ configs/ benchmarks/
 
-~/.local/bin/llm  →  ~/.loco-llm/.venv/bin/llm
-
-~/.config/localllm/settings.yaml         ← user settings
-~/.local/share/localllm/                 ← models, builds, lifecycle state
+~/.local/bin/loco  →  ~/.loco/install/.venv/bin/loco
 ```
 
 | Concern | Mechanism |
 |---------|-----------|
-| First install | `curl …/scripts/install.sh \| bash` clones, checks out latest `v*.*.*` tag, `uv pip install -e .` |
-| Upgrade | `llm update` → `git fetch`, checkout latest tag (or `--branch` / `--tag`) |
-| Release artifact | Git tag + GitHub Release CHANGELOG only |
-| Resolve install root | `scaffold_root()` → `$LOCO_LLM_HOME` → settings `repo_root` → git toplevel of package |
+| CLI | **`loco`** on `$PATH` (`[project.scripts]` in `pyproject.toml`) |
+| First install | `install.sh` clones to `$LOCO_HOME/install`, seeds `config.yaml` + `configs/` |
+| Upgrade | `loco update` → git + `uv pip install -e .` on **install/** only |
+| Launch configs | Read/write `{LOCO_HOME}/configs/` only |
+| Resolve install | `install_root()` → `$LOCO_INSTALL` → `repo_root` (dev) → `{data_home}/install/.git` |
+| Resolve data | `data_home()` → `$LOCO_HOME` → `config.yaml` `data_root` → `~/.loco` |
 
-`scaffold_root()` is the install root; there is no second "scaffold directory" or tarball layer.
+`scaffold_root()` is an alias for `install_root()`.
 
 ### Install / update scripts
 
 - **`scripts/install.sh`** — public curl entry; documented in [INSTALLATION.md](INSTALLATION.md).
-- **Root `install.sh`** — thin wrapper that execs `scripts/install.sh` for anyone running `./install.sh` from a clone.
 
 ### Off-tag operation
 
-`llm update --branch` is for hotfixes. Bare `llm update` **re-anchors** to the latest semver tag. `llm doctor` and `llm --version` surface when HEAD is not an exact tag.
+`loco update --branch` is for hotfixes. Bare `loco update` **re-anchors** to the latest semver tag.
 
 ## CLI layers
 
 | Layer | Role |
 |-------|------|
 | `src/llm_cli/commands/` | Typer commands (`setup`, `serve`, `update`, …) |
-| `src/llm_cli/core/` | Settings, scaffold root, lifecycle, registry |
-| Repo `runtimes/` | Manifests + build/serve scripts (discovered from install root) |
-| User data dir | Models, installed runtimes, `running.json`, logs |
+| `src/llm_cli/core/` | Settings, paths, lifecycle, registry |
+| `install/runtimes/` | Manifests + build/serve scripts (read-only recipes) |
+| Data home | Configs, models, installed runtimes, `state/` |
 
 ## CI and release (summary)
 

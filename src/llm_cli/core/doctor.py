@@ -448,6 +448,12 @@ def run_quick_checks() -> tuple[bool, str]:
     except Exception as exc:  # noqa: BLE001
         return False, f"settings: {exc}"
 
+    from llm_cli.core.editable_install import check_editable_install
+
+    _cid, editable_status, editable_msg = check_editable_install()
+    if editable_status == "error":
+        return False, editable_msg
+
     root = scaffold_root()
     if not root.is_dir():
         return False, f"scaffold root missing: {root}"
