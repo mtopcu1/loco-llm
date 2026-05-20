@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.5.0](https://github.com/mtopcu1/loco-llm/compare/v1.4.0...v1.5.0) (2026-05-20)
+
+
+### Features
+
+* **setup:** chain-only onboarding with improved doctor hints ([beb7217](https://github.com/mtopcu1/loco-llm/commit/beb721733d93accd679549ccd840d753f1824a74))
+* **setup:** chain-only onboarding, docs refresh, and No/Yes buttons ([8ec40aa](https://github.com/mtopcu1/loco-llm/commit/8ec40aa7764b2a3c58b659e1a9826f78641ab8fb))
+* **wizards:** replace Y/n prompts with No/Yes buttons ([0e842b4](https://github.com/mtopcu1/loco-llm/commit/0e842b4294c1773ff10508813adce5c3b2673d91))
+
+
+### Bug Fixes
+
+* **advisor:** exit non-zero when no recommendations apply ([5517242](https://github.com/mtopcu1/loco-llm/commit/5517242dd757fe3a02018ebe0258433442a89dba))
+
+
+### Documentation
+
+* streamline README; add docs/CLI.md and docs/GLOSSARY.md; move discipline to CONTRIBUTING.md; refresh INSTALLATION, DASHBOARD, and index. ([beb7217](https://github.com/mtopcu1/loco-llm/commit/beb721733d93accd679549ccd840d753f1824a74))
+
 ## [1.4.0](https://github.com/mtopcu1/loco-llm/compare/v1.3.0...v1.4.0) (2026-05-20)
 
 
