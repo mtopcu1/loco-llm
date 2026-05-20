@@ -62,7 +62,8 @@ def test_pull_model_returns_job_id(test_client, monkeypatch):
 
 
 @pytest.mark.webapi
-def test_add_local_model(test_client, tmp_path):
+def test_add_local_model(test_client, tmp_path, webapi_repo):
+    del webapi_repo
     gguf = tmp_path / "model.gguf"
     gguf.write_bytes(b"fake")
 

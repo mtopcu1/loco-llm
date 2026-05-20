@@ -157,3 +157,34 @@ def ensure_data_dirs(settings: Settings) -> None:
     user_root = settings.data_root / "user"
     for sub in ("runtimes", "configs", "benchmarks"):
         (user_root / sub).mkdir(parents=True, exist_ok=True)
+
+
+class SettingsValidationError(ValueError):
+    """Raised when a setting value fails KEY_REGISTRY validation."""
+
+
+def set(key: str, value: str | None) -> dict[str, str]:
+    """Set or clear a single settings key; returns the stored dict."""
+    if key not in KEY_REGISTRY:
+        raise UnknownSettingError(
+            f"unknown setting {key!r}. Valid keys: {', '.join(sorted(KEY_REGISTRY))}"
+        )
+    meta = KEY_REGISTRY[key]
+    stored = load_settings()
+    if value is None:
+        if meta.get("required"):
+            raise SettingsValidationError(f"{key!r} is required and cannot be cleared")
+        stored.pop(key, None)
+    else:
+        if meta.get("kind") == "path":
+            expanded = _expand(value)
+            if key == "repo_root":
+                if not expanded.is_dir():
+                    raise SettingsValidationError(
+                        f"{key!r} must be an existing directory: {value}"
+                    )
+            elif not str(value).strip():
+                raise SettingsValidationError(f"{key!r} path cannot be empty")
+        stored[key] = value
+    save_settings(stored)
+    return load_settings()
