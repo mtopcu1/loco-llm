@@ -19,7 +19,7 @@ def test_setup_default_skips_chain(monkeypatch):
     assert not invoked
 
 
-def test_setup_invokes_chain_on_interactive_path(monkeypatch):
+def test_setup_interactive_does_not_invoke_chain(monkeypatch):
     invoked: list[int] = []
     from llm_cli.core import chain
 
@@ -29,4 +29,4 @@ def test_setup_invokes_chain_on_interactive_path(monkeypatch):
 
     result = runner.invoke(app, ["setup"])
     assert result.exit_code == 0
-    assert invoked == [1]
+    assert not invoked

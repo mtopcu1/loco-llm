@@ -7,7 +7,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from llm_cli.main import app
-from tests.cli_helpers import cli_plain
+from tests.cli_helpers import cli_plain, data_config_path
 
 runner = CliRunner()
 
@@ -153,9 +153,9 @@ def test_advisor_config_id_form(monkeypatch, tmp_path):
     _patch_specs(monkeypatch)
     _patch_model(monkeypatch, "qwen-7b", 8 * 1024**3)
 
-    cfg_dir = tmp_path / "configs"
-    cfg_dir.mkdir()
-    (cfg_dir / "llamacpp__qwen-7b__default.yaml").write_text(
+    cfg_dir = data_config_path(tmp_path, "llamacpp__qwen-7b__default.yaml").parent
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    data_config_path(tmp_path, "llamacpp__qwen-7b__default.yaml").write_text(
         "id: llamacpp__qwen-7b__default\n"
         "runtime: llamacpp\n"
         "model: qwen-7b\n"
@@ -186,8 +186,6 @@ def test_advisor_config_id_form(monkeypatch, tmp_path):
 def test_advisor_config_id_unknown_errors(monkeypatch, tmp_path):
     _configure_user_settings(monkeypatch, tmp_path, tmp_path)
     _patch_specs(monkeypatch)
-    cfg_dir = tmp_path / "configs"
-    cfg_dir.mkdir()
     from llm_cli.core import repo as repo_mod
 
     monkeypatch.setattr(repo_mod, "repo_root", lambda: tmp_path)

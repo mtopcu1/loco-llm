@@ -84,6 +84,6 @@ def test_setup_prints_next_steps_panel(tmp_path, monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert "Recommended next steps" in result.stdout
-    assert "llm runtime setup" in result.stdout
-    assert "llm model pull" in result.stdout
-    assert "llm serve" in result.stdout
+    assert "loco runtime setup" in result.stdout
+    assert "loco model pull" in result.stdout
+    assert "loco serve" in result.stdout

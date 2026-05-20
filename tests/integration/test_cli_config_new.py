@@ -8,7 +8,7 @@ import yaml
 from typer.testing import CliRunner
 
 from llm_cli.main import app
-from tests.cli_helpers import cli_plain
+from tests.cli_helpers import cli_plain, data_config_path
 
 runner = CliRunner()
 
@@ -57,7 +57,7 @@ def _seed_repo(tmp_path: Path, monkeypatch) -> Path:
 
 
 def _user_config_path(tmp_path: Path, name: str) -> Path:
-    return tmp_path / "data" / "user" / "configs" / name
+    return data_config_path(tmp_path, name)
 
 
 def test_config_new_writes_valid_yaml(monkeypatch, tmp_path):

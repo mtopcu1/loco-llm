@@ -11,12 +11,17 @@ from llm_cli.core.install_record import InstallRecord, write_record
 from llm_cli.core.lifecycle import LifecycleRecord, read_running, write_running
 from llm_cli.core.settings import save_settings
 from llm_cli.main import app
+from tests.cli_helpers import data_config_path, data_root_path
 
 runner = CliRunner()
 
 
 def _configure(tmp_path: Path, repo: Path) -> None:
-    save_settings({"data_root": str(tmp_path / "data"), "repo_root": str(repo)})
+    save_settings({"data_root": str(data_root_path(tmp_path)), "repo_root": str(repo)})
+
+
+def _state(tmp_path: Path) -> Path:
+    return data_root_path(tmp_path)
 
 
 def _make_repo(root: Path, port: int = 18080, *, installed: bool = True) -> Path:
@@ -56,8 +61,9 @@ def _make_repo(root: Path, port: int = 18080, *, installed: bool = True) -> Path
             installed_at="2026-05-17T00:00:00Z",
         ),
     )
-    (repo / "configs").mkdir()
-    (repo / "configs" / "cfg-a.yaml").write_text(
+    configs = root / "data" / "configs"
+    configs.mkdir(parents=True, exist_ok=True)
+    (configs / "cfg-a.yaml").write_text(
         f"id: cfg-a\nruntime: rt-a\nmodel: md-a\nserve:\n  host: 127.0.0.1\n  port: {port}\n  params:\n    token: test-token\n",
         encoding="utf-8",
     )
@@ -87,7 +93,7 @@ def test_serve_background_writes_running_json_and_calls_spawn(tmp_path: Path) ->
         result = runner.invoke(app, ["serve", "cfg-a"], catch_exceptions=False)
     assert result.exit_code == 0, result.stdout
     sb.assert_called_once()
-    rec = read_running(repo)
+    rec = read_running(_state(tmp_path))
     assert rec is not None
     assert rec.mode == "background"
     assert rec.config_id == "cfg-a"
@@ -141,7 +147,7 @@ def test_serve_readiness_timeout_kills_child_and_clears_state(tmp_path: Path) ->
         "timed out" in result.stdout.lower() or "did not become ready" in result.stdout.lower()
     )
     assert killed["called"] is True
-    assert read_running(repo) is None
+    assert read_running(_state(tmp_path)) is None
 
 
 def test_serve_foreground_writes_running_and_clears_on_exit(tmp_path: Path) -> None:
@@ -150,7 +156,7 @@ def test_serve_foreground_writes_running_and_clears_on_exit(tmp_path: Path) -> N
 
     def fake_spawn_fg(*, inner, env, on_started, **kw):
         on_started(7777)
-        assert read_running(repo).pid == 7777
+        assert read_running(_state(tmp_path)).pid == 7777
         return 7777, 0
 
     with (
@@ -161,7 +167,7 @@ def test_serve_foreground_writes_running_and_clears_on_exit(tmp_path: Path) -> N
             app, ["serve", "cfg-a", "--foreground"], catch_exceptions=False
         )
     assert result.exit_code == 0
-    assert read_running(repo) is None
+    assert read_running(_state(tmp_path)) is None
 
 
 def test_serve_systemd_rewrites_unit_and_writes_running(tmp_path: Path) -> None:
@@ -183,7 +189,7 @@ def test_serve_systemd_rewrites_unit_and_writes_running(tmp_path: Path) -> None:
     wid.assert_called_once()
     dr.assert_called_once()
     ru.assert_called_once_with("llm.service")
-    rec = read_running(repo)
+    rec = read_running(_state(tmp_path))
     assert rec is not None
     assert rec.mode == "systemd"
     assert rec.unit == "llm.service"
@@ -220,7 +226,7 @@ def test_foreground_from_supervisor_does_not_touch_running_json(tmp_path: Path) 
         started_at="t",
         unit="llm.service",
     )
-    write_running(repo, pre)
+    write_running(_state(tmp_path), pre)
 
     def fake_spawn_fg(*, inner, env, on_started, **kw):
         on_started(1234)
@@ -235,7 +241,7 @@ def test_foreground_from_supervisor_does_not_touch_running_json(tmp_path: Path) 
             catch_exceptions=False,
         )
     assert result.exit_code == 0
-    assert read_running(repo) == pre
+    assert read_running(_state(tmp_path)) == pre
 
 
 def test_foreground_from_supervisor_hidden_from_help() -> None:
@@ -247,7 +253,7 @@ def test_switch_background_stops_old_starts_new(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path, port=18098)
     _configure(tmp_path, repo)
     write_running(
-        repo,
+        _state(tmp_path),
         LifecycleRecord(
             mode="background",
             config_id="cfg-a",
@@ -257,7 +263,7 @@ def test_switch_background_stops_old_starts_new(tmp_path: Path) -> None:
             log_path="state/logs/cfg-a.log",
         ),
     )
-    (repo / "configs" / "cfg-b.yaml").write_text(
+    (data_config_path(tmp_path, "cfg-b.yaml")).write_text(
         "id: cfg-b\nruntime: rt-a\nmodel: md-a\n"
         "serve:\n  host: 127.0.0.1\n  port: 18099\n",
         encoding="utf-8",
@@ -279,7 +285,7 @@ def test_switch_background_stops_old_starts_new(tmp_path: Path) -> None:
         result = runner.invoke(app, ["switch", "cfg-b"], catch_exceptions=False)
     assert result.exit_code == 0, result.stdout
     assert killed["pid"] == os.getpid()
-    rec = read_running(repo)
+    rec = read_running(_state(tmp_path))
     assert rec.config_id == "cfg-b"
     assert rec.mode == "background"
 
@@ -296,7 +302,7 @@ def test_switch_foreground_refuses_with_hint(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
     _configure(tmp_path, repo)
     write_running(
-        repo,
+        _state(tmp_path),
         LifecycleRecord(
             mode="foreground",
             config_id="cfg-a",
@@ -317,7 +323,7 @@ def test_serve_systemd_noop_when_same_config_already_active(tmp_path: Path) -> N
     repo = _make_repo(tmp_path, port=18100)
     _configure(tmp_path, repo)
     write_running(
-        repo,
+        _state(tmp_path),
         LifecycleRecord(
             mode="systemd",
             config_id="cfg-a",

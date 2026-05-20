@@ -15,12 +15,17 @@ from llm_cli.core.lifecycle import LifecycleRecord, logs_dir, read_running, writ
 from llm_cli.core.settings import save_settings
 from llm_cli.commands import lifecycle_cmds
 from llm_cli.main import app
+from tests.cli_helpers import data_root_path
 
 runner = CliRunner()
 
 
 def _configure(tmp_path: Path, repo: Path) -> None:
-    save_settings({"data_root": str(tmp_path / "data"), "repo_root": str(repo)})
+    save_settings({"data_root": str(data_root_path(tmp_path)), "repo_root": str(repo)})
+
+
+def _state(tmp_path: Path) -> Path:
+    return data_root_path(tmp_path)
 
 
 def _empty_repo(root: Path) -> Path:
@@ -41,7 +46,7 @@ def test_stop_background_sigterms_pid_and_clears(tmp_path: Path) -> None:
     repo = _empty_repo(tmp_path)
     _configure(tmp_path, repo)
     write_running(
-        repo,
+        _state(tmp_path),
         LifecycleRecord(
             mode="background",
             config_id="cfg-a",
@@ -72,7 +77,7 @@ def test_stop_background_escalates_to_sigkill_if_pid_persists(tmp_path: Path) ->
     repo = _empty_repo(tmp_path)
     _configure(tmp_path, repo)
     write_running(
-        repo,
+        _state(tmp_path),
         LifecycleRecord(
             mode="background",
             config_id="cfg-a",
@@ -105,7 +110,7 @@ def test_stop_systemd_calls_systemctl_stop(tmp_path: Path) -> None:
     repo = _empty_repo(tmp_path)
     _configure(tmp_path, repo)
     write_running(
-        repo,
+        _state(tmp_path),
         LifecycleRecord(
             mode="systemd",
             config_id="cfg-a",
@@ -136,7 +141,7 @@ def test_status_background_text(tmp_path: Path) -> None:
     repo = _empty_repo(tmp_path)
     _configure(tmp_path, repo)
     write_running(
-        repo,
+        _state(tmp_path),
         LifecycleRecord(
             mode="background",
             config_id="cfg-a",
@@ -159,7 +164,7 @@ def test_status_json_includes_uptime_and_pid_alive(tmp_path: Path) -> None:
     repo = _empty_repo(tmp_path)
     _configure(tmp_path, repo)
     write_running(
-        repo,
+        _state(tmp_path),
         LifecycleRecord(
             mode="background",
             config_id="cfg-a",
@@ -187,7 +192,7 @@ def test_status_systemd_text(tmp_path: Path) -> None:
     repo = _empty_repo(tmp_path)
     _configure(tmp_path, repo)
     write_running(
-        repo,
+        _state(tmp_path),
         LifecycleRecord(
             mode="systemd",
             config_id="cfg-a",
@@ -219,11 +224,11 @@ def test_logs_no_record_errors(tmp_path: Path) -> None:
 def test_logs_background_tails_last_n_lines(tmp_path: Path) -> None:
     repo = _empty_repo(tmp_path)
     _configure(tmp_path, repo)
-    logs_dir(repo).mkdir(parents=True, exist_ok=True)
-    log = logs_dir(repo) / "cfg-a.log"
+    logs_dir(_state(tmp_path)).mkdir(parents=True, exist_ok=True)
+    log = logs_dir(_state(tmp_path)) / "cfg-a.log"
     log.write_text("\n".join(f"line-{i}" for i in range(1, 21)) + "\n", encoding="utf-8")
     write_running(
-        repo,
+        _state(tmp_path),
         LifecycleRecord(
             mode="background",
             config_id="cfg-a",
@@ -245,7 +250,7 @@ def test_logs_systemd_invokes_journalctl(tmp_path: Path) -> None:
     repo = _empty_repo(tmp_path)
     _configure(tmp_path, repo)
     write_running(
-        repo,
+        _state(tmp_path),
         LifecycleRecord(
             mode="systemd",
             config_id="cfg-a",
