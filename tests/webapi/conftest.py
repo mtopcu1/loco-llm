@@ -47,6 +47,40 @@ def webapi_repo(tmp_path):
 
 
 @pytest.fixture
+def seed_model(webapi_repo):
+    del webapi_repo
+
+    from llm_cli.core.model_registry import (
+        Artifact,
+        HFSource,
+        Metadata,
+        RegistryEntry,
+        upsert_entry,
+    )
+    from llm_cli.core.settings import resolve_settings
+
+    def _seed(model_id: str, *, model_format: str = "gguf") -> None:
+        settings = resolve_settings()
+        upsert_entry(
+            settings.models_dir,
+            RegistryEntry(
+                id=model_id,
+                format=model_format,
+                source=HFSource(repo="owner/repo"),
+                artifact=Artifact(
+                    primary="weights.gguf",
+                    files=("weights.gguf",),
+                    total_size_bytes=123,
+                ),
+                metadata=Metadata(display_name=model_id),
+                installed_at="2026-05-20T00:00:00Z",
+            ),
+        )
+
+    return _seed
+
+
+@pytest.fixture
 def test_client(tmp_path, monkeypatch) -> TestClient:
     monkeypatch.setattr("llm_cli.webapi.app._dist_dir", lambda: tmp_path / "empty-dist")
     app = create_app(allowed_hosts={"testserver"})

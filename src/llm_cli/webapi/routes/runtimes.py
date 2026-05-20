@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
-from llm_cli.core import install_record, jobs as jobs_module, registry
+from llm_cli.core import install_record, jobs as jobs_module, param_grid_models as pgm, registry
 from llm_cli.core.lifecycle import read_running, reconcile, state_root
 from llm_cli.core.settings import resolve_settings
 from llm_cli.webapi.errors import ApiError, ErrorCode
@@ -99,6 +99,27 @@ def get_runtime(runtime_id: str):
         install_record=asdict(rec) if rec else None,
         drift=None,
     )
+
+
+@router.get("/runtimes/{runtime_id}/default-params", tags=["runtimes"])
+def default_params(runtime_id: str, model_id: str | None = None):
+    if registry.get_runtime_merged(runtime_id) is None:
+        raise ApiError(
+            ErrorCode.RUNTIME_NOT_FOUND,
+            f"Runtime '{runtime_id}' not found",
+            details={"runtime_id": runtime_id},
+            status_code=404,
+        )
+    try:
+        cells = pgm.load_defaults_for_runtime(runtime_id, model_id=model_id)
+    except KeyError as exc:
+        raise ApiError(
+            ErrorCode.RUNTIME_NOT_FOUND,
+            f"Runtime '{runtime_id}' not found",
+            details={"runtime_id": runtime_id},
+            status_code=404,
+        ) from exc
+    return [asdict(cell) for cell in cells]
 
 
 @router.post("/runtimes/{runtime_id}/install", tags=["runtimes"])

@@ -24,6 +24,7 @@ from llm_cli.webapi.routes import (
     jobs,
     models,
     overview,
+    recommendations,
     runtimes,
     settings,
     version,
@@ -83,6 +84,7 @@ def create_app(
     api.include_router(jobs.router)
     api.include_router(models.router)
     api.include_router(overview.router)
+    api.include_router(recommendations.router)
     api.include_router(runtimes.router)
     api.include_router(settings.router)
     api.include_router(version.router)
