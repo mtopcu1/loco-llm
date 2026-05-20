@@ -3,8 +3,13 @@ from __future__ import annotations
 
 import hashlib
 import os
+import signal
 import shutil
+import socket
 import subprocess
+import sys
+import time
+import webbrowser
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -243,3 +248,151 @@ def run_install(
     )
     write_installed_record(record)
     return record
+
+
+def _port_in_use(host: str, port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.2)
+        try:
+            sock.connect((host, port))
+            return True
+        except OSError:
+            return False
+
+
+def _allowed_hosts_for(host: str, port: int) -> set[str]:
+    return {
+        f"{host}:{port}",
+        f"localhost:{port}",
+        f"127.0.0.1:{port}",
+    }
+
+
+def start_server_background(host: str, port: int) -> int:
+    """Spawn uvicorn detached and wait until /api/health is ready."""
+    if _port_in_use(host, port):
+        raise RuntimeError(f"Port {port} already in use on {host}.")
+
+    log_path = server_log_path()
+    log_fd = log_path.open("ab")
+    env = os.environ.copy()
+    env["LLM_DASHBOARD_ALLOWED_HOSTS"] = ",".join(sorted(_allowed_hosts_for(host, port)))
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "uvicorn",
+        "llm_cli.webapi.app:create_app",
+        "--factory",
+        "--host",
+        host,
+        "--port",
+        str(port),
+        "--log-level",
+        "warning",
+    ]
+    proc = subprocess.Popen(
+        cmd,
+        stdout=log_fd,
+        stderr=log_fd,
+        stdin=subprocess.DEVNULL,
+        env=env,
+        start_new_session=True,
+    )
+    server_pid_path().write_text(str(proc.pid), encoding="utf-8")
+    log_fd.close()
+
+    deadline = time.time() + 30.0
+    last_err: str | None = None
+    while time.time() < deadline:
+        try:
+            import httpx
+
+            response = httpx.get(
+                f"http://{host}:{port}/api/health",
+                headers={"Host": f"{host}:{port}"},
+                timeout=1.0,
+            )
+            if response.status_code == 200 and response.json().get("ok") is True:
+                return proc.pid
+            last_err = f"HTTP {response.status_code}"
+        except Exception as exc:  # noqa: BLE001
+            last_err = str(exc)
+
+        if proc.poll() is not None:
+            raise RuntimeError(
+                f"Dashboard server exited during startup (last error: {last_err}). "
+                f"See {log_path} for details."
+            )
+        time.sleep(0.25)
+
+    proc.terminate()
+    raise RuntimeError(
+        f"Dashboard server did not become ready within 30s (last error: {last_err})."
+    )
+
+
+def run_server_foreground(host: str, port: int) -> None:
+    """Run uvicorn in-process and clean up pid file on exit."""
+    import uvicorn
+
+    server_pid_path().write_text(str(os.getpid()), encoding="utf-8")
+    os.environ["LLM_DASHBOARD_ALLOWED_HOSTS"] = ",".join(
+        sorted(_allowed_hosts_for(host, port))
+    )
+    try:
+        uvicorn.run(
+            "llm_cli.webapi.app:create_app",
+            factory=True,
+            host=host,
+            port=port,
+            log_level="warning",
+        )
+    finally:
+        try:
+            server_pid_path().unlink()
+        except FileNotFoundError:
+            pass
+
+
+def stop_server() -> bool:
+    """Stop dashboard server by pid file. Returns True if stop attempted."""
+    pid = read_server_pid()
+    if pid is None:
+        return False
+    if not is_server_alive(pid):
+        try:
+            server_pid_path().unlink()
+        except FileNotFoundError:
+            pass
+        return False
+
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError):
+        return False
+
+    deadline = time.time() + 10.0
+    while time.time() < deadline:
+        if not is_server_alive(pid):
+            break
+        time.sleep(0.25)
+
+    if is_server_alive(pid):
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except (AttributeError, ProcessLookupError, PermissionError):
+            pass
+
+    try:
+        server_pid_path().unlink()
+    except FileNotFoundError:
+        pass
+    return True
+
+
+def open_browser(host: str, port: int) -> None:
+    try:
+        webbrowser.open(f"http://{host}:{port}/")
+    except Exception:  # noqa: BLE001
+        pass

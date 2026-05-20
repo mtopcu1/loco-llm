@@ -53,3 +53,20 @@ def test_install_writes_installed_record_when_skips_used(tmp_path, monkeypatch):
     record = (repo / "dashboard" / ".installed").read_text(encoding="utf-8")
     assert "node_version: 20.11.1" in record
     assert "npm_version: 10.2.4" in record
+
+
+def test_serve_refuses_when_not_installed(tmp_path, monkeypatch):
+    monkeypatch.setattr("llm_cli.commands.dashboard_cmd.current_cli_version", lambda: "1.1.0")
+    monkeypatch.setattr(
+        "llm_cli.core.dashboard.verify_installed",
+        lambda _ver: ("missing", "dashboard/.installed not found"),
+    )
+    result = runner.invoke(app, ["dashboard", "serve"])
+    assert result.exit_code != 0
+    assert "install" in (result.stdout + (result.stderr or "")).lower()
+
+
+def test_serve_refuses_non_localhost_host():
+    result = runner.invoke(app, ["dashboard", "serve", "--host", "0.0.0.0"])
+    assert result.exit_code != 0
+    assert "--insecure" in (result.stdout + (result.stderr or ""))

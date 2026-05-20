@@ -9,6 +9,7 @@ from llm_cli.core import dashboard as dash
 from llm_cli.core.versions import current_cli_version
 
 app = typer.Typer(help="Manage the LocalLLM web dashboard.")
+_LOCALHOST_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 
 @app.callback(invoke_without_command=True)
@@ -50,8 +51,43 @@ def serve(
     no_open: Annotated[bool, typer.Option("--no-open")] = False,
 ) -> None:
     """Start the dashboard server."""
-    typer.secho("`llm dashboard serve` not yet implemented (Plan 1, Task 14).", fg=typer.colors.YELLOW)
-    raise typer.Exit(code=2)
+    if host not in _LOCALHOST_HOSTS:
+        typer.secho(
+            f"Refusing to bind to {host}. Non-localhost binding requires --insecure "
+            "(planned for a later security hardening release).",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=78)
+
+    verdict, reason = dash.verify_installed(current_cli_version())
+    if verdict != "ok":
+        hint = " --reset" if verdict in {"version_mismatch", "hash_mismatch"} else ""
+        typer.secho(
+            f"Dashboard is not ready ({verdict}): {reason}. "
+            f"Run `llm dashboard install{hint}`.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=78)
+
+    if foreground:
+        typer.echo(
+            f"Starting dashboard on http://{host}:{port}/ (foreground; Ctrl-C to stop)"
+        )
+        if not no_open:
+            dash.open_browser(host, port)
+        dash.run_server_foreground(host, port)
+        return
+
+    try:
+        pid = dash.start_server_background(host, port)
+    except RuntimeError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+    typer.secho(f"Dashboard started on http://{host}:{port}/ (pid {pid})", fg=typer.colors.GREEN)
+    if not no_open:
+        dash.open_browser(host, port)
 
 
 @app.command()
