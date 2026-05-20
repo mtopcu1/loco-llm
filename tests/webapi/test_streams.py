@@ -6,7 +6,7 @@ from llm_cli.webapi.streams import EventHub
 
 
 @pytest.mark.webapi
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_event_hub_delivers_to_subscribers():
     hub = EventHub[dict]()
 
@@ -28,7 +28,7 @@ async def test_event_hub_delivers_to_subscribers():
 
 
 @pytest.mark.webapi
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_event_hub_multiple_subscribers_each_get_all_events():
     hub = EventHub[int]()
     s1, s2 = hub.subscribe(), hub.subscribe()
