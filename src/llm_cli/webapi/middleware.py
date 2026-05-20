@@ -58,6 +58,10 @@ class HostHeaderMiddleware(BaseHTTPMiddleware):
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, *, insecure: bool = False) -> None:
+        super().__init__(app)
+        self.insecure = insecure
+
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
@@ -66,4 +70,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Permissions-Policy"] = "()"
         response.headers["Content-Security-Policy"] = CSP
+        if self.insecure:
+            response.headers["X-LocalLLM-Insecure"] = "true"
         return response

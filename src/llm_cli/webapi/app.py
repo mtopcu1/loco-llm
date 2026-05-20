@@ -63,7 +63,8 @@ def create_app(
 
     install_exception_handlers(app)
 
-    app.add_middleware(SecurityHeadersMiddleware)
+    insecure = os.environ.get("LLM_DASHBOARD_INSECURE") == "1"
+    app.add_middleware(SecurityHeadersMiddleware, insecure=insecure)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins or [],
