@@ -1,3 +1,4 @@
+import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { PerformanceMetricsCard } from '../PerformanceMetricsCard'

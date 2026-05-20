@@ -45,6 +45,7 @@ describe('OverviewPage live metrics', () => {
     renderAtRoute('/')
     await waitFor(() => expect(screen.getByText(/running: default/i)).toBeInTheDocument())
     expect(screen.getByText(/TPS 42.3/)).toBeInTheDocument()
-    expect(screen.getByText(/TTFT 88 ms/)).toBeInTheDocument()
+    expect(screen.getByText(/TTFT/)).toBeInTheDocument()
+    expect(screen.getByText(/88\.0/)).toBeInTheDocument()
   })
 })

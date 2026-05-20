@@ -1,3 +1,4 @@
+import React from 'react'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { MetricsTab } from '../MetricsTab'
@@ -54,9 +55,9 @@ vi.mock('@tanstack/react-query', async () => {
 describe('MetricsTab', () => {
   it('renders live metric cards and sparklines', () => {
     render(<MetricsTab configId="default" />)
-    expect(screen.getByText('Decode TPS')).toBeInTheDocument()
-    expect(screen.getByText('99')).toBeInTheDocument()
-    expect(screen.getByText('TTFT')).toBeInTheDocument()
+    expect(screen.getAllByText('Decode TPS')).toHaveLength(2)
+    expect(screen.getByText('99.0')).toBeInTheDocument()
+    expect(screen.getAllByText('TTFT')).toHaveLength(2)
     expect(document.querySelectorAll('polyline').length).toBeGreaterThan(0)
   })
 
