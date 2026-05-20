@@ -1,5 +1,4 @@
-import { createRouter, createRootRoute, createRoute, Outlet } from '@tanstack/react-router'
-import { Layout } from '@/components/Layout'
+import { createRootRoute, createRoute, createRouter } from '@tanstack/react-router'
 import { OverviewPage } from '@/features/overview/OverviewPage'
 import { RuntimesPage } from '@/features/runtimes/RuntimesPage'
 import { RuntimeDetailPage } from '@/features/runtimes/RuntimeDetailPage'
@@ -13,13 +12,7 @@ import { DiskPage } from '@/features/disk/DiskPage'
 import { HistoryPage } from '@/features/history/HistoryPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
 
-const rootRoute = createRootRoute({
-  component: () => (
-    <Layout>
-      <Outlet />
-    </Layout>
-  ),
-})
+const rootRoute = createRootRoute()
 
 const overviewRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -93,7 +86,7 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 })
 
-const routeTree = rootRoute.addChildren([
+export const routeTree = rootRoute.addChildren([
   overviewRoute,
   runtimesRoute,
   runtimeDetailRoute,
@@ -108,10 +101,10 @@ const routeTree = rootRoute.addChildren([
   settingsRoute,
 ])
 
-export const router = createRouter({ routeTree })
+export type TestRouter = ReturnType<typeof createRouter<typeof routeTree>>
 
 declare module '@tanstack/react-router' {
   interface Register {
-    router: typeof router
+    router: TestRouter
   }
 }
