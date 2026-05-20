@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.3.0](https://github.com/mtopcu1/loco-llm/compare/v1.2.0...v1.3.0) (2026-05-20)
+
+
+### Features
+
+* **dashboard:** Config detail Params tab uses ParamGrid (replaces JSON dump) ([9c7450e](https://github.com/mtopcu1/loco-llm/commit/9c7450ea37360868612469b0644f65ae684bc9d5))
+* **dashboard:** live metrics pipeline (Plan 4/5) ([#22](https://github.com/mtopcu1/loco-llm/issues/22)) ([698a41b](https://github.com/mtopcu1/loco-llm/commit/698a41bcbc39392b04827a5383e03edc71928b50))
+* **dashboard:** new-config wizard shell (5-step state machine) ([78b1897](https://github.com/mtopcu1/loco-llm/commit/78b1897218b3769cf0c3b35536e1b0c74de10734))
+* **dashboard:** NewConfigPage delegates to the 5-step wizard ([d732f88](https://github.com/mtopcu1/loco-llm/commit/d732f88334d769a287c9bf8f4764ff57fea8c954))
+* **dashboard:** param grid and new-config wizard (Plan 3/5) ([f256115](https://github.com/mtopcu1/loco-llm/commit/f2561152b347b01c46b3f7bcb5e1b314271cb46c))
+* **dashboard:** ParamGrid (the flagship form) — filter, suggestions, bulk actions, dirty tracking ([c5cba32](https://github.com/mtopcu1/loco-llm/commit/c5cba3273a860fcc9503c7c1bc1188f269107824))
+* **dashboard:** ParamRow with enabled/key/value/suggestion/lock/description columns ([cb7ff18](https://github.com/mtopcu1/loco-llm/commit/cb7ff188755a9ac85e0c27727d8a30c9f75bd2fa))
+* **dashboard:** ParamValueInput dispatches on param type (string/int/bool/path/enum) ([be747a3](https://github.com/mtopcu1/loco-llm/commit/be747a3b446e8d67ee2b8a16dedf4142da1b6dd9))
+* **dashboard:** pure-functional ParamCell helpers (filter/suggestion/reset/diff) ([5f2e6e6](https://github.com/mtopcu1/loco-llm/commit/5f2e6e6cfe206bff969a46ab6a4b8b2b22d03713))
+* **dashboard:** security hardening and update notifier (Plan 5/5) ([#23](https://github.com/mtopcu1/loco-llm/issues/23)) ([6c0479d](https://github.com/mtopcu1/loco-llm/commit/6c0479de7c83b70b5b8c3fc4a54c8a6c01a68383))
+* **dashboard:** useParamGridState reducer hook (toggle/set/filter/suggestions/reset) ([a920517](https://github.com/mtopcu1/loco-llm/commit/a920517c88207ffff4d0c834601f448b1ba773a6))
+* **dashboard:** wizard step 1 — pick runtime ([0c0886f](https://github.com/mtopcu1/loco-llm/commit/0c0886f1e55f7e6501b642f7f57dcf35a931bc20))
+* **dashboard:** wizard step 2 — pick model (optional, filtered by runtime format) ([95458d9](https://github.com/mtopcu1/loco-llm/commit/95458d99df3e62788f4eaf1bbe641d0d4cb3d4ad))
+* **dashboard:** wizard step 3 — params via ParamGrid with advisor ([f78a323](https://github.com/mtopcu1/loco-llm/commit/f78a323a3602dbdb55ccec9a2f6d606f16d53cec))
+* **dashboard:** wizard step 4 — review with id uniqueness check ([9e9c80f](https://github.com/mtopcu1/loco-llm/commit/9e9c80fae1390635e45a1b3191417586e245e196))
+* **dashboard:** wizard step 5 — save + redirect on success ([5aa9f5c](https://github.com/mtopcu1/loco-llm/commit/5aa9f5ca85e5853a47e0ca9ba5a4fc7dec40621e))
+
+
+### Bug Fixes
+
+* **dashboard:** export ParamGridHandle via forwardRef for wizard step 3 ([5d30f7c](https://github.com/mtopcu1/loco-llm/commit/5d30f7ce70632123858b3b979eac8fe24f62c9ff))
+* **dashboard:** seed wizard params on step 3 for reliable navigation ([3e7b33c](https://github.com/mtopcu1/loco-llm/commit/3e7b33ccf51e5df8e5b5e52d54cfff271f9b4575))
+
 ## [1.2.0](https://github.com/mtopcu1/loco-llm/compare/v1.1.0...v1.2.0) (2026-05-20)
 
 
