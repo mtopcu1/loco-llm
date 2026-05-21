@@ -11,7 +11,7 @@ Without these, release-please can prepare a release branch but cannot open the P
 
 ## 2. Branch protection on `main`
 
-Require one status check: `test`. Allow admin bypass — release PRs are opened
+Require status checks: `pytest`, `dashboard`, and `check`. Allow admin bypass — release PRs are opened
 by `github-actions[bot]` and don't get checks attached (a GitHub limitation,
 not a workflow bug). The release PR only edits version + CHANGELOG; review
 the diff and admin-merge.
