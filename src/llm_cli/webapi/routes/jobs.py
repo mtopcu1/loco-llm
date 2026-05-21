@@ -48,8 +48,9 @@ async def iter_job_stream_events(job_id: str, sub):
                     "event": "update",
                     "data": json.dumps({"log": line}, sort_keys=True),
                 }
-    async for ev in sub.events():
-        yield {"event": "update", "data": json.dumps(ev, sort_keys=True)}
+    if job.status in ("queued", "running"):
+        async for ev in sub.events():
+            yield {"event": "update", "data": json.dumps(ev, sort_keys=True)}
 
 
 @router.get("/{job_id}/stream")

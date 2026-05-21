@@ -105,7 +105,7 @@ async def test_job_stream_events_include_json_log_tail(monkeypatch, tmp_path):
         jobs_module.Job(
             id=job_id,
             kind="model_pull",
-            status="running",
+            status="succeeded",
             created_at=datetime.now(tz=UTC),
             context={"url": "https://example.com/x.gguf"},
         )
