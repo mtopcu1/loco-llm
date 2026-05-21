@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+import json
+
 import pytest
 
 from llm_cli.core import jobs as jobs_module
@@ -86,3 +89,43 @@ def test_cancel_running_subprocess_job(test_client, webapi_repo, monkeypatch, tm
             break
         time.sleep(0.05)
     assert jobs_module.registry().get(job_id).status == "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_job_stream_events_include_json_log_tail(monkeypatch, tmp_path):
+    from datetime import UTC, datetime
+
+    from llm_cli.webapi.routes.jobs import iter_job_stream_events
+
+    monkeypatch.setattr(jobs_module, "_jobs_dir", lambda: tmp_path)
+    log_path = tmp_path / "abc123.log"
+    log_path.write_text("line one\nline two\n", encoding="utf-8")
+    job_id = "abc123"
+    jobs_module.registry()._record(
+        jobs_module.Job(
+            id=job_id,
+            kind="model_pull",
+            status="running",
+            created_at=datetime.now(tz=UTC),
+            context={"url": "https://example.com/x.gguf"},
+        )
+    )
+    jobs_module.registry()._order.insert(0, job_id)
+    sub = jobs_module.registry().subscribe(job_id)
+
+    collected: list[dict] = []
+
+    async def collect():
+        async for ev in iter_job_stream_events(job_id, sub):
+            collected.append(ev)
+            if len(collected) >= 3:
+                break
+
+    await asyncio.wait_for(collect(), timeout=2.0)
+
+    events = collected
+    assert events[0]["event"] == "snapshot"
+    json.loads(events[0]["data"])
+    log_events = [ev for ev in events if '"log"' in ev["data"]]
+    assert len(log_events) >= 2
+    assert json.loads(log_events[0]["data"]) == {"log": "line one"}

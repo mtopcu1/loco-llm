@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useJobs, type JobRecord } from '@/hooks/useJobs'
+import { jobTitle } from '@/lib/jobLabel'
 import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
@@ -18,6 +20,12 @@ import {
 import { AddLocalModelDialog } from './AddLocalModelDialog'
 import { PullModelDialog } from './PullModelDialog'
 
+const ACTIVE_JOB = new Set(['queued', 'running'])
+
+function pendingModelPulls(jobs: JobRecord[] | undefined): JobRecord[] {
+  return (jobs ?? []).filter((j) => j.kind === 'model_pull' && ACTIVE_JOB.has(j.status))
+}
+
 export function ModelsPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -32,6 +40,9 @@ export function ModelsPage() {
       return (data ?? []) as Array<{ id: string; format?: string; metadata?: { display_name?: string } }>
     },
   })
+
+  const jobs = useJobs()
+  const inProgressPulls = pendingModelPulls(jobs.data)
 
   const uninstall = useMutation({
     mutationFn: async ({ id, purge }: { id: string; purge: boolean }) => {
@@ -74,6 +85,26 @@ export function ModelsPage() {
           </TableRow>
         </TableHeader>
         <TableBody>
+          {inProgressPulls.map((job) => (
+            <TableRow key={job.id} className="bg-zinc-50/80">
+              <TableCell className="font-mono text-zinc-500 italic" colSpan={2}>
+                {jobTitle(job.kind, job.context)}
+              </TableCell>
+              <TableCell className="text-zinc-600 text-sm">
+                {job.progress?.stage ?? job.status}
+                {job.progress?.percent != null ? ` (${job.progress.percent}%)` : ''}
+              </TableCell>
+              <TableCell className="text-zinc-500 text-xs">Pulling…</TableCell>
+            </TableRow>
+          ))}
+          {models.data!.length === 0 && inProgressPulls.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={4} className="text-zinc-500 text-sm py-8 text-center">
+                No models yet. Use <strong>Pull from HF</strong> with a file URL (…/blob/main/….gguf)
+                or <strong>Add local</strong> for weights already on disk.
+              </TableCell>
+            </TableRow>
+          )}
           {models.data!.map((model) => (
             <TableRow key={model.id}>
               <TableCell

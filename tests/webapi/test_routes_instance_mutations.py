@@ -64,6 +64,31 @@ def test_start_instance_returns_job_id(test_client, seed_config, monkeypatch):
 
 
 @pytest.mark.webapi
+def test_start_instance_when_already_running(test_client, webapi_repo, seed_config, monkeypatch):
+    settings = resolve_settings()
+    state_root = settings.data_root
+    write_running(
+        state_root,
+        LifecycleRecord(
+            mode="background",
+            config_id=seed_config,
+            port=8080,
+            started_at="2026-05-20T00:00:00Z",
+            pid=4242,
+        ),
+    )
+    monkeypatch.setattr("llm_cli.core.lifecycle.is_alive", lambda pid: True)
+
+    r = test_client.post(
+        "/api/instance/start",
+        headers={"Host": "testserver"},
+        json={"config_id": seed_config, "mode": "background"},
+    )
+    assert r.status_code == 409
+    assert r.json()["error"]["code"] == "INSTANCE_ALREADY_RUNNING"
+
+
+@pytest.mark.webapi
 def test_start_instance_404(test_client):
     r = test_client.post(
         "/api/instance/start",

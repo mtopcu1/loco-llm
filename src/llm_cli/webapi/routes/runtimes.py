@@ -122,6 +122,13 @@ def default_params(runtime_id: str, model_id: str | None = None):
     return [asdict(cell) for cell in cells]
 
 
+def _install_argv(runtime_id: str) -> list[str]:
+    argv = _llm_argv("runtime", "install", runtime_id, "--yes")
+    if runtime_id == "vllm":
+        argv.extend(["-p", "vllm_version=0.21.0", "-p", "pip_extra=cuda"])
+    return argv
+
+
 @router.post("/runtimes/{runtime_id}/install", tags=["runtimes"])
 def install_runtime_route(runtime_id: str):
     if registry.get_runtime_merged(runtime_id) is None:
@@ -134,7 +141,7 @@ def install_runtime_route(runtime_id: str):
     job_id = jobs_module.registry().start_subprocess(
         kind="runtime_install",
         context={"runtime_id": runtime_id},
-        argv=_llm_argv("runtime", "install", runtime_id, "--yes"),
+        argv=_install_argv(runtime_id),
     )
     return {"job_id": job_id}
 

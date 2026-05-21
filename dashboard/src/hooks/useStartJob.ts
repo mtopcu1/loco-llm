@@ -28,10 +28,17 @@ export function useStartJob() {
       if (error) throw error
       return data as { job_id?: string }
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       if (data?.job_id) {
         setSelectedJobId(data.job_id)
         void qc.invalidateQueries({ queryKey: ['jobs'] })
+        if (
+          variables.path === '/instance/start' ||
+          variables.path === '/instance/switch' ||
+          variables.path === '/instance/stop'
+        ) {
+          void qc.invalidateQueries({ queryKey: ['instance'] })
+        }
         toast.success('Job started')
       }
     },
