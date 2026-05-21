@@ -39,7 +39,13 @@ export function useStartJob() {
         ) {
           void qc.invalidateQueries({ queryKey: ['instance'] })
         }
-        toast.success('Job started')
+        const startMsg =
+          variables.path === '/instance/switch'
+            ? 'Switching instance — open Jobs for live log'
+            : variables.path === '/instance/start'
+              ? 'Starting instance — open Jobs for live log'
+              : 'Job started'
+        toast.success(startMsg)
       }
     },
     onError: errorToToast,

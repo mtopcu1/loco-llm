@@ -333,7 +333,10 @@ def serve_instance(config_id: str, *, mode: str) -> None:
             systemd=(mode == "systemd"),
         )
     except typer.Exit as exc:
-        raise LifecycleError(f"serve exited with code {exc.exit_code}") from exc
+        raise LifecycleError(
+            f"serve failed (exit {exc.exit_code}); see job log or "
+            f"state/logs for details"
+        ) from exc
 
 
 def switch_instance(config_id: str) -> None:
@@ -345,4 +348,7 @@ def switch_instance(config_id: str) -> None:
     try:
         switch_cmd(config_id)
     except typer.Exit as exc:
-        raise LifecycleError(f"switch exited with code {exc.exit_code}") from exc
+        raise LifecycleError(
+            f"switch failed (exit {exc.exit_code}); see job log or "
+            f"state/logs for details"
+        ) from exc

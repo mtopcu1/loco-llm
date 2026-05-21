@@ -12,6 +12,9 @@ export function JobsTray() {
   const jobs = useJobs()
 
   const active = (jobs.data ?? []).filter((j) => ACTIVE.has(j.status))
+  const recentFailed = (jobs.data ?? [])
+    .filter((j) => j.status === 'failed')
+    .slice(0, 3)
 
   if (collapsed) return null
 
@@ -33,6 +36,14 @@ export function JobsTray() {
         {active.map((job) => (
           <JobsTrayItem key={job.id} job={job} />
         ))}
+        {recentFailed.length > 0 && (
+          <>
+            <p className="text-xs text-zinc-500 pt-1">Recent failures</p>
+            {recentFailed.map((job) => (
+              <JobsTrayItem key={job.id} job={job} failed />
+            ))}
+          </>
+        )}
       </div>
     </div>
   )

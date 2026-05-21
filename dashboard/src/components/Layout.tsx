@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react'
 import { JobDetailSheet } from '@/features/jobs/JobDetailSheet'
+import { useJobNotifications } from '@/hooks/useJobNotifications'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
 import { SecurityBanner } from './SecurityBanner'
 
 export function Layout({ children }: { children: ReactNode }) {
+  useJobNotifications()
   return (
     <div className="min-h-screen flex flex-col">
       <SecurityBanner />

@@ -149,19 +149,48 @@ def _read_running_mode() -> str | None:
     return rec.mode if rec is not None else None
 
 
+def _serve_log_tail_lines(config_id: str, *, max_lines: int = 60) -> list[str]:
+    """Last lines from the config serve log (where readiness / runtime errors land)."""
+    root = _state_root()
+    log_path = lifecycle.logs_dir(root) / f"{config_id}.log"
+    if not log_path.is_file():
+        return [f"(no serve log at {log_path})"]
+    text = log_path.read_text(encoding="utf-8", errors="replace")
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    if not lines:
+        return ["(serve log file is empty)"]
+    return lines[-max_lines:]
+
+
+async def _report_instance_failure(config_id: str, report, exc: BaseException) -> None:
+    await report({"stage": "failed"})
+    await report({"log": f"error: {exc}"})
+    await report({"log": "--- serve log tail ---"})
+    for line in _serve_log_tail_lines(config_id):
+        await report({"log": line})
+
+
 async def _instance_start_coro(
     config_id: str,
     mode: str,
     report,
 ) -> None:
-    await report({"stage": "starting"})
-    await asyncio.to_thread(lifecycle.serve_instance, config_id, mode=mode)
+    await report({"stage": "starting", "log": f"config: {config_id} (mode={mode})"})
+    try:
+        await asyncio.to_thread(lifecycle.serve_instance, config_id, mode=mode)
+    except Exception as exc:
+        await _report_instance_failure(config_id, report, exc)
+        raise
     await report({"stage": "ready"})
 
 
 async def _instance_switch_coro(config_id: str, report) -> None:
-    await report({"stage": "switching"})
-    await asyncio.to_thread(lifecycle.switch_instance, config_id)
+    await report({"stage": "switching", "log": f"config: {config_id}"})
+    try:
+        await asyncio.to_thread(lifecycle.switch_instance, config_id)
+    except Exception as exc:
+        await _report_instance_failure(config_id, report, exc)
+        raise
     await report({"stage": "ready"})
 
 

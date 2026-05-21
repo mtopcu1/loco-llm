@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 import { api } from '@/api/client'
 import { useJob } from '@/hooks/useJob'
-import { useSSE } from '@/hooks/useSSE'
 import { useAppStore } from '@/store'
 import { jobTitle, shortenUrl } from '@/lib/jobLabel'
 import { Button } from '@/components/ui/button'
@@ -31,37 +29,31 @@ export function JobDetailSheet() {
   const qc = useQueryClient()
   const [logLines, setLogLines] = useState<string[]>([])
   const logEndRef = useRef<HTMLDivElement>(null)
-  const notifiedStatus = useRef<string | null>(null)
-
-  const logStream = useSSE<{ log?: string; status?: string }>({
-    url: jobId ? `/api/jobs/${jobId}/stream` : '',
-    enabled: !!jobId,
-    eventNames: ['snapshot', 'update'],
-  })
-
   useEffect(() => {
-    if (!logStream.event?.log) return
-    setLogLines((prev) => [...prev, logStream.event!.log!])
-  }, [logStream.event])
+    if (!jobId) return
+    const es = new EventSource(`/api/jobs/${jobId}/stream`)
+    const onUpdate = (raw: MessageEvent) => {
+      try {
+        const data = JSON.parse(String(raw.data)) as { log?: string; status?: string }
+        const line = data.log
+        if (line) {
+          setLogLines((prev) => [...prev, line])
+        }
+        if (data.status) {
+          void qc.invalidateQueries({ queryKey: ['jobs', jobId] })
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    es.addEventListener('snapshot', onUpdate)
+    es.addEventListener('update', onUpdate)
+    return () => es.close()
+  }, [jobId, qc])
 
   useEffect(() => {
     setLogLines([])
-    notifiedStatus.current = null
   }, [jobId])
-
-  useEffect(() => {
-    const status = job.data?.status
-    if (!status || status === notifiedStatus.current) return
-    if (status !== 'succeeded' && status !== 'failed') return
-    notifiedStatus.current = status
-    if (status === 'succeeded' && job.data?.kind === 'model_pull') {
-      void qc.invalidateQueries({ queryKey: ['models'] })
-      toast.success('Model registered')
-    }
-    if (status === 'failed' && job.data?.error) {
-      toast.error(job.data.error.message)
-    }
-  }, [job.data, qc])
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -112,7 +104,14 @@ export function JobDetailSheet() {
               </div>
             )}
             {j.error && (
-              <p className="text-red-600 text-xs whitespace-pre-wrap">{j.error.message}</p>
+              <p className="text-red-600 text-xs whitespace-pre-wrap font-medium">
+                {j.error.message}
+              </p>
+            )}
+            {j.status === 'failed' && j.kind === 'instance_start_wait' && (
+              <p className="text-zinc-500 text-xs">
+                Check the log below and the Instance → Logs tab for the config serve log.
+              </p>
             )}
           </dl>
         )}

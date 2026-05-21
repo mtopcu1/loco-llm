@@ -33,6 +33,23 @@ async def test_start_async_succeeds_and_records_status(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_start_async_report_log_lines(tmp_path, monkeypatch):
+    monkeypatch.setattr(jobs, "_jobs_dir", lambda: tmp_path)
+
+    async def work(report):
+        await report({"log": "step one"})
+        await report({"log": "step two"})
+
+    job_id = jobs.registry().start_async(
+        kind="instance_start_wait", context={}, coro_factory=work
+    )
+    await asyncio.sleep(0.05)
+    log = (tmp_path / f"{job_id}.log").read_text()
+    assert "step one" in log
+    assert "step two" in log
+
+
+@pytest.mark.asyncio
 async def test_start_async_failure_captures_error(tmp_path, monkeypatch):
     monkeypatch.setattr(jobs, "_jobs_dir", lambda: tmp_path)
 
@@ -44,6 +61,8 @@ async def test_start_async_failure_captures_error(tmp_path, monkeypatch):
     j = jobs.registry().get(job_id)
     assert j.status == "failed"
     assert "boom" in j.error["message"]
+    log = (tmp_path / f"{job_id}.log").read_text()
+    assert "error: boom" in log
 
 
 def test_start_subprocess_runs_to_completion(tmp_path, monkeypatch):

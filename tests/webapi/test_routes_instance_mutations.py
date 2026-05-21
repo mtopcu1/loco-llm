@@ -1,10 +1,19 @@
 from __future__ import annotations
 
+import time
+
 import pytest
 import yaml
 
-from llm_cli.core.lifecycle import LifecycleRecord, write_running
+from llm_cli.core import jobs as jobs_module
+from llm_cli.core.lifecycle import LifecycleError, LifecycleRecord, write_running
 from llm_cli.core.settings import resolve_settings
+from llm_cli.webapi.routes import instance as instance_routes
+
+
+@pytest.fixture(autouse=True)
+def reset_jobs():
+    jobs_module._reset_for_tests()
 
 
 @pytest.fixture
@@ -174,3 +183,62 @@ def test_switch_instance_refuses_foreground(
     )
     assert r.status_code == 409
     assert r.json()["error"]["code"] == "INSTANCE_FOREGROUND_NOT_SWITCHABLE"
+
+
+@pytest.mark.webapi
+def test_switch_instance_job_failure_includes_serve_log(
+    test_client, webapi_repo, seed_config, monkeypatch, tmp_path
+):
+    from llm_cli.core import lifecycle
+
+    monkeypatch.setattr(jobs_module, "_jobs_dir", lambda: tmp_path)
+    settings = resolve_settings()
+    log_path = lifecycle.logs_dir(settings.data_root) / f"{seed_config}.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text("GPU OOM: cannot load 35B weights\n", encoding="utf-8")
+
+    def fail_switch(_config_id: str) -> None:
+        raise LifecycleError("switch failed (exit 1); see job log")
+
+    monkeypatch.setattr(
+        "llm_cli.webapi.routes.instance.lifecycle.switch_instance",
+        fail_switch,
+    )
+
+    r = test_client.post(
+        "/api/instance/switch",
+        headers={"Host": "testserver"},
+        json={"config_id": seed_config},
+    )
+    assert r.status_code == 200
+    job_id = r.json()["job_id"]
+
+    j = {}
+    deadline = time.time() + 5.0
+    while time.time() < deadline:
+        j = test_client.get(
+            f"/api/jobs/{job_id}", headers={"Host": "testserver"}
+        ).json()
+        if j["status"] == "failed":
+            break
+        time.sleep(0.05)
+
+    assert j["status"] == "failed"
+    assert "switch failed" in j["error"]["message"]
+    log_text = (tmp_path / f"{job_id}.log").read_text()
+    assert "error:" in log_text
+    assert "serve log tail" in log_text
+    assert "GPU OOM" in log_text
+
+
+@pytest.mark.webapi
+def test_serve_log_tail_reads_config_log(webapi_repo, seed_config):
+    from llm_cli.core import lifecycle
+
+    settings = resolve_settings()
+    log_path = lifecycle.logs_dir(settings.data_root) / f"{seed_config}.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text("line one\nline two\n", encoding="utf-8")
+    tail = instance_routes._serve_log_tail_lines(seed_config, max_lines=10)
+    assert "line one" in tail
+    assert "line two" in tail

@@ -26,9 +26,10 @@ function elapsed(startedAt: string | null | undefined): string {
 type Props = {
   job: JobRecord
   compact?: boolean
+  failed?: boolean
 }
 
-export function JobsTrayItem({ job, compact }: Props) {
+export function JobsTrayItem({ job, compact, failed }: Props) {
   const setSelectedJobId = useAppStore((s) => s.setSelectedJobId)
   const qc = useQueryClient()
 
@@ -58,23 +59,32 @@ export function JobsTrayItem({ job, compact }: Props) {
       <div className="flex-1 min-w-0">
         <div className="font-medium truncate">{jobTitle(job.kind, job.context)}</div>
         <div className="text-zinc-500 truncate">{contextSummary(job.context)}</div>
-        {job.progress?.stage && (
-          <div className="text-zinc-400 truncate">{job.progress.stage}</div>
+        {failed && job.error?.message ? (
+          <div className="text-red-600 truncate">{job.error.message}</div>
+        ) : (
+          job.progress?.stage && (
+            <div className="text-zinc-400 truncate">{job.progress.stage}</div>
+          )
         )}
       </div>
-      <span className="text-zinc-400 shrink-0">{elapsed(job.started_at)}</span>
-      <Button
-        size="xs"
-        variant="ghost"
-        className="shrink-0 h-6 px-1"
-        disabled={cancel.isPending}
-        onClick={(e) => {
-          e.stopPropagation()
-          cancel.mutate()
-        }}
-      >
-        ×
-      </Button>
+      {!failed && (
+        <>
+          <span className="text-zinc-400 shrink-0">{elapsed(job.started_at)}</span>
+          <Button
+            size="xs"
+            variant="ghost"
+            className="shrink-0 h-6 px-1"
+            disabled={cancel.isPending}
+            onClick={(e) => {
+              e.stopPropagation()
+              cancel.mutate()
+            }}
+          >
+            ×
+          </Button>
+        </>
+      )}
+      {failed && <span className="text-red-600 shrink-0 text-[10px] font-medium">failed</span>}
     </div>
   )
 }

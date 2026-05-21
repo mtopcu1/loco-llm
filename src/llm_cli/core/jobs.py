@@ -173,14 +173,24 @@ class _JobRegistry:
             log = log_path.open("a", encoding="utf-8")
 
             async def report(progress: dict) -> None:
-                stage = str(progress.get("stage", ""))
-                percent = progress.get("percent")
-                with self._lock:
-                    self._jobs[job_id].progress = JobProgress(percent=percent, stage=stage)
-                self._publish_status(job_id)
-                log.write(f"stage: {stage}\n")
-                log.flush()
-                self._publish_log_line(job_id, f"stage: {stage}")
+                stage = progress.get("stage")
+                if stage is not None:
+                    stage_s = str(stage)
+                    percent = progress.get("percent")
+                    with self._lock:
+                        self._jobs[job_id].progress = JobProgress(
+                            percent=percent, stage=stage_s
+                        )
+                    self._publish_status(job_id)
+                    log.write(f"stage: {stage_s}\n")
+                    log.flush()
+                    self._publish_log_line(job_id, f"stage: {stage_s}")
+                log_line = progress.get("log")
+                if log_line is not None:
+                    text = str(log_line)
+                    log.write(text + "\n")
+                    log.flush()
+                    self._publish_log_line(job_id, text)
 
             with self._lock:
                 j2 = self._jobs[job_id]
@@ -206,8 +216,10 @@ class _JobRegistry:
                     j2.status = "failed"
                     j2.finished_at = datetime.now(tz=UTC)
                     j2.error = {"code": "INTERNAL_ERROR", "message": str(e), "details": {}}
-                log.write(f"error: {e}\n")
+                err_line = f"error: {e}"
+                log.write(err_line + "\n")
                 log.flush()
+                self._publish_log_line(job_id, err_line)
             finally:
                 self._publish_status(job_id)
                 log.close()
