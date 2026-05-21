@@ -196,6 +196,7 @@ def run_install(
             raise RuntimeError(
                 f"managed venv not found at {root.parent / '.venv'}; rerun install.sh first."
             )
+        install_root = root.parent
         subprocess.check_call(
             [
                 uv,
@@ -203,10 +204,10 @@ def run_install(
                 "install",
                 "--python",
                 str(venv_python),
-                "fastapi>=0.115,<1.0",
-                "uvicorn[standard]>=0.30,<1.0",
-                "sse-starlette>=2.1,<3.0",
-            ]
+                "-e",
+                f"{install_root}[dashboard]",
+            ],
+            cwd=str(install_root),
         )
 
     if not skip_frontend:
@@ -242,6 +243,18 @@ def run_install(
     )
     write_installed_record(record)
     return record
+
+
+def _tail_log(path: Path, *, max_lines: int = 24) -> str:
+    if not path.is_file():
+        return ""
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return ""
+    if not lines:
+        return ""
+    return "\n".join(lines[-max_lines:])
 
 
 def _port_in_use(host: str, port: int) -> bool:
@@ -298,6 +311,10 @@ def start_server_background(
     log_path = server_log_path()
     log_fd = log_path.open("ab")
     env = os.environ.copy()
+    from llm_cli.core.scaffold import data_home, install_root
+
+    env.setdefault("LOCO_HOME", str(data_home()))
+    env.setdefault("LOCO_INSTALL", str(install_root()))
     _apply_server_env(env, allowed_hosts=allowed_hosts, insecure=insecure)
 
     cmd = [
@@ -342,10 +359,14 @@ def start_server_background(
             last_err = str(exc)
 
         if proc.poll() is not None:
-            raise RuntimeError(
+            tail = _tail_log(log_path)
+            msg = (
                 f"Dashboard server exited during startup (last error: {last_err}). "
                 f"See {log_path} for details."
             )
+            if tail:
+                msg += f"\n--- log tail ---\n{tail}"
+            raise RuntimeError(msg)
         time.sleep(0.25)
 
     proc.terminate()
