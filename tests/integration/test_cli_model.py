@@ -137,7 +137,7 @@ def test_model_pull_existing_id_refreshes(tmp_path: Path) -> None:
     def fake_dl(repo, revision, include, exclude, target_dir):
         return 0
 
-    with patch("llm_cli.core.model_pull.hf_download", side_effect=fake_dl):
+    with patch("llm_cli.commands.model_cmd.hf_download", side_effect=fake_dl):
         result = runner.invoke(app, ["model", "pull", "qwen-q__q4"], catch_exceptions=False)
     assert result.exit_code == 0
     e = get_entry(models_dir, "qwen-q__q4")
