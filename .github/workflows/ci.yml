@@ -21,4 +21,4 @@ jobs:
           CI: "true"
           NO_COLOR: "1"
           TERM: "dumb"
-        run: uv run pytest -q --tb=short
+        run: uv run pytest -q --tb=short -n auto
