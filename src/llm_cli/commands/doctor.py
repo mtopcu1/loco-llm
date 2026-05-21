@@ -40,7 +40,7 @@ def _check_on_release_tag() -> tuple[str, str, str]:
         return (
             "install-channel",
             "warn",
-            "not on a release tag — run `loco update` to re-anchor to the latest stable tag",
+            "not on a release tag — run `loco update --stable` for the latest release tag",
         )
 
 

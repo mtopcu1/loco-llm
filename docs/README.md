@@ -7,7 +7,7 @@ Start at the root [README.md](../README.md) for install and first-run steps.
 | [**CLI.md**](CLI.md) | Full `loco` command reference |
 | [**GLOSSARY.md**](GLOSSARY.md) | Terms and quick navigation |
 | [INSTALLATION.md](INSTALLATION.md) | Official installer, flags, layout |
-| [UPDATE.md](UPDATE.md) | `loco update` and re-anchor behavior |
+| [UPDATE.md](UPDATE.md) | `loco update`, `--stable`, and branch/tag refresh |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Data home vs install root, discovery |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Git clone + uv dev loop |
 | [DASHBOARD.md](DASHBOARD.md) | Web dashboard install and serve |
