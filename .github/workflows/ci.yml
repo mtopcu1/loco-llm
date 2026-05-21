@@ -2,10 +2,13 @@ name: ci
 on:
   pull_request:
     branches: [main]
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   pytest:
     if: ${{ !startsWith(github.head_ref, 'release-please--') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -22,7 +25,12 @@ jobs:
           NO_COLOR: "1"
           TERM: "dumb"
         run: |
-          uv run pytest -v --tb=long -ra -o addopts= --junitxml=pytest-results.xml
+          echo "=== runner diagnostics ==="
+          uname -a
+          nproc
+          free -h || true
+          echo "=== pytest ==="
+          uv run pytest -v --tb=long -ra -o addopts= --junitxml=pytest-results.xml -n auto --durations=15
       - name: Upload pytest results
         if: always()
         uses: actions/upload-artifact@v4
