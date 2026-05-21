@@ -4,7 +4,6 @@ from __future__ import annotations
 import json as _json
 import os
 import shutil
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -12,7 +11,6 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from llm_cli.core.hf_client import fetch_repo_revision
 from llm_cli.core.hf_url import HFUrlError, parse_hf_url
 from llm_cli.core.model_resolve import build_artifact
 from llm_cli.core.model_registry import (
@@ -34,12 +32,10 @@ from llm_cli.core.model_pull import (
     pull_hf_url_model_id,
 )
 from llm_cli.core.settings import load_settings, resolve
+from llm_cli.core.time import utc_now_iso
 
 console = Console()
 
-
-def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 model_app = typer.Typer(help="Manage models (list/info/pull/add/uninstall).")
 
@@ -197,7 +193,7 @@ def model_pull(
             sha256=existing.artifact.sha256,
         ),
         metadata=existing.metadata,
-        installed_at=_utc_now_iso(),
+        installed_at=utc_now_iso(),
     )
     upsert_entry(models_dir, refreshed)
     console.print(f"[green]refreshed[/green] {existing.id}")
@@ -268,7 +264,7 @@ def model_add(
         source=LocalSource(original_path=str(path.resolve())),
         artifact=artifact,
         metadata=Metadata(display_name=model_id),
-        installed_at=_utc_now_iso(),
+        installed_at=utc_now_iso(),
     )
     upsert_entry(models_dir, entry)
     console.print(f"[green]registered[/green] {model_id}")

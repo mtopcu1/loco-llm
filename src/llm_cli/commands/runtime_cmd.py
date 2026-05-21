@@ -32,6 +32,7 @@ from llm_cli.core.params import derive_env_name, validate_params
 from llm_cli.core.repo import scaffold_root
 from llm_cli.core.scaffold import user_runtimes_dir
 from llm_cli.core.settings import Settings, load_settings, resolve
+from llm_cli.core.time import utc_now_iso
 from llm_cli.core import runtime_install as rt_install
 from llm_cli.core.runtime_install import RuntimeInstallError
 from llm_cli.core.wsl import run_runtime_bash
@@ -255,7 +256,7 @@ def _runtime_setup_custom() -> str:
     params_data = yaml.safe_load(_CUSTOM_PARAMS_YAML) or {}
     record = InstallRecord(
         runtime_id=rt_id,
-        installed_at=_utc_now_iso(),
+        installed_at=utc_now_iso(),
         build_params={},
         build_sh_sha256="",
         verify_passed=None,
@@ -310,18 +311,13 @@ def _settings() -> Settings:
     return resolve(load_settings())
 
 
-def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def _parse_param_flag(token: str) -> tuple[str, str]:
-    if "=" not in token:
-        raise typer.BadParameter(f"--param must be key=value (got {token!r})")
-    key, value = token.split("=", 1)
-    key = key.strip()
-    if not key:
-        raise typer.BadParameter("--param key cannot be empty")
-    return key, value.strip()
+    from llm_cli.core.params import ParamTokenError, parse_cli_param_token
+
+    try:
+        return parse_cli_param_token(token)
+    except ParamTokenError as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
 
 def _resolve_build_params(

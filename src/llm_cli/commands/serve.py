@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import typer
 
+from llm_cli.commands.serve_io import raise_serve_exit, serve_status_message
 from llm_cli.core.serve import (
     _serve_env_from_params,
     serve_dispatch,
@@ -42,9 +43,10 @@ def serve(
             foreground=foreground,
             systemd=systemd,
             foreground_from_supervisor=foreground_from_supervisor,
+            on_message=serve_status_message,
         )
     except ServeError as exc:
-        raise typer.Exit(code=exc.exit_code) from exc
+        raise_serve_exit(exc)
 
 
 def switch(
@@ -52,6 +54,6 @@ def switch(
 ) -> None:
     """Stop the currently-running service and start <config_id> in the same mode."""
     try:
-        switch_impl(config_id)
+        switch_impl(config_id, on_message=serve_status_message)
     except ServeError as exc:
-        raise typer.Exit(code=exc.exit_code) from exc
+        raise_serve_exit(exc)

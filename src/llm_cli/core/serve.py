@@ -4,13 +4,11 @@ from __future__ import annotations
 import os
 import signal
 import time
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NoReturn
-
-from rich.console import Console
+from typing import TYPE_CHECKING, Any, Callable, NoReturn
 
 from llm_cli.core import registry
+from llm_cli.core.time import utc_now_iso
 from llm_cli.core.serve_errors import ServeError
 from llm_cli.core.install_record import is_installed
 from llm_cli.core.lifecycle import (
@@ -58,14 +56,11 @@ _SIGKILL = int(getattr(signal, "SIGKILL", 9))
 if TYPE_CHECKING:
     from llm_cli.core.registry import ConfigRecord
 
-console = Console()
+ServeMessageFn = Callable[[str], None] | None
 
 
 def _fail(message: str, *, hint: str | None = None, code: int = 1) -> NoReturn:
-    console.print(f"[red]error:[/red] {message}")
-    if hint:
-        console.print(hint)
-    raise ServeError(message, exit_code=code)
+    raise ServeError(message, exit_code=code, hint=hint)
 
 
 def _tail_log_file(log_path: str | Path, *, max_lines: int = 30) -> list[str]:
@@ -85,15 +80,7 @@ def _fail_with_log(message: str, log_path: str | Path, *, code: int = 1) -> NoRe
         parts.append("last log lines:")
         parts.extend(tail[-20:])
     full = "\n".join(parts)
-    console.print(f"[red]error:[/red] {message}")
-    console.print(f"see {log_path}")
-    for line in tail[-12:]:
-        console.print(f"  {line}")
     raise ServeError(full, exit_code=code)
-
-
-def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _resolve_cfg(config_id: str) -> "ConfigRecord":
@@ -194,6 +181,8 @@ def _do_background(
     state_base: Path,
     env: dict[str, str],
     runtime_path: Path,
+    *,
+    on_message: ServeMessageFn = None,
 ) -> None:
     serve = cfg.data["serve"]
     host = str(serve["host"])
@@ -220,7 +209,7 @@ def _do_background(
         mode="background",
         config_id=cfg.id,
         port=port,
-        started_at=_utc_now_iso(),
+        started_at=utc_now_iso(),
         pid=pid,
         log_path=(Path("state/logs") / f"{cfg.id}.log").as_posix(),
     )
@@ -228,7 +217,8 @@ def _do_background(
     append_history(
         state_base, {"action": "start", "mode": "background", "config_id": cfg.id}
     )
-    console.print(f"[green]running[/green] {cfg.id} (pid {pid}, port {port})")
+    if on_message is not None:
+        on_message(f"running {cfg.id} (pid {pid}, port {port})")
 
 
 def _do_foreground(
@@ -270,7 +260,7 @@ def _do_foreground(
             mode="foreground",
             config_id=cfg.id,
             port=port,
-            started_at=_utc_now_iso(),
+            started_at=utc_now_iso(),
             pid=pid,
             log_path=(Path("state/logs") / f"{cfg.id}.log").as_posix(),
         )
@@ -296,6 +286,8 @@ def _do_systemd(
     state_base: Path,
     env: dict[str, str],
     runtime_path: Path,
+    *,
+    on_message: ServeMessageFn = None,
 ) -> None:
     serve_obj = cfg.data["serve"]
     host = str(serve_obj["host"])
@@ -337,12 +329,13 @@ def _do_systemd(
         mode="systemd",
         config_id=cfg.id,
         port=port,
-        started_at=_utc_now_iso(),
+        started_at=utc_now_iso(),
         unit="loco.service",
     )
     write_running(state_base, rec)
     append_history(state_base, {"action": "start", "mode": "systemd", "config_id": cfg.id})
-    console.print(f"[green]running[/green] {cfg.id} via systemd (port {port})")
+    if on_message is not None:
+        on_message(f"running {cfg.id} via systemd (port {port})")
 
 
 def serve_dispatch(
@@ -351,6 +344,7 @@ def serve_dispatch(
     foreground: bool = False,
     systemd: bool = False,
     foreground_from_supervisor: bool = False,
+    on_message: ServeMessageFn = None,
 ) -> None:
     """Start a config in foreground, background, or systemd mode (raises ServeError)."""
     _serve_dispatch_impl(
@@ -358,6 +352,7 @@ def serve_dispatch(
         foreground=foreground,
         systemd=systemd,
         foreground_from_supervisor=foreground_from_supervisor,
+        on_message=on_message,
     )
 
 
@@ -367,6 +362,7 @@ def _serve_dispatch_impl(
     foreground: bool = False,
     systemd: bool = False,
     foreground_from_supervisor: bool = False,
+    on_message: ServeMessageFn = None,
 ) -> None:
     if foreground and systemd:
         _fail("--foreground and --systemd are mutually exclusive")
@@ -395,7 +391,8 @@ def _serve_dispatch_impl(
         and existing.config_id == config_id
         and systemd_is_active("loco.service")
     ):
-        console.print(f"[green]already serving[/green] {config_id} via systemd")
+        if on_message is not None:
+            on_message(f"already serving {config_id} via systemd")
         return
 
     if existing and existing.config_id == config_id and not foreground_from_supervisor:
@@ -418,18 +415,24 @@ def _serve_dispatch_impl(
             settings, cfg_for_env, state_base, env, runtime_path, from_supervisor=True
         )
     elif systemd:
-        _do_systemd(settings, cfg_for_env, state_base, env, runtime_path)
+        _do_systemd(
+            settings, cfg_for_env, state_base, env, runtime_path, on_message=on_message
+        )
     else:
-        _do_background(settings, cfg_for_env, state_base, env, runtime_path)
+        _do_background(
+            settings, cfg_for_env, state_base, env, runtime_path, on_message=on_message
+        )
 
 
-def switch_impl(config_id: str) -> None:
+def switch_impl(config_id: str, *, on_message: ServeMessageFn = None) -> None:
     """Stop the running service and start another config in the same mode."""
-    _switch_impl_body(config_id)
+    _switch_impl_body(config_id, on_message=on_message)
 
 
 def _switch_impl_body(
     config_id: str,
+    *,
+    on_message: ServeMessageFn = None,
 ) -> None:
     settings = resolve(load_settings())
     state_base = state_root(settings)
@@ -476,7 +479,14 @@ def _switch_impl_body(
                 "to": config_id,
             },
         )
-        _do_background(settings, new_for_env, state_base, env, runtime_path)
+        _do_background(
+            settings,
+            new_for_env,
+            state_base,
+            env,
+            runtime_path,
+            on_message=on_message,
+        )
         return
 
     if rec.mode == "systemd":
@@ -490,7 +500,14 @@ def _switch_impl_body(
                 "to": config_id,
             },
         )
-        _do_systemd(settings, new_for_env, state_base, env, runtime_path)
+        _do_systemd(
+            settings,
+            new_for_env,
+            state_base,
+            env,
+            runtime_path,
+            on_message=on_message,
+        )
         return
 
     _fail(f"unknown mode {rec.mode!r}")

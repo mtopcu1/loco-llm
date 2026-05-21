@@ -7,9 +7,10 @@ import os as _os
 import subprocess as _subprocess
 from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from llm_cli.core.time import utc_now_iso
 
 if TYPE_CHECKING:
     from llm_cli.core.settings import Settings
@@ -85,16 +86,13 @@ def clear_running(repo: Path) -> None:
         path.unlink()
 
 
-def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
 
 def append_history(repo: Path, event: dict[str, Any]) -> None:
     """Append a JSON object as one line to state/history.jsonl."""
     sd = state_dir(repo)
     sd.mkdir(parents=True, exist_ok=True)
     line = dict(event)
-    line.setdefault("ts", _utc_now_iso())
+    line.setdefault("ts", utc_now_iso())
     with history_path(repo).open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(line, sort_keys=True) + "\n")
     if line.get("action") in ("start", "stop", "switch"):

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import typer
 
-from llm_cli.core import chain
+from llm_cli.commands import setup_chain as chain
 
 
 def _chain_settings(tmp_path: Path, monkeypatch) -> None:

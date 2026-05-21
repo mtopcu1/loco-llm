@@ -6,9 +6,10 @@ import os
 import shutil
 import tempfile
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Union
+
+from llm_cli.core.time import utc_now_iso
 
 REGISTRY_FILENAME = "registry.json"
 SCHEMA_VERSION = 1
@@ -210,10 +211,6 @@ class ModelAlreadyRegisteredError(ModelRegistryError):
     pass
 
 
-def _utc_now_iso() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def _symlink_or_copy(src: Path, dst: Path) -> None:
     if dst.exists() or dst.is_symlink():
         dst.unlink()
@@ -264,7 +261,7 @@ def add_local(models_dir: Path, model_id: str, path: Path, fmt: str) -> Registry
         source=LocalSource(original_path=str(path.resolve())),
         artifact=artifact,
         metadata=Metadata(display_name=model_id),
-        installed_at=_utc_now_iso(),
+        installed_at=utc_now_iso(),
     )
     upsert_entry(models_dir, entry)
     return entry

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timezone
 from pathlib import Path
 from subprocess import run as _subprocess_run
 from typing import Optional
@@ -24,6 +23,7 @@ from llm_cli.core.model_resolve import (
     infer_format,
 )
 from llm_cli.core.settings import load_settings, resolve
+from llm_cli.core.time import utc_now_iso
 
 
 class PullModelError(Exception):
@@ -58,9 +58,6 @@ def hf_download(
     result = _subprocess_run(cmd, check=False)
     return result.returncode
 
-
-def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _verify_sha256(target_dir: Path, expected: dict[str, str]) -> list[str]:
@@ -161,7 +158,7 @@ def pull_hf_url_model_id(
             license=info.license,
             ctx_length=None,
         ),
-        installed_at=_utc_now_iso(),
+        installed_at=utc_now_iso(),
     )
     upsert_entry(models_dir, entry)
     return mid

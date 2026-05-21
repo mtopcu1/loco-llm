@@ -1,4 +1,4 @@
-"""Orchestration for `loco setup` onboarding chain."""
+"""Interactive onboarding chain for `loco setup` (runtime → model → config → serve)."""
 from __future__ import annotations
 
 from typing import Any
@@ -115,9 +115,9 @@ def _interactive_model_pull_for_setup(url: str) -> str | None:
 
 
 def _do_model_pull(url: str, **kwargs: Any) -> str:
-    from llm_cli.commands.model_cmd import do_model_pull
+    from llm_cli.core.model_pull import pull_hf_url_model_id
 
-    return do_model_pull(url, **kwargs)
+    return pull_hf_url_model_id(url, **kwargs)
 
 
 def _do_config_setup(
@@ -135,11 +135,13 @@ def _do_config_setup(
 
 def _do_serve(config_id: str) -> int:
     from llm_cli.core.serve import serve_dispatch
+    from llm_cli.core.serve_errors import ServeError
 
     try:
         serve_dispatch(config_id)
-    except typer.Exit as exc:
-        return int(exc.exit_code or 1)
+    except ServeError as exc:
+        console.print(f"[red]error:[/red] {exc.message}")
+        return exc.exit_code
     return 0
 
 

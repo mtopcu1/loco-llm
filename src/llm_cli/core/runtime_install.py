@@ -1,7 +1,6 @@
 """Canonical runtime install and rebuild (CLI and dashboard API)."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +18,7 @@ from llm_cli.core.lifecycle import append_history, state_root
 from llm_cli.core.params import derive_env_name, validate_params
 from llm_cli.core.repo import scaffold_root
 from llm_cli.core.settings import Settings, load_settings, resolve
+from llm_cli.core.time import utc_now_iso
 from llm_cli.core.wsl import run_runtime_bash
 
 
@@ -38,18 +38,13 @@ def default_build_param_tokens(runtime_id: str) -> list[str]:
     return []
 
 
-def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def _parse_param_token(token: str) -> tuple[str, str]:
-    if "=" not in token:
-        raise RuntimeInstallError(f"--param must be key=value (got {token!r})")
-    key, value = token.split("=", 1)
-    key = key.strip()
-    if not key:
-        raise RuntimeInstallError("--param key cannot be empty")
-    return key, value.strip()
+    from llm_cli.core.params import ParamTokenError, parse_cli_param_token
+
+    try:
+        return parse_cli_param_token(token)
+    except ParamTokenError as exc:
+        raise RuntimeInstallError(str(exc)) from exc
 
 
 def _resolve_build_params(
@@ -175,7 +170,7 @@ def install_runtime(
 
     record = InstallRecord(
         runtime_id=runtime_id,
-        installed_at=_utc_now_iso(),
+        installed_at=utc_now_iso(),
         build_params=build_params,
         build_sh_sha256=file_sha256(manifest.path / "build.sh"),
         verify_passed=True if verify_rc == 0 else None,

@@ -296,3 +296,18 @@ def validate_params(
     if errors:
         return {}, errors
     return coerced, []
+
+
+class ParamTokenError(ValueError):
+    """Invalid ``--param key=value`` token."""
+
+
+def parse_cli_param_token(token: str) -> tuple[str, str]:
+    """Parse a single ``key=value`` CLI flag token."""
+    if "=" not in token:
+        raise ParamTokenError(f"--param must be key=value (got {token!r})")
+    key, value = token.split("=", 1)
+    key = key.strip()
+    if not key:
+        raise ParamTokenError("--param key cannot be empty")
+    return key, value.strip()

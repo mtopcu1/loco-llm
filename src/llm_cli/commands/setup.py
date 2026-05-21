@@ -4,7 +4,7 @@ from __future__ import annotations
 import typer
 from rich.console import Console
 
-from llm_cli.core.chain import run_setup_chain
+from llm_cli.commands.setup_chain import run_setup_chain
 from llm_cli.core.settings import (
     ensure_data_dirs,
     load_settings,

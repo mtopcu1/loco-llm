@@ -1,7 +1,6 @@
 """`loco doctor` — verify external requirements; `loco doctor render-requirements` regenerates the markdown."""
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 import typer
@@ -16,36 +15,14 @@ from llm_cli.core.doctor import (
     run_quick_checks,
     systemd_linger_advisory,
 )
+from llm_cli.core.doctor_install import check_on_release_tag
 from llm_cli.core.repo import scaffold_root
-from llm_cli.core.scaffold import scaffold_root as install_root
 
 console = Console()
 
 
-def _check_on_release_tag() -> tuple[str, str, str]:
-    """Return (id, status, detail) for the head-on-tag check."""
-    try:
-        root = install_root()
-    except RuntimeError as exc:
-        return ("install-channel", "error", str(exc))
-    try:
-        subprocess.run(
-            ["git", "-C", str(root), "describe", "--tags", "--exact-match", "HEAD"],
-            capture_output=True,
-            check=True,
-            timeout=2,
-        )
-        return ("install-channel", "ok", "on a release tag")
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
-        return (
-            "install-channel",
-            "warn",
-            "not on a release tag — run `loco update --stable` for the latest release tag",
-        )
-
-
 def _print_install_channel_check() -> None:
-    cid, status, detail = _check_on_release_tag()
+    cid, status, detail = check_on_release_tag()
     if status == "ok":
         return
     if status == "warn":
