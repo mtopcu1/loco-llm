@@ -24,7 +24,7 @@ def _prompt_text(prompt: str, *, default: str = "") -> str:
 
 
 def _do_runtime_setup() -> str | None:
-    from llm_cli.commands.runtime_cmd import interactive_runtime_setup
+    from llm_cli.commands.runtime_setup import interactive_runtime_setup
 
     return interactive_runtime_setup()
 
