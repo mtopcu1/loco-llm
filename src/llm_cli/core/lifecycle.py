@@ -326,12 +326,16 @@ def serve_instance(config_id: str, *, mode: str) -> None:
 
     if mode not in ("background", "systemd"):
         raise LifecycleError(f"unsupported mode {mode!r}")
+    from llm_cli.core.serve_errors import ServeError
+
     try:
         serve_dispatch(
             config_id,
             foreground=False,
             systemd=(mode == "systemd"),
         )
+    except ServeError as exc:
+        raise LifecycleError(exc.message) from exc
     except typer.Exit as exc:
         raise LifecycleError(
             f"serve failed (exit {exc.exit_code}); see job log or "
@@ -343,10 +347,13 @@ def switch_instance(config_id: str) -> None:
     """Switch the running service to another config."""
     import typer
 
-    from llm_cli.commands.serve import switch as switch_cmd
+    from llm_cli.commands.serve import _switch_impl
+    from llm_cli.core.serve_errors import ServeError
 
     try:
-        switch_cmd(config_id)
+        _switch_impl(config_id)
+    except ServeError as exc:
+        raise LifecycleError(exc.message) from exc
     except typer.Exit as exc:
         raise LifecycleError(
             f"switch failed (exit {exc.exit_code}); see job log or "

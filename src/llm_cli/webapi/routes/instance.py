@@ -149,25 +149,47 @@ def _read_running_mode() -> str | None:
     return rec.mode if rec is not None else None
 
 
+def _serve_log_path(config_id: str) -> Path:
+    return lifecycle.logs_dir(_state_root()) / f"{config_id}.log"
+
+
 def _serve_log_tail_lines(config_id: str, *, max_lines: int = 60) -> list[str]:
     """Last lines from the config serve log (where readiness / runtime errors land)."""
-    root = _state_root()
-    log_path = lifecycle.logs_dir(root) / f"{config_id}.log"
+    log_path = _serve_log_path(config_id)
     if not log_path.is_file():
-        return [f"(no serve log at {log_path})"]
+        return [f"(no serve log file yet: {log_path})"]
     text = log_path.read_text(encoding="utf-8", errors="replace")
-    lines = [ln for ln in text.splitlines() if ln.strip()]
+    lines = text.splitlines()
     if not lines:
-        return ["(serve log file is empty)"]
+        return ["(serve log file exists but is empty — failure may be before serve.sh wrote output)"]
     return lines[-max_lines:]
+
+
+def _debug_hints(config_id: str) -> list[str]:
+    log_path = _serve_log_path(config_id)
+    return [
+        f"serve log on disk: {log_path}",
+        f"terminal: llm switch {config_id}",
+        f"tail log: llm logs  (while any instance is running) or: Get-Content -Wait '{log_path}'",
+        "check runtime installed: llm runtime list",
+        "check model on disk: llm model list",
+        "full diagnostics: llm doctor",
+    ]
 
 
 async def _report_instance_failure(config_id: str, report, exc: BaseException) -> None:
     await report({"stage": "failed"})
-    await report({"log": f"error: {exc}"})
+    msg = str(exc).strip()
+    for line in msg.splitlines():
+        await report({"log": f"error: {line}" if line else "error: (unknown)"})
     await report({"log": "--- serve log tail ---"})
-    for line in _serve_log_tail_lines(config_id):
+    tail = _serve_log_tail_lines(config_id)
+    for line in tail:
         await report({"log": line})
+    if len(tail) <= 2 and tail and tail[0].startswith("("):
+        await report({"log": "--- how to debug ---"})
+        for hint in _debug_hints(config_id):
+            await report({"log": hint})
 
 
 async def _instance_start_coro(

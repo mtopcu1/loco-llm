@@ -198,7 +198,9 @@ def test_switch_instance_job_failure_includes_serve_log(
     log_path.write_text("GPU OOM: cannot load 35B weights\n", encoding="utf-8")
 
     def fail_switch(_config_id: str) -> None:
-        raise LifecycleError("switch failed (exit 1); see job log")
+        raise LifecycleError(
+            "runtime 'inst-rt' is not installed\nserve log: /tmp/x.log"
+        )
 
     monkeypatch.setattr(
         "llm_cli.webapi.routes.instance.lifecycle.switch_instance",
@@ -224,7 +226,7 @@ def test_switch_instance_job_failure_includes_serve_log(
         time.sleep(0.05)
 
     assert j["status"] == "failed"
-    assert "switch failed" in j["error"]["message"]
+    assert "not installed" in j["error"]["message"]
     log_text = (tmp_path / f"{job_id}.log").read_text()
     assert "error:" in log_text
     assert "serve log tail" in log_text

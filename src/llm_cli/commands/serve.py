@@ -6,12 +6,13 @@ import signal
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NoReturn
 
 import typer
 from rich.console import Console
 
 from llm_cli.core import registry
+from llm_cli.core.serve_errors import ServeError
 from llm_cli.core.install_record import is_installed
 from llm_cli.core.lifecycle import (
     LifecycleRecord,
@@ -61,6 +62,37 @@ if TYPE_CHECKING:
 console = Console()
 
 
+def _fail(message: str, *, hint: str | None = None, code: int = 1) -> NoReturn:
+    console.print(f"[red]error:[/red] {message}")
+    if hint:
+        console.print(hint)
+    raise ServeError(message, exit_code=code)
+
+
+def _tail_log_file(log_path: str | Path, *, max_lines: int = 30) -> list[str]:
+    path = Path(log_path)
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8", errors="replace")
+    lines = text.splitlines()
+    return lines[-max_lines:] if lines else []
+
+
+def _fail_with_log(message: str, log_path: str | Path, *, code: int = 1) -> NoReturn:
+    """Fail after readiness timeout; include recent serve.log lines in the exception."""
+    tail = _tail_log_file(log_path, max_lines=40)
+    parts = [message, f"serve log: {Path(log_path).resolve()}"]
+    if tail:
+        parts.append("last log lines:")
+        parts.extend(tail[-20:])
+    full = "\n".join(parts)
+    console.print(f"[red]error:[/red] {message}")
+    console.print(f"see {log_path}")
+    for line in tail[-12:]:
+        console.print(f"  {line}")
+    raise ServeError(full, exit_code=code)
+
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -68,13 +100,10 @@ def _utc_now_iso() -> str:
 def _resolve_cfg(config_id: str) -> "ConfigRecord":
     cfg = registry.get_config_merged(config_id)
     if cfg is None:
-        console.print(f"[red]error:[/red] unknown config {config_id!r}")
-        raise typer.Exit(code=1)
+        _fail(f"unknown config {config_id!r}")
     errs = registry.validate_config(scaffold_root(), cfg)
     if errs:
-        for e in errs:
-            console.print(f"[red]error:[/red] {e}")
-        raise typer.Exit(code=1)
+        _fail("; ".join(str(e) for e in errs))
     return cfg
 
 
@@ -96,9 +125,7 @@ def _serve_env_from_params(
     raw_params = serve.get("params") or {}
     coerced, errors = validate_params(schema, raw_params)
     if errors:
-        for error in errors:
-            console.print(f"[red]error:[/red] {cfg_data.get('id')}: {error}")
-        raise typer.Exit(code=1)
+        _fail("; ".join(f"{cfg_data.get('id')}: {error}" for error in errors))
 
     env: dict[str, str] = {
         "LLM_DATA_ROOT": settings.data_root.as_posix(),
@@ -183,13 +210,15 @@ def _do_background(
     host = str(serve["host"])
     port = int(serve["port"])
     if port_in_use(host, port):
-        console.print(f"[red]error:[/red] port {port} is already in use")
-        raise typer.Exit(code=1)
+        _fail(f"port {port} is already in use")
 
     logs_dir(state_base).mkdir(parents=True, exist_ok=True)
     log_path = (logs_dir(state_base) / f"{cfg.id}.log").as_posix()
     inner = _serve_script_inner(runtime_path, "serve.sh")
-    pid = spawn_background(inner=inner, log_path=log_path, env=env)
+    try:
+        pid = spawn_background(inner=inner, log_path=log_path, env=env)
+    except RuntimeError as exc:
+        _fail_with_log(f"failed to start {cfg.id}: {exc}", log_path)
     timeout = _readiness_timeout(cfg.data)
     probe = _make_healthcheck_probe(runtime_path, env)
     if not wait_for_ready(probe, timeout_s=float(timeout), poll_s=1.0):
@@ -197,11 +226,7 @@ def _do_background(
             os.kill(pid, signal.SIGTERM)
         except ProcessLookupError:
             pass
-        console.print(
-            f"[red]error:[/red] {cfg.id} did not become ready in {timeout}s; "
-            f"see {log_path}"
-        )
-        raise typer.Exit(code=1)
+        _fail_with_log(f"{cfg.id} did not become ready in {timeout}s", log_path)
     rec = LifecycleRecord(
         mode="background",
         config_id=cfg.id,
@@ -230,8 +255,7 @@ def _do_foreground(
     host = str(serve_obj["host"])
     port = int(serve_obj["port"])
     if not from_supervisor and port_in_use(host, port):
-        console.print(f"[red]error:[/red] port {port} is already in use")
-        raise typer.Exit(code=1)
+        _fail(f"port {port} is already in use")
 
     if from_supervisor:
         inner = _serve_script_inner(runtime_path, "serve.sh")
@@ -285,8 +309,7 @@ def _do_systemd(
     host = str(serve_obj["host"])
     port = int(serve_obj["port"])
     if port_in_use(host, port):
-        console.print(f"[red]error:[/red] port {port} is already in use")
-        raise typer.Exit(code=1)
+        _fail(f"port {port} is already in use")
 
     text = desired_unit_text(cfg.id)
     changed = write_if_different(text)
@@ -314,11 +337,10 @@ def _do_systemd(
             stop_unit("llm.service")
         except RuntimeError:
             pass
-        console.print(
-            f"[red]error:[/red] {cfg.id} did not become ready in {timeout}s; "
-            f"see `journalctl --user -u llm.service -n 50`"
+        _fail(
+            f"{cfg.id} did not become ready in {timeout}s; "
+            "see `journalctl --user -u llm.service -n 50`"
         )
-        raise typer.Exit(code=1)
     rec = LifecycleRecord(
         mode="systemd",
         config_id=cfg.id,
@@ -340,23 +362,20 @@ def serve_dispatch(
 ) -> None:
     """Programmatic serve entry (raises typer.Exit)."""
     if foreground and systemd:
-        console.print(
-            "[red]error:[/red] --foreground and --systemd are mutually exclusive"
-        )
-        raise typer.Exit(code=1)
+        _fail("--foreground and --systemd are mutually exclusive")
     settings = resolve(load_settings())
     state_base = state_root(settings)
     reconcile(state_base)
     cfg = _resolve_cfg(config_id)
     runtime_id = str(cfg.data["runtime"])
     if not is_installed(settings.runtimes_dir, runtime_id):
-        console.print(f"[red]error:[/red] runtime {runtime_id!r} is not installed")
-        console.print(f"hint:  llm runtime install {runtime_id}")
-        raise typer.Exit(code=1)
+        _fail(
+            f"runtime {runtime_id!r} is not installed",
+            hint=f"hint:  llm runtime install {runtime_id}",
+        )
     mf = get_runtime_manifest_merged(runtime_id)
     if mf is None:
-        console.print(f"[red]error:[/red] unknown runtime {runtime_id!r}")
-        raise typer.Exit(code=1)
+        _fail(f"unknown runtime {runtime_id!r}")
     runtime_path = mf.path
     cfg_for_env = registry.ConfigRecord(id=cfg.id, path=cfg.path, data=cfg.data)
     env = _serve_env_from_params(settings, cfg_for_env.data, mf.serve_schema)
@@ -373,17 +392,15 @@ def serve_dispatch(
         return
 
     if existing and existing.config_id == config_id and not foreground_from_supervisor:
-        console.print(
-            f"[red]error:[/red] {config_id} already running in {existing.mode}; "
-            f"use `llm switch` to change config or `llm stop` first"
+        _fail(
+            f"{config_id} already running in {existing.mode}; "
+            "use `llm switch` to change config or `llm stop` first"
         )
-        raise typer.Exit(code=1)
     if existing and not foreground_from_supervisor:
-        console.print(
-            f"[red]error:[/red] {existing.config_id} already running in {existing.mode}; "
+        _fail(
+            f"{existing.config_id} already running in {existing.mode}; "
             "stop it first or use `llm switch`"
         )
-        raise typer.Exit(code=1)
 
     if foreground:
         _do_foreground(
@@ -412,45 +429,52 @@ def serve(
     ),
 ) -> None:
     """Start a server for <config_id>."""
-    serve_dispatch(
-        config_id,
-        foreground=foreground,
-        systemd=systemd,
-        foreground_from_supervisor=foreground_from_supervisor,
-    )
+    try:
+        serve_dispatch(
+            config_id,
+            foreground=foreground,
+            systemd=systemd,
+            foreground_from_supervisor=foreground_from_supervisor,
+        )
+    except ServeError as exc:
+        raise typer.Exit(code=exc.exit_code) from exc
 
 
 def switch(
     config_id: str = typer.Argument(..., help="New config id."),
 ) -> None:
     """Stop the currently-running service and start <config_id> in the same mode."""
+    try:
+        _switch_impl(config_id)
+    except ServeError as exc:
+        raise typer.Exit(code=exc.exit_code) from exc
+
+
+def _switch_impl(
+    config_id: str,
+) -> None:
     settings = resolve(load_settings())
     state_base = state_root(settings)
     reconcile(state_base)
     rec = read_running(state_base)
     if rec is None:
-        console.print(
-            f"[red]error:[/red] nothing running; use `llm serve {config_id}` instead"
-        )
-        raise typer.Exit(code=1)
+        _fail(f"nothing running; use `llm serve {config_id}` instead")
     if rec.mode == "foreground":
-        console.print(
-            "[red]error:[/red] foreground sessions can't be switched; "
+        _fail(
+            "foreground sessions can't be switched; "
             "Ctrl-C in the original terminal and rerun `llm serve <new>`"
         )
-        raise typer.Exit(code=1)
 
-    settings = resolve(load_settings())
     new_cfg = _resolve_cfg(config_id)
     runtime_id = str(new_cfg.data["runtime"])
     if not is_installed(settings.runtimes_dir, runtime_id):
-        console.print(f"[red]error:[/red] runtime {runtime_id!r} is not installed")
-        console.print(f"hint:  llm runtime install {runtime_id}")
-        raise typer.Exit(code=1)
+        _fail(
+            f"runtime {runtime_id!r} is not installed",
+            hint=f"hint:  llm runtime install {runtime_id}",
+        )
     mf = get_runtime_manifest_merged(runtime_id)
     if mf is None:
-        console.print(f"[red]error:[/red] unknown runtime {runtime_id!r}")
-        raise typer.Exit(code=1)
+        _fail(f"unknown runtime {runtime_id!r}")
     runtime_path = mf.path
     new_for_env = registry.ConfigRecord(
         id=new_cfg.id, path=new_cfg.path, data=new_cfg.data
@@ -460,8 +484,7 @@ def switch(
 
     if rec.mode == "background":
         if rec.pid is None:
-            console.print("[red]error:[/red] running record has no pid; aborting switch")
-            raise typer.Exit(code=1)
+            _fail("running record has no pid; aborting switch")
         try:
             os.kill(rec.pid, signal.SIGTERM)
         except ProcessLookupError:
@@ -498,5 +521,4 @@ def switch(
         _do_systemd(settings, new_for_env, state_base, env, runtime_path)
         return
 
-    console.print(f"[red]error:[/red] unknown mode {rec.mode!r}")
-    raise typer.Exit(code=1)
+    _fail(f"unknown mode {rec.mode!r}")
