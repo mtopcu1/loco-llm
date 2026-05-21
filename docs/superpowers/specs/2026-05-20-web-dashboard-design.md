@@ -14,7 +14,7 @@ Goal: turn "tab back to the terminal to manage runtimes / models / configs / ins
 - **Cover the CLI** — every routine operation a power user does with the CLI is reachable from the dashboard: install runtimes, pull models, author configs (with rich param editing), serve them, monitor them, and inspect history.
 - **Stay a control plane** — same discipline as the CLI: the dashboard never holds canonical state; it reads and writes the same files (`configs/*.yaml`, `runtimes/<id>/.installed`, `state/*`, `~/.config/llm/config.yaml`) via the same `llm_cli.core.*` functions the CLI calls.
 - **Localhost-first** — bound to `127.0.0.1` by default. LAN exposure requires friction (`--insecure --i-understand --allowed-host …`) and is loudly warned about everywhere.
-- **Opt-in toolchain** — Node + FastAPI are extras, gated behind `llm dashboard install`. Users who only want the CLI never see them.
+- **Opt-in toolchain** — Node + FastAPI are extras, gated behind `loco dashboard install`. Users who only want the CLI never see them.
 - **Mirror existing patterns** — `install` writes a `.installed` marker; `doctor` gains a `dashboard` scope; `setup` gets an opt-in step; `update` opportunistically rebuilds.
 
 ## 3. Non-goals
@@ -26,7 +26,7 @@ Goal: turn "tab back to the terminal to manage runtimes / models / configs / ins
 - **No historical time-series charts in v1.** Live numbers + sparkline (last 60 snapshots) + simple aggregates only.
 - **No persistent job survival across dashboard restart.** Jobs die with the dashboard server (subprocess SIGTERMed). v2.
 - **No themes / plugin system in v1.** Single fixed light theme (shadcn zinc). Dark mode is a v2 toggle.
-- **No native systemd mode for the dashboard server itself.** `llm dashboard serve` runs background or foreground only.
+- **No native systemd mode for the dashboard server itself.** `loco dashboard serve` runs background or foreground only.
 - **No advanced settings UI for per-runtime options.** Still YAML-only in v1.
 
 ## 4. V1 scope
@@ -40,12 +40,12 @@ Pages in v1:
 | 3 | Models | `$LLM_MODELS/registry.json`, `du` | list, pull from HF, add local, uninstall, disk usage |
 | 4 | Configs | `configs/*.yaml`, `runtimes/<id>/params.yaml`, advisor | list, create via React param grid, edit, validate, delete |
 | 5 | Instance | `state/running.json`, runtime healthcheck, runtime `/metrics` | start any config, stop, switch, live logs, live metrics |
-| 6 | Doctor | `requirements.yaml`, scoped `llm doctor` outputs | scoped health checks (default / runtime / dashboard) |
+| 6 | Doctor | `requirements.yaml`, scoped `loco doctor` outputs | scoped health checks (default / runtime / dashboard) |
 | 7 | Disk | `du` over `$LLM_DATA_ROOT/*` | data-root summary, per-model sizes, cache cleanup |
 | 8 | History | `state/history.jsonl` | reverse-chronological event timeline with filters |
 | 9 | Settings | `~/.config/llm/config.yaml` via `KEY_REGISTRY` | view + edit settings |
 
-Header bar: project version, "update available" badge (driven by `llm update --check`), status pill ("running: `<config-id>`" / "idle"), persistent red security banner when bound non-localhost.
+Header bar: project version, "update available" badge (driven by `loco update --check`), status pill ("running: `<config-id>`" / "idle"), persistent red security banner when bound non-localhost.
 
 ### Cross-cutting features
 
@@ -58,48 +58,48 @@ Header bar: project version, "update available" badge (driven by `llm update --c
 ### 5.1 New CLI commands
 
 ```text
-llm dashboard install [--reset] [--skip-frontend] [--skip-python]
-llm dashboard serve   [--port N] [--host H] [--foreground] [--no-open]
+loco dashboard install [--reset] [--skip-frontend] [--skip-python]
+loco dashboard serve   [--port N] [--host H] [--foreground] [--no-open]
                       [--insecure --i-understand --allowed-host HOST:PORT]
-llm dashboard           # alias for `serve`
-llm dashboard uninstall [--purge]
-llm dashboard status
-llm dashboard stop
-llm doctor dashboard    # new scope
+loco dashboard           # alias for `serve`
+loco dashboard uninstall [--purge]
+loco dashboard status
+loco dashboard stop
+loco doctor dashboard    # new scope
 ```
 
-### 5.2 `llm dashboard install` flow
+### 5.2 `loco dashboard install` flow
 
 1. **Python deps** — `uv pip install` (into the managed venv) `fastapi`, `uvicorn[standard]`, `sse-starlette`, `httpx` (already a CLI dep), `prometheus-client`. Same set declared in `pyproject.toml` as a `[dashboard]` optional-deps group so editable installs match. `--skip-python` skips.
 2. **Toolchain check** — verify `node >= 20` and `npm`. On missing, print per-platform install hint (WSL: `nvm install --lts`; macOS: `brew install node`) and exit 78. Recorded as `requirements.yaml` entries under `scope: dashboard`.
 3. **Frontend build** — `cd dashboard/ && npm ci && npm run build` → emits `dashboard/dist/`. `--skip-frontend` skips (useful for dev mode). `--reset` wipes `dashboard/node_modules` first then `npm ci`.
 4. **Write `.installed`** — `dashboard/.installed` YAML: `installed_at`, `cli_version`, `node_version`, `npm_version`, `dist_hash` (sha256 of `dist/index.html` + `dist/assets/*` concatenated).
 
-### 5.3 `llm dashboard serve` gating
+### 5.3 `loco dashboard serve` gating
 
-- Refuses to start if `dashboard/.installed` is missing → suggests `llm dashboard install`.
-- Refuses if `.installed.cli_version` differs from running CLI version → suggests `llm dashboard install --reset`.
+- Refuses to start if `dashboard/.installed` is missing → suggests `loco dashboard install`.
+- Refuses if `.installed.cli_version` differs from running CLI version → suggests `loco dashboard install --reset`.
 - Refuses if `dist_hash` doesn't match what's on disk → suggests rebuild.
 - Honors `--insecure` only with `--i-understand`; otherwise refuses with the warning quoted in §10.
 
 ### 5.4 Setup chain integration
 
-`llm setup` gains a new optional step **after** the existing runtime / model / config / serve chain:
+`loco setup` gains a new optional step **after** the existing runtime / model / config / serve chain:
 
 ```text
 ? Install the web dashboard now? [y/N]
 ```
 
-Default **No**. On yes, calls into `llm dashboard install` inline (no subprocess), surfacing the same progress.
+Default **No**. On yes, calls into `loco dashboard install` inline (no subprocess), surfacing the same progress.
 
-### 5.5 `llm update` interaction
+### 5.5 `loco update` interaction
 
 - If `dashboard/.installed` exists and the new CLI version differs from recorded:
-  - Auto-runs `llm dashboard install` as part of update.
-  - Skipped silently if `npm` is no longer available (next `llm dashboard serve` will refuse and tell the user).
+  - Auto-runs `loco dashboard install` as part of update.
+  - Skipped silently if `npm` is no longer available (next `loco dashboard serve` will refuse and tell the user).
 - If `--restart` was passed and the dashboard was running, restart it after rebuild.
 
-### 5.6 `llm doctor dashboard` checks
+### 5.6 `loco doctor dashboard` checks
 
 | Check | Severity |
 |---|---|
@@ -198,7 +198,7 @@ state/
 │   └── <job-id>.log
 │
 └── dashboard/                           # NEW — dashboard-internal runtime state
-    ├── server.pid                       # written by `llm dashboard serve`
+    ├── server.pid                       # written by `loco dashboard serve`
     └── server.log                       # uvicorn's stdout/stderr in detached mode
 ```
 
@@ -229,18 +229,18 @@ Each runtime manifest gains an optional `metrics:` block (see §9 for full schem
 
 On shutdown: cancel metrics tasks, SIGTERM all in-flight job subprocesses, flush log files, remove `state/dashboard/server.pid`.
 
-### 7.2 Process model for `llm dashboard serve`
+### 7.2 Process model for `loco dashboard serve`
 
 - **Default (background):** spawns `uvicorn llm_cli.webapi.app:create_app --factory --host 127.0.0.1 --port 7878` detached via existing `core/serve_spawn.py` plumbing; writes `state/dashboard/server.pid` and `state/dashboard/server.log`; polls `GET /api/health` until 200 OK (timeout 30s); opens browser; returns.
 - **`--foreground`:** attaches uvicorn to the current terminal. Tees logs to terminal + `server.log`. SIGINT cleans up `server.pid`.
-- `llm dashboard status` reads `server.pid`, `kill -0`s it, prints state + port + uptime.
-- `llm dashboard stop` SIGTERMs the PID, waits up to 10s, escalates to SIGKILL.
+- `loco dashboard status` reads `server.pid`, `kill -0`s it, prints state + port + uptime.
+- `loco dashboard stop` SIGTERMs the PID, waits up to 10s, escalates to SIGKILL.
 
 ### 7.3 "Every write goes through core" contract
 
 Hard rule:
 
-- FastAPI route handlers **never** touch YAML files, `state/*.json`, or subprocess `llm` invocations directly.
+- FastAPI route handlers **never** touch YAML files, `state/*.json`, or subprocess `loco` invocations directly.
 - They call `llm_cli.core.*` functions that the CLI's command handlers also call.
 - Concretely: `POST /api/configs` → `core/registry.write_config(...)`; `POST /api/runtimes/<id>/install` → enqueues a job that calls `core/install_record.install_runtime(...)`.
 
@@ -430,7 +430,7 @@ Table (id, kind, installed status, build date, version recorded). Row click → 
 
 #### Models
 
-Table (id, format, size, source, registered date). Per-row: info, uninstall (with `purge` toggle), open registry entry. Top: **"Pull from HuggingFace"** form (URL + format/include/exclude/id), equivalent to `llm model pull`. **"Add local model"** secondary form for `llm model add`.
+Table (id, format, size, source, registered date). Per-row: info, uninstall (with `purge` toggle), open registry entry. Top: **"Pull from HuggingFace"** form (URL + format/include/exclude/id), equivalent to `loco model pull`. **"Add local model"** secondary form for `loco model add`.
 
 #### Configs
 
@@ -566,7 +566,7 @@ For sparklines: `GET /api/configs/{id}/metrics/sparkline?bucket=5m&window=24h` �
 | 3. CORS | Allow-list to localhost origins | Cross-origin XHR from random pages |
 | 4. CSP | Restrictive default-src `'self'` | Injected `<script>` from compromised content |
 | 5. Exposure friction | `--insecure` + `--i-understand` + persistent banner | Accidental exposure |
-| 6. Doctor surfacing | `llm doctor dashboard` flags exposure | Forgetting `--insecure` is on |
+| 6. Doctor surfacing | `loco doctor dashboard` flags exposure | Forgetting `--insecure` is on |
 | 7. Documentation | `docs/DASHBOARD-SECURITY.md` | "I didn't know" |
 
 ### 10.2 Host header allow-list
@@ -596,7 +596,7 @@ With `--insecure --allowed-host`, those hosts are added. **Wildcards never permi
 
 ### 10.4 `--insecure` UX
 
-`llm dashboard serve --insecure` alone refuses with the multi-line warning quoted below, exit code 78:
+`loco dashboard serve --insecure` alone refuses with the multi-line warning quoted below, exit code 78:
 
 ```text
 ═══════════════════════════════════════════════════════════════════════
@@ -618,7 +618,7 @@ If you actually need remote access, prefer:
   • A reverse proxy with TLS and auth in front (out of scope for v1)
 
 If you understand and accept the risk, re-run with --i-understand:
-  llm dashboard serve --insecure --i-understand --allowed-host <host:port>
+  loco dashboard serve --insecure --i-understand --allowed-host <host:port>
 
 See: docs/DASHBOARD-SECURITY.md
 ```
@@ -664,7 +664,7 @@ base-uri 'self';
 3. The four risks of `--insecure`.
 4. Safer alternatives (SSH forward, Tailscale, reverse proxy).
 5. DNS rebinding — what it is, why Host header check matters.
-6. Self-audit checklist (run `llm doctor dashboard`, check `server.log`, verify `--insecure` not baked into any systemd unit).
+6. Self-audit checklist (run `loco doctor dashboard`, check `server.log`, verify `--insecure` not baked into any systemd unit).
 
 ## 11. Testing & dev workflow
 
@@ -713,7 +713,7 @@ uv run uvicorn llm_cli.webapi.app:create_app --factory --reload --port 7878
 cd dashboard && npm run dev   # http://localhost:5173, proxies /api → :7878
 ```
 
-- `llm dashboard serve --dev` is sugar that prints these two commands and exits (does not manage Vite itself).
+- `loco dashboard serve --dev` is sugar that prints these two commands and exits (does not manage Vite itself).
 - `dashboard/README.md` documents the loop, including the `regen-client` step after backend route changes.
 
 Live API client regen via `scripts/regen-api-client.sh` (runs `export_openapi`, pipes into `openapi-typescript`, writes `dashboard/src/api/generated.ts`). Result committed. Pre-commit hook optional (opt-in); CI is the safety net.
@@ -726,7 +726,7 @@ Live API client regen via `scripts/regen-api-client.sh` (runs `export_openapi`, 
 {
   "error": {
     "code": "RUNTIME_NOT_INSTALLED",
-    "message": "Runtime 'vllm' is not installed. Run `llm runtime install vllm` first.",
+    "message": "Runtime 'vllm' is not installed. Run `loco runtime install vllm` first.",
     "details": { "runtime_id": "vllm" },
     "fix_hint": "POST /api/runtimes/vllm/install"
   },
@@ -743,12 +743,12 @@ Live API client regen via `scripts/regen-api-client.sh` (runs `export_openapi`, 
 - Every mutation: `useMutation.onError` → sonner toast with `code`-mapped title + `message` body + "Show details" expander.
 - Every query: error state → page renders an error card (not a toast).
 - SSE disconnect: silent reconnect for first 3 retries, then top-banner "Lost connection to backend — retrying…" until reconnect.
-- Backend unreachable (no `/api/health` for 10s): full-page overlay "Dashboard server is not responding. Run `llm dashboard status` to check."
+- Backend unreachable (no `/api/health` for 10s): full-page overlay "Dashboard server is not responding. Run `loco dashboard status` to check."
 
 ### 12.3 CLI error consistency
 
-- `llm dashboard install` failures use existing CLI error printing (rich panels). Same exit codes as the rest of the CLI.
-- `llm dashboard serve` startup failures (port in use, install missing, `--insecure` refused) print clear remediation. No stack traces.
+- `loco dashboard install` failures use existing CLI error printing (rich panels). Same exit codes as the rest of the CLI.
+- `loco dashboard serve` startup failures (port in use, install missing, `--insecure` refused) print clear remediation. No stack traces.
 
 ## 13. Performance budgets
 
@@ -770,7 +770,7 @@ No budget for `/api/disk` — `du` is unbounded; UI shows a spinner.
 - **Historical time-series charts** — TanStack Charts (or similar) for full-resolution multi-day views.
 - **Settings persistence for dashboard preferences** — `dashboard.port`, `dashboard.auto_open` in `KEY_REGISTRY`.
 - **Dark mode toggle.**
-- **Native systemd mode for the dashboard server** (`llm dashboard serve --systemd`).
+- **Native systemd mode for the dashboard server** (`loco dashboard serve --systemd`).
 - **Themes / plugin system** à la Hermes.
 - **Token-based auth + TLS termination** for legitimate LAN/remote scenarios (paired with built-in reverse-proxy guidance).
 - **Edit-as-YAML view for configs.**

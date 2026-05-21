@@ -1,4 +1,4 @@
-"""`llm dashboard ...` command group."""
+"""`loco dashboard ...` command group."""
 from __future__ import annotations
 
 from typing import Annotated
@@ -32,7 +32,7 @@ If you actually need remote access, prefer:
   • A reverse proxy with TLS and auth in front (out of scope for v1)
 
 If you understand and accept the risk, re-run with --i-understand:
-  llm dashboard serve --insecure --i-understand --allowed-host <host:port>
+  loco dashboard serve --insecure --i-understand --allowed-host <host:port>
 
 See: docs/DASHBOARD-SECURITY.md
 """
@@ -40,7 +40,7 @@ See: docs/DASHBOARD-SECURITY.md
 
 @app.callback(invoke_without_command=True)
 def _default(ctx: typer.Context) -> None:
-    """Bare `llm dashboard` → alias for `llm dashboard serve`."""
+    """Bare `loco dashboard` → alias for `loco dashboard serve`."""
     if ctx.invoked_subcommand is None:
         serve()
 
@@ -111,7 +111,7 @@ def serve(
         hint = " --reset" if verdict in {"version_mismatch", "hash_mismatch"} else ""
         typer.secho(
             f"Dashboard is not ready ({verdict}): {reason}. "
-            f"Run `llm dashboard install{hint}`.",
+            f"Run `loco dashboard install{hint}`.",
             fg=typer.colors.RED,
             err=True,
         )
@@ -150,10 +150,10 @@ def status() -> None:
     try:
         record = dash.load_installed_record()
     except RuntimeError:
-        typer.echo("Dashboard not installed. Run `llm dashboard install`.")
+        typer.echo("Dashboard not installed. Run `loco dashboard install`.")
         raise typer.Exit(code=0)
     if record is None:
-        typer.echo("Dashboard not installed. Run `llm dashboard install`.")
+        typer.echo("Dashboard not installed. Run `loco dashboard install`.")
         raise typer.Exit(code=0)
     typer.echo(f"Installed for CLI {record.cli_version} at {record.installed_at}")
     pid = dash.read_server_pid()

@@ -19,12 +19,12 @@ Replace the per-model `manifest.yaml` + `pull.sh` abstraction with a single loca
 ## 3. Goals
 
 - **One registry per machine** at `$LLM_MODELS/registry.json` is the single source of truth for installed models. Not tracked in git.
-- **One CLI verb to fetch from HF**: `llm model pull <url>` resolves the URL, downloads the artifact via `hf download`, and records a complete registry entry.
-- **One CLI verb to register pre-existing local weights**: `llm model add <id> <path> --format <fmt>` symlinks them under `$LLM_MODELS/<id>/` and records the entry.
+- **One CLI verb to fetch from HF**: `loco model pull <url>` resolves the URL, downloads the artifact via `hf download`, and records a complete registry entry.
+- **One CLI verb to register pre-existing local weights**: `loco model add <id> <path> --format <fmt>` symlinks them under `$LLM_MODELS/<id>/` and records the entry.
 - **`models/` directory in the repo goes away.** No `manifest.yaml`, no `pull.sh`, no `README.md` per model.
 - **Strict-by-default URL handling.** If the format can't be inferred unambiguously, `pull` errors out and asks for `--format`/`--include`. No silent fallbacks, no "unknown" stub state.
 - **Configs reference models by id and use a `${model_path}` template** in `serve.params` values. No invisible auto-wiring; the path appears in the config text.
-- **Format-vs-runtime compatibility checked at `llm config validate`.** A new `accepts_formats` field on runtime manifests gates which models that runtime will accept.
+- **Format-vs-runtime compatibility checked at `loco config validate`.** A new `accepts_formats` field on runtime manifests gates which models that runtime will accept.
 - **Multi-file artifacts are first-class.** Shard sets and safetensors directories are represented uniformly via `artifact.primary` (the path the runtime should consume) and `artifact.files` (the full set).
 
 ## 4. Non-goals
@@ -34,7 +34,7 @@ Replace the per-model `manifest.yaml` + `pull.sh` abstraction with a single loca
 - **A `verify` subcommand.** sha256 verification happens during `pull` only, when HF publishes a hash for the file (LFS). No standalone re-verify.
 - **A model `rebuild`/drift-detection analogue to runtimes.** `pull <id>` re-resolves and re-downloads, and that's enough.
 - **Multi-source backends beyond `hf` and `local`.** No direct-URL, no Ollama, no ModelScope in v1. The `source.kind` discriminator leaves room to add them later.
-- **Automatic ingestion of legacy `models/<id>/` dirs.** A one-shot manual `llm model add` per local set is the migration path.
+- **Automatic ingestion of legacy `models/<id>/` dirs.** A one-shot manual `loco model add` per local set is the migration path.
 - **Per-config model variants.** A model id is one specific artifact (one file for GGUF, one directory for safetensors). Different quants are different ids.
 - **Remote model registry / browsing / search.** The CLI does not list HF models or recommend choices.
 - **Concurrent pulls or registry locking.** Single-user, single-machine assumed. Atomic writes only.
@@ -43,7 +43,7 @@ Replace the per-model `manifest.yaml` + `pull.sh` abstraction with a single loca
 
 ### 5.1 Registry file
 
-Path: **`$LLM_MODELS/registry.json`**. Created on first `llm model pull|add`. Writes are atomic via `tmp + os.replace`.
+Path: **`$LLM_MODELS/registry.json`**. Created on first `loco model pull|add`. Writes are atomic via `tmp + os.replace`.
 
 ```json
 {
@@ -194,10 +194,10 @@ A small `core/hf_client.py` using stdlib `urllib`:
 
 The `hf download` subprocess remains responsible for the actual bytes.
 
-### 5.9 Local registration (`llm model add`)
+### 5.9 Local registration (`loco model add`)
 
 ```bash
-llm model add <id> <path> --format <gguf|safetensors-dir>
+loco model add <id> <path> --format <gguf|safetensors-dir>
 ```
 
 - Path must exist.
@@ -209,26 +209,26 @@ llm model add <id> <path> --format <gguf|safetensors-dir>
 ### 5.10 CLI command surface
 
 ```text
-llm model list [--json]
-llm model info <id> [--json]
-llm model pull <url-or-id>
+loco model list [--json]
+loco model info <id> [--json]
+loco model pull <url-or-id>
         [--format gguf|safetensors-dir]
         [--include PATTERN ...]
         [--exclude PATTERN ...]
         [--id NEW_ID]
         [--force]
-llm model add <id> <path> --format <gguf|safetensors-dir>
-llm model uninstall <id> [--purge] [--yes]
+loco model add <id> <path> --format <gguf|safetensors-dir>
+loco model uninstall <id> [--purge] [--yes]
 ```
 
-`llm model list` table: id, format, source kind, total size, present (files on disk?), installed_at.
+`loco model list` table: id, format, source kind, total size, present (files on disk?), installed_at.
 
 ## 6. CLI flows
 
 ### 6.1 Pull from a clear GGUF URL
 
 ```bash
-llm model pull \
+loco model pull \
   https://huggingface.co/unsloth/Qwen3.6-235B-A22B-GGUF/blob/main/Qwen3.6-235B-A22B-UD-Q4_K_XL-00001-of-00010.gguf
 ```
 
@@ -246,7 +246,7 @@ Steps:
 ### 6.2 Pull from an ambiguous repo
 
 ```bash
-llm model pull https://huggingface.co/unsloth/Qwen3.6-235B-A22B-GGUF
+loco model pull https://huggingface.co/unsloth/Qwen3.6-235B-A22B-GGUF
 # error: this HF repo contains multiple GGUF quants. Re-run with one of:
 #   --include "*UD-Q4_K_XL*"      (and --id <suggested>)
 #   --include "*Q5_K_M*"          (...)
@@ -258,7 +258,7 @@ No registry entry is written.
 ### 6.3 Local registration
 
 ```bash
-llm model add my-finetune ~/llm/staging/my-finetune --format safetensors-dir
+loco model add my-finetune ~/llm/staging/my-finetune --format safetensors-dir
 ```
 
 Steps: validate path → mkdir `$LLM_MODELS/my-finetune/` → symlink children → record entry with `source.kind=local`.
@@ -266,7 +266,7 @@ Steps: validate path → mkdir `$LLM_MODELS/my-finetune/` → symlink children �
 ### 6.4 Refresh / repair an existing id
 
 ```bash
-llm model pull unsloth-qwen3.6-235b-a22b__ud-q4-k-xl
+loco model pull unsloth-qwen3.6-235b-a22b__ud-q4-k-xl
 ```
 
 Steps: look up source from registry → re-run `hf download` (resumes partial files) → re-verify hashes → rewrite registry entry timestamp.
@@ -274,14 +274,14 @@ Steps: look up source from registry → re-run `hf download` (resumes partial fi
 ### 6.5 Uninstall
 
 ```bash
-llm model uninstall my-finetune --purge --yes
+loco model uninstall my-finetune --purge --yes
 ```
 
 Removes registry row; with `--purge`, removes `$LLM_MODELS/<id>/` (which for local-add is just symlinks pointing at the user's untouched originals).
 
 ## 7. Validation rules (added/changed)
 
-`llm config validate` runs these rules in addition to today's:
+`loco config validate` runs these rules in addition to today's:
 
 1. `runtime:` resolves; runtime manifest loads cleanly.
 2. If `runtime.accepts_formats` is non-empty, `model:` is required.
@@ -305,13 +305,13 @@ In-repo changes:
 4. **Add** `accepts_formats: []` to `runtimes/stub-runtime/manifest.yaml`.
 5. **Delete** `src/llm_cli/core/registry.py`'s `ModelRecord`, `discover_models`, `get_model`, `validate_model_layout` (replaced by registry-backed lookups).
 6. **Rewrite** `src/llm_cli/commands/model_cmd.py` against the new registry module.
-7. **Update** `docs/add-a-model.md` to describe `llm model pull <url>` / `llm model add <id> <path>` and the `${model_path}` template.
+7. **Update** `docs/add-a-model.md` to describe `loco model pull <url>` / `loco model add <id> <path>` and the `${model_path}` template.
 8. **Update** `docs/repo-conventions.md` (drop the `models/{id}/` row; mention `$LLM_MODELS/registry.json`).
-9. **Update** the example llamacpp config (untracked today) to use `${model_path}` and the new model id once the user runs `llm model pull` for their preferred quant.
+9. **Update** the example llamacpp config (untracked today) to use `${model_path}` and the new model id once the user runs `loco model pull` for their preferred quant.
 
 User-side migration:
 
-- Existing `$LLM_MODELS/<id>/` directories not in the registry are inert until the user runs `llm model add <id> <path> --format <fmt>` to register them.
+- Existing `$LLM_MODELS/<id>/` directories not in the registry are inert until the user runs `loco model add <id> <path> --format <fmt>` to register them.
 
 ## 9. Testing approach
 
@@ -323,18 +323,18 @@ User-side migration:
   - `derive_id` from URL components.
   - Format inference cases (clear gguf, all-gguf-repo, safetensors repo, mixed repo).
 - **Integration (Typer + tmpdir):**
-  - `llm model add` with a real tmpdir → assert symlinks under `$LLM_MODELS/<id>/`, registry row present, `source.kind=local`.
-  - `llm model pull <url>` happy path with HF client patched and `hf download` subprocess patched.
-  - `llm model pull <ambiguous-url>` exits 1, registry unchanged, hint mentions `--include` and `--format`.
-  - `llm model pull <existing-id>` re-runs `hf download` with stored args; updates `installed_at`.
-  - `llm model uninstall --purge` removes registry row and files.
-  - `llm config validate`:
+  - `loco model add` with a real tmpdir → assert symlinks under `$LLM_MODELS/<id>/`, registry row present, `source.kind=local`.
+  - `loco model pull <url>` happy path with HF client patched and `hf download` subprocess patched.
+  - `loco model pull <ambiguous-url>` exits 1, registry unchanged, hint mentions `--include` and `--format`.
+  - `loco model pull <existing-id>` re-runs `hf download` with stored args; updates `installed_at`.
+  - `loco model uninstall --purge` removes registry row and files.
+  - `loco config validate`:
     - llamacpp + missing `model:` → error.
     - stub-runtime + erroneous `model:` → error.
     - llamacpp + safetensors model → format-mismatch error.
     - config with `${model_path}` but no `model:` → error.
     - happy path → ok, with warning when runtime not installed.
-  - `llm serve` template expansion writes the right env to a fake serve.sh script (use the existing test harness).
+  - `loco serve` template expansion writes the right env to a fake serve.sh script (use the existing test harness).
 
 ## 10. Open follow-ups (deferred)
 

@@ -1,4 +1,4 @@
-"""`llm runtime` - manage runtime installs."""
+"""`loco runtime` - manage runtime installs."""
 from __future__ import annotations
 
 import json
@@ -145,14 +145,14 @@ def _runtime_setup_custom() -> str:
     if registry.get_runtime_merged(rt_id) is not None:
         console.print(
             f"[red]error:[/red] runtime {rt_id!r} already exists. "
-            f"Pick a different id, or use `llm runtime uninstall {rt_id} --purge` "
+            f"Pick a different id, or use `loco runtime uninstall {rt_id} --purge` "
             f"if you own a user-layer copy."
         )
         raise typer.Exit(code=1)
     if rt_dir.exists():
         console.print(
             f"[red]error:[/red] runtime {rt_id!r} already exists at {rt_dir}. "
-            f"`llm runtime uninstall {rt_id} --purge` first, or pick a different id."
+            f"`loco runtime uninstall {rt_id} --purge` first, or pick a different id."
         )
         raise typer.Exit(code=1)
 
@@ -266,7 +266,7 @@ def _runtime_setup_custom() -> str:
     console.print(f"[green]wrote[/green] user/runtimes/{rt_id}/serve.sh")
     console.print(f"[green]wrote[/green] user/runtimes/{rt_id}/healthcheck.sh")
     console.print(f"[green]wrote[/green] {settings.runtimes_dir / rt_id / '.installed'}")
-    console.print(f"\nNext: llm config setup --runtime {rt_id}")
+    console.print(f"\nNext: loco config setup --runtime {rt_id}")
     typer.echo(rt_id)
     return rt_id
 
@@ -429,7 +429,7 @@ def _install_impl(
     if manifest.kind == "custom":
         console.print(
             f"[red]error:[/red] runtime {runtime_id!r} is kind: custom — it has no "
-            "build step. Use `llm runtime setup` to re-register or edit files under "
+            "build step. Use `loco runtime setup` to re-register or edit files under "
             f"{manifest.path}."
         )
         raise typer.Exit(code=1)
@@ -566,7 +566,7 @@ def runtime_info(runtime_id: str = typer.Argument(...)) -> None:
     record = read_record(settings.runtimes_dir, manifest.id)
     if record is None:
         console.print("\n[yellow]not installed[/yellow]")
-        console.print(f"hint: llm runtime install {manifest.id}")
+        console.print(f"hint: loco runtime install {manifest.id}")
         return
 
     console.print("\n[bold]install:[/bold] [green]installed[/green]")
@@ -587,7 +587,7 @@ def runtime_info(runtime_id: str = typer.Argument(...)) -> None:
     if record.schema_hash and current_schema and current_schema != record.schema_hash:
         console.print(
             "[yellow]drift:[/yellow] build schema changed since install; "
-            f"run `llm runtime rebuild {manifest.id} --reset` to refresh"
+            f"run `loco runtime rebuild {manifest.id} --reset` to refresh"
         )
 
 

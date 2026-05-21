@@ -32,7 +32,7 @@ python -m pytest -q
 WSL smoke (interactive TTY):
 
 ```bash
-llm config setup --runtime llamacpp --model <id>
+loco config setup --runtime llamacpp --model <id>
 ```
 
 Expect: configuration list → Next → parameter list (no gguf_path) → Enter on row opens detail with suggestion.

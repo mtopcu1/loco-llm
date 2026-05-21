@@ -1,4 +1,4 @@
-"""Unit tests for `llm setup` Y/n chain orchestrator."""
+"""Unit tests for `loco setup` Y/n chain orchestrator."""
 from __future__ import annotations
 
 from pathlib import Path

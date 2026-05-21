@@ -105,7 +105,7 @@ python -m pytest tests/unit/test_params.py -q
 if "default" in entry:
     raise ValueError(
         f"param {key!r}: `default` was removed from params.yaml; "
-        "use llm advisor for suggestions"
+        "use loco advisor for suggestions"
     )
 ```
 
@@ -693,8 +693,8 @@ Expected: all pass (TUI pexpect tests may skip on Windows).
 - [ ] **Step 2: Manual smoke (Linux/WSL if available)**
 
 ```bash
-llm config setup --runtime stub-runtime   # enable one param only; verify YAML size
-llm config show <id>                       # sparse serve.params
+loco config setup --runtime stub-runtime   # enable one param only; verify YAML size
+loco config show <id>                       # sparse serve.params
 ```
 
 - [ ] **Step 3: Open PR**

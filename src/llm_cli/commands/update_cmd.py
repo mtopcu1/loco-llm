@@ -88,7 +88,7 @@ def _report_git_error(
                 f"[yellow]hint:[/yellow] branch {branch!r} is not on origin yet. "
                 f"Push it from your dev machine, then retry:\n"
                 f"  git push -u origin {branch}\n"
-                f"  llm update --branch {branch}"
+                f"  loco update --branch {branch}"
             )
         else:
             console.print(
@@ -242,7 +242,7 @@ def _maybe_restart_around_update(restart: bool):
         return None
     if not restart:
         console.print(
-            "[red]error:[/red] a service is running. Stop it first (`llm stop`) "
+            "[red]error:[/red] a service is running. Stop it first (`loco stop`) "
             "or pass --restart to stop and re-start it around the update."
         )
         raise typer.Exit(code=1)
@@ -314,7 +314,7 @@ def _post_update_hooks() -> None:
     if not shutil.which("node") or not shutil.which("npm"):
         console.print(
             "[yellow]warning:[/yellow] dashboard is installed but node/npm not found; "
-            "skipping rebuild. Run `llm dashboard install` after installing Node 20+."
+            "skipping rebuild. Run `loco dashboard install` after installing Node 20+."
         )
         return
 

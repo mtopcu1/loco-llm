@@ -1,4 +1,4 @@
-"""Tests for `llm serve` env construction."""
+"""Tests for `loco serve` env construction."""
 from __future__ import annotations
 
 from pathlib import Path

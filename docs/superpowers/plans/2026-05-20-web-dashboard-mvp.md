@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship a working `llm dashboard install` + `llm dashboard serve` that opens a browser to a usable read-only monitoring dashboard covering all v1 pages (Overview, Runtimes, Models, Configs, Instance, Doctor, Disk, History, Settings). No mutations, no jobs, no metrics scrape, no `--insecure` UX. Baseline security (Host header / CORS / CSP / Request-ID) is in place from day one.
+**Goal:** Ship a working `loco dashboard install` + `loco dashboard serve` that opens a browser to a usable read-only monitoring dashboard covering all v1 pages (Overview, Runtimes, Models, Configs, Instance, Doctor, Disk, History, Settings). No mutations, no jobs, no metrics scrape, no `--insecure` UX. Baseline security (Host header / CORS / CSP / Request-ID) is in place from day one.
 
-**Architecture:** New `webapi` Python package containing a FastAPI factory that mounts read-only routes under `/api/*` and serves the built React SPA from `dashboard/dist/` at `/`. Routes call into `llm_cli.core.*` for data (never raw file writes — that's a Plan 2 concern but the contract is enforced now). Real-time read-only streams (instance state, instance logs, history appends) use SSE via `sse-starlette`. React SPA built with Vite, React 19, TypeScript, Tailwind v4, shadcn/ui, TanStack Router, TanStack Query, Zustand, sonner. Backend launched as a detached uvicorn process by `llm dashboard serve` (background by default, `--foreground` available).
+**Architecture:** New `webapi` Python package containing a FastAPI factory that mounts read-only routes under `/api/*` and serves the built React SPA from `dashboard/dist/` at `/`. Routes call into `llm_cli.core.*` for data (never raw file writes — that's a Plan 2 concern but the contract is enforced now). Real-time read-only streams (instance state, instance logs, history appends) use SSE via `sse-starlette`. React SPA built with Vite, React 19, TypeScript, Tailwind v4, shadcn/ui, TanStack Router, TanStack Query, Zustand, sonner. Backend launched as a detached uvicorn process by `loco dashboard serve` (background by default, `--foreground` available).
 
 **Tech Stack:** Python 3.11+, FastAPI, Uvicorn, sse-starlette, httpx, Typer, pytest. React 19, TypeScript, Vite, Tailwind v4, shadcn/ui, TanStack Router, TanStack Query, Zustand, sonner, Vitest + Testing Library + msw. CI on GitHub Actions.
 
@@ -252,14 +252,14 @@ Append to `requirements.yaml`:
     Install Node.js 20+:
       WSL/Linux: `curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash && nvm install --lts`
       macOS:     `brew install node`
-  required_for: "llm dashboard install / serve"
+  required_for: "loco dashboard install / serve"
 
 - name: npm
   scope: dashboard
   check: npm --version
   min_version: "10.0.0"
   install_hint: "Bundled with Node.js (see Node.js install hint)."
-  required_for: "llm dashboard install / serve"
+  required_for: "loco dashboard install / serve"
 ```
 
 (Adjust schema to match exactly what `requirements.yaml` already uses — read the file first.)
@@ -267,7 +267,7 @@ Append to `requirements.yaml`:
 - [ ] **Step 3: Regenerate requirements.md**
 
 ```bash
-llm doctor render-requirements
+loco doctor render-requirements
 ```
 
 - [ ] **Step 4: Verify by viewing the diff**
@@ -509,8 +509,8 @@ def dashboard_root() -> Path:
     settings = resolve_settings()
     if settings.repo_root is None:
         raise RuntimeError(
-            "repo_root not configured. Run `llm setup` or set repo_root via "
-            "`llm settings edit repo_root`."
+            "repo_root not configured. Run `loco setup` or set repo_root via "
+            "`loco settings edit repo_root`."
         )
     return settings.repo_root / "dashboard"
 
@@ -838,7 +838,7 @@ pytest tests/unit/test_cli_dashboard.py -v
 - [ ] **Step 3: Implement `commands/dashboard_cmd.py`**
 
 ```python
-"""`llm dashboard ...` command group."""
+"""`loco dashboard ...` command group."""
 from __future__ import annotations
 
 from typing import Annotated
@@ -852,7 +852,7 @@ app = typer.Typer(help="Manage the LocalLLM web dashboard.")
 
 @app.callback(invoke_without_command=True)
 def _default(ctx: typer.Context) -> None:
-    """Bare `llm dashboard` → alias for `llm dashboard serve`."""
+    """Bare `loco dashboard` → alias for `loco dashboard serve`."""
     if ctx.invoked_subcommand is None:
         serve()
 
@@ -864,7 +864,7 @@ def install(
     skip_python: Annotated[bool, typer.Option("--skip-python")] = False,
 ) -> None:
     """Install Python deps + Node deps + build the frontend."""
-    typer.secho("`llm dashboard install` not yet implemented (Plan 1, Task 13).", fg=typer.colors.YELLOW)
+    typer.secho("`loco dashboard install` not yet implemented (Plan 1, Task 13).", fg=typer.colors.YELLOW)
     raise typer.Exit(code=2)
 
 
@@ -876,7 +876,7 @@ def serve(
     no_open: Annotated[bool, typer.Option("--no-open")] = False,
 ) -> None:
     """Start the dashboard server."""
-    typer.secho("`llm dashboard serve` not yet implemented (Plan 1, Task 14).", fg=typer.colors.YELLOW)
+    typer.secho("`loco dashboard serve` not yet implemented (Plan 1, Task 14).", fg=typer.colors.YELLOW)
     raise typer.Exit(code=2)
 
 
@@ -885,7 +885,7 @@ def status() -> None:
     """Print dashboard install + server status."""
     record = dash.load_installed_record()
     if record is None:
-        typer.echo("Dashboard not installed. Run `llm dashboard install`.")
+        typer.echo("Dashboard not installed. Run `loco dashboard install`.")
         raise typer.Exit(code=0)
     typer.echo(f"Installed for CLI {record.cli_version} at {record.installed_at}")
     pid = dash.read_server_pid()
@@ -899,7 +899,7 @@ def status() -> None:
 @app.command()
 def stop() -> None:
     """Stop the dashboard server."""
-    typer.secho("`llm dashboard stop` not yet implemented (Plan 1, Task 15).", fg=typer.colors.YELLOW)
+    typer.secho("`loco dashboard stop` not yet implemented (Plan 1, Task 15).", fg=typer.colors.YELLOW)
     raise typer.Exit(code=2)
 
 
@@ -908,7 +908,7 @@ def uninstall(
     purge: Annotated[bool, typer.Option("--purge", help="Delete dashboard/dist and dashboard/node_modules.")] = False,
 ) -> None:
     """Remove the .installed marker (and optionally build artifacts)."""
-    typer.secho("`llm dashboard uninstall` not yet implemented (Plan 1, Task 15).", fg=typer.colors.YELLOW)
+    typer.secho("`loco dashboard uninstall` not yet implemented (Plan 1, Task 15).", fg=typer.colors.YELLOW)
     raise typer.Exit(code=2)
 ```
 
@@ -926,7 +926,7 @@ app.add_typer(dashboard_app, name="dashboard")
 
 ```bash
 pytest tests/unit/test_cli_dashboard.py -v
-llm dashboard --help
+loco dashboard --help
 ```
 
 Expected: help output lists install / serve / status / stop / uninstall.
@@ -935,7 +935,7 @@ Expected: help output lists install / serve / status / stop / uninstall.
 
 ```bash
 git add src/llm_cli/commands/dashboard_cmd.py src/llm_cli/main.py tests/unit/test_cli_dashboard.py
-git commit -m "feat(dashboard): wire `llm dashboard` subcommand group with status stub"
+git commit -m "feat(dashboard): wire `loco dashboard` subcommand group with status stub"
 ```
 
 ---
@@ -1432,7 +1432,7 @@ git commit -m "feat(webapi): in-process EventHub for SSE fan-out"
 - Create: `src/llm_cli/webapi/static.py`
 - Modify: `tests/webapi/test_routes_health_version.py` (created in Task 11; this task's tests piggyback)
 
-Behavior: mount `dashboard/dist/` at `/`; for any path that doesn't match a file, return `index.html` (so client-side routing works on hard refresh). If `dashboard/dist/` does not exist, mount returns 503 for all non-`/api/*` paths with a helpful "run `llm dashboard install`" message.
+Behavior: mount `dashboard/dist/` at `/`; for any path that doesn't match a file, return `index.html` (so client-side routing works on hard refresh). If `dashboard/dist/` does not exist, mount returns 503 for all non-`/api/*` paths with a helpful "run `loco dashboard install`" message.
 
 - [ ] **Step 1: Implement (no separate tests — integration tested in Task 11)**
 
@@ -1470,9 +1470,9 @@ def mount_spa(app: FastAPI, dist_dir: Path) -> None:
                 content={
                     "error": {
                         "code": "DASHBOARD_NOT_BUILT",
-                        "message": "Dashboard frontend not built. Run `llm dashboard install`.",
+                        "message": "Dashboard frontend not built. Run `loco dashboard install`.",
                         "details": {"dist_dir": str(dist_dir)},
-                        "fix_hint": "Run `llm dashboard install`",
+                        "fix_hint": "Run `loco dashboard install`",
                     }
                 },
             )
@@ -1761,7 +1761,7 @@ git commit -m "feat(webapi): OpenAPI exporter + regen-api-client.sh with --check
 
 ## Phase C — Install + serve + status + uninstall
 
-### Task 13: Complete `llm dashboard install`
+### Task 13: Complete `loco dashboard install`
 
 **Files:**
 - Modify: `src/llm_cli/commands/dashboard_cmd.py`
@@ -1927,12 +1927,12 @@ def install(
 
 ```bash
 git add src/llm_cli/core/dashboard.py src/llm_cli/commands/dashboard_cmd.py tests/unit/test_cli_dashboard.py
-git commit -m "feat(dashboard): implement `llm dashboard install` (python deps + npm build + .installed)"
+git commit -m "feat(dashboard): implement `loco dashboard install` (python deps + npm build + .installed)"
 ```
 
 ---
 
-### Task 14: Complete `llm dashboard serve` (background + foreground)
+### Task 14: Complete `loco dashboard serve` (background + foreground)
 
 **Files:**
 - Modify: `src/llm_cli/commands/dashboard_cmd.py`
@@ -2153,7 +2153,7 @@ def serve(
     if verdict != "ok":
         typer.secho(
             f"Dashboard is not ready ({verdict}): {reason}. "
-            "Run `llm dashboard install`"
+            "Run `loco dashboard install`"
             + (" --reset" if verdict in ("version_mismatch", "hash_mismatch") else "")
             + ".",
             fg=typer.colors.RED, err=True,
@@ -2184,12 +2184,12 @@ def serve(
 ```bash
 git add src/llm_cli/core/dashboard.py src/llm_cli/commands/dashboard_cmd.py \
         src/llm_cli/webapi/app.py tests/unit/test_cli_dashboard.py
-git commit -m "feat(dashboard): `llm dashboard serve` (background + foreground, readiness wait, browser auto-open)"
+git commit -m "feat(dashboard): `loco dashboard serve` (background + foreground, readiness wait, browser auto-open)"
 ```
 
 ---
 
-### Task 15: `llm dashboard stop` + `uninstall` (final wiring)
+### Task 15: `loco dashboard stop` + `uninstall` (final wiring)
 
 **Files:**
 - Modify: `src/llm_cli/commands/dashboard_cmd.py`
@@ -2249,12 +2249,12 @@ def uninstall(
 
 ```bash
 git add src/llm_cli/commands/dashboard_cmd.py tests/unit/test_cli_dashboard.py
-git commit -m "feat(dashboard): implement `llm dashboard stop` and `uninstall [--purge]`"
+git commit -m "feat(dashboard): implement `loco dashboard stop` and `uninstall [--purge]`"
 ```
 
 ---
 
-### Task 16: `llm doctor dashboard` scope
+### Task 16: `loco doctor dashboard` scope
 
 **Files:**
 - Modify: `src/llm_cli/core/doctor.py`
@@ -2302,7 +2302,7 @@ Add to `core/doctor.py`:
 
 ```python
 def _dashboard_scope_checks() -> list[CheckResult]:
-    """Return CheckResult list for `llm doctor dashboard`."""
+    """Return CheckResult list for `loco doctor dashboard`."""
     from llm_cli.core import dashboard as dash
     from llm_cli.core.versions import current_cli_version
     import shutil
@@ -2329,7 +2329,7 @@ def _dashboard_scope_checks() -> list[CheckResult]:
         name="dashboard installed",
         status="info" if record is None else "ok",
         message=(
-            "Not installed (run `llm dashboard install`)" if record is None
+            "Not installed (run `loco dashboard install`)" if record is None
             else f"Installed for CLI {record.cli_version} at {record.installed_at}"
         ),
     ))
@@ -2341,7 +2341,7 @@ def _dashboard_scope_checks() -> list[CheckResult]:
             message=(
                 "Match" if record.cli_version == cur
                 else f"Built for CLI {record.cli_version}, current is {cur}. "
-                     "Run `llm dashboard install --reset`."
+                     "Run `loco dashboard install --reset`."
             ),
         ))
         verdict, reason = dash.verify_installed(cur)
@@ -2357,7 +2357,7 @@ def _dashboard_scope_checks() -> list[CheckResult]:
             name="dashboard server pid alive",
             status="ok" if dash.is_server_alive(pid) else "warning",
             message=(f"pid={pid} alive" if dash.is_server_alive(pid)
-                     else f"Stale pid file (pid={pid}); run `llm dashboard stop`."),
+                     else f"Stale pid file (pid={pid}); run `loco dashboard stop`."),
         ))
 
     return results
@@ -2376,7 +2376,7 @@ git commit -m "feat(doctor): add `dashboard` scope (node/npm, install record, di
 
 ---
 
-### Task 17: `llm setup` chain — opt-in dashboard step
+### Task 17: `loco setup` chain — opt-in dashboard step
 
 **Files:**
 - Modify: `src/llm_cli/commands/setup.py`
@@ -2418,7 +2418,7 @@ def _maybe_install_dashboard(noninteractive: bool) -> None:
     if not questionary.confirm(
         "Install the web dashboard now?", default=False
     ).ask():
-        typer.echo("Skipped dashboard install. You can run `llm dashboard install` later.")
+        typer.echo("Skipped dashboard install. You can run `loco dashboard install` later.")
         return
     try:
         _dashboard_install()  # delegates to the Typer command's logic
@@ -2426,7 +2426,7 @@ def _maybe_install_dashboard(noninteractive: bool) -> None:
         if e.exit_code != 0:
             typer.secho(
                 "Dashboard install failed; continuing setup. "
-                "Run `llm dashboard install` to retry.",
+                "Run `loco dashboard install` to retry.",
                 fg=typer.colors.YELLOW,
             )
 ```
@@ -2439,12 +2439,12 @@ Wire `_maybe_install_dashboard(...)` into the chain after the existing steps.
 
 ```bash
 git add src/llm_cli/commands/setup.py tests/unit/test_setup*
-git commit -m "feat(setup): offer optional dashboard install at end of `llm setup` chain"
+git commit -m "feat(setup): offer optional dashboard install at end of `loco setup` chain"
 ```
 
 ---
 
-### Task 18: `llm update` — auto-rebuild dashboard if installed
+### Task 18: `loco update` — auto-rebuild dashboard if installed
 
 **Files:**
 - Modify: `src/llm_cli/commands/update_cmd.py`
@@ -2511,7 +2511,7 @@ def _post_update_hooks() -> None:
     if not shutil.which("node") or not shutil.which("npm"):
         typer.secho(
             "Dashboard is installed but node/npm not found; skipping rebuild. "
-            "Run `llm dashboard install` after installing Node 20+.",
+            "Run `loco dashboard install` after installing Node 20+.",
             fg=typer.colors.YELLOW,
         )
         return
@@ -2533,7 +2533,7 @@ Call `_post_update_hooks()` at the end of the existing update flow.
 
 ```bash
 git add src/llm_cli/commands/update_cmd.py tests/unit/test_update*
-git commit -m "feat(update): rebuild dashboard after `llm update` when version drifts (best-effort)"
+git commit -m "feat(update): rebuild dashboard after `loco update` when version drifts (best-effort)"
 ```
 
 ---
@@ -3612,7 +3612,7 @@ export function ParamsView({ configId }: { configId: string }) {
 **InstancePage:**
 
 - Reads `useQuery(['instance'])` and `useSSE('/api/instance/stream')`.
-- If `instance.running === false`: show a card "Nothing is running. Start a config from the CLI (`llm serve <config>`) — start/stop controls arrive in Plan 2."
+- If `instance.running === false`: show a card "Nothing is running. Start a config from the CLI (`loco serve <config>`) — start/stop controls arrive in Plan 2."
 - If running: status card + tabs (Logs / Metrics-placeholder / Switch-disabled).
 
 **LogsView:**
@@ -3693,14 +3693,14 @@ This is already done in Task 11 via `mount_spa()`. This task is a verification +
 
 ```bash
 # From repo root
-llm dashboard install
-llm dashboard serve --no-open
+loco dashboard install
+loco dashboard serve --no-open
 # In another terminal:
 curl http://127.0.0.1:7878/api/health
 # Expected: {"ok":true}
 curl -i http://127.0.0.1:7878/
 # Expected: 200 OK, Content-Type: text/html, with React SPA HTML
-llm dashboard stop
+loco dashboard stop
 ```
 
 Document any rough edges found in `docs/DASHBOARD.md` (Task 44).
@@ -3813,12 +3813,12 @@ git commit -m "ci: add api-contract-check workflow (OpenAPI ↔ TS client sync)"
 The LocalLLM dashboard is an optional, locally-hosted web UI for managing your
 LocalLLM installation: viewing runtimes, models, configs, the currently-running
 instance, logs, doctor results, disk usage, and history. It is **opt-in** —
-default `llm` installs do not include it.
+default `loco` installs do not include it.
 
 ## Install
 
 ```bash
-llm dashboard install
+loco dashboard install
 ```
 
 This:
@@ -3832,10 +3832,10 @@ Skip flags: `--skip-python`, `--skip-frontend`, `--reset` (wipe node_modules).
 ## Serve
 
 ```bash
-llm dashboard serve                    # background, auto-opens browser
-llm dashboard serve --foreground       # attached to terminal
-llm dashboard serve --port 8000        # custom port
-llm dashboard serve --no-open          # don't open browser
+loco dashboard serve                    # background, auto-opens browser
+loco dashboard serve --foreground       # attached to terminal
+loco dashboard serve --port 8000        # custom port
+loco dashboard serve --no-open          # don't open browser
 ```
 
 Server binds to `127.0.0.1` by default. Non-localhost binding will require a
@@ -3844,16 +3844,16 @@ Server binds to `127.0.0.1` by default. Non-localhost binding will require a
 ## Status / stop / uninstall
 
 ```bash
-llm dashboard status     # install state + server pid
-llm dashboard stop       # SIGTERM the server, escalate to SIGKILL after 10s
-llm dashboard uninstall  # remove .installed
-llm dashboard uninstall --purge  # also delete dist/ and node_modules/
+loco dashboard status     # install state + server pid
+loco dashboard stop       # SIGTERM the server, escalate to SIGKILL after 10s
+loco dashboard uninstall  # remove .installed
+loco dashboard uninstall --purge  # also delete dist/ and node_modules/
 ```
 
 ## Health checks
 
 ```bash
-llm doctor dashboard
+loco doctor dashboard
 ```
 
 Checks Node/npm availability, dashboard install state, dist integrity, server
@@ -3861,7 +3861,7 @@ PID liveness.
 
 ## Update
 
-When you run `llm update` and the dashboard is installed, it will be rebuilt
+When you run `loco update` and the dashboard is installed, it will be rebuilt
 automatically (best-effort; skipped if node/npm are unavailable).
 
 ## Limitations of this release
@@ -3949,10 +3949,10 @@ rm -rf dashboard/dist dashboard/node_modules dashboard/.installed
 rm -rf state/dashboard
 
 # Reinstall + serve
-llm dashboard install
-llm dashboard status        # should show "Installed for CLI ..."
-llm dashboard serve --no-open
-llm dashboard status        # should show "Server: running (pid=...)"
+loco dashboard install
+loco dashboard status        # should show "Installed for CLI ..."
+loco dashboard serve --no-open
+loco dashboard status        # should show "Server: running (pid=...)"
 ```
 
 - [ ] **Step 2: Browser smoke**
@@ -3963,7 +3963,7 @@ Open `http://127.0.0.1:7878/` and click through each page:
 - Clicking a runtime opens detail with Manifest tab populated
 - Models list renders
 - Configs list renders, detail opens, Params tab shows JSON
-- Instance shows "Nothing is running" (or status if a CLI `llm serve` is active)
+- Instance shows "Nothing is running" (or status if a CLI `loco serve` is active)
 - Doctor renders 3 scopes
 - Disk renders model sizes
 - History renders past lifecycle events
@@ -3972,8 +3972,8 @@ Open `http://127.0.0.1:7878/` and click through each page:
 - [ ] **Step 3: Stop**
 
 ```bash
-llm dashboard stop
-llm dashboard status        # should show "Server: not running"
+loco dashboard stop
+loco dashboard status        # should show "Server: not running"
 ```
 
 - [ ] **Step 4: Full test pass**
@@ -3995,13 +3995,13 @@ gh pr create --title "feat(dashboard): web dashboard MVP (Plan 1/5 — install, 
 Implements Plan 1 of 5 from `docs/superpowers/plans/2026-05-20-web-dashboard-mvp.md`.
 
 ## Summary
-- New `llm dashboard install / serve / status / stop / uninstall` commands
+- New `loco dashboard install / serve / status / stop / uninstall` commands
 - FastAPI backend with read-only routes for runtimes, models, configs, instance (incl. SSE logs), doctor, settings, disk, history, overview
 - Baseline security: Host header allow-list, CORS, CSP, security headers, request-id
 - React SPA (React 19 + Vite + Tailwind v4 + shadcn + TanStack Router/Query + Zustand + sonner)
-- `llm doctor dashboard` scope
-- `llm setup` opt-in dashboard step
-- `llm update` rebuilds dashboard if installed
+- `loco doctor dashboard` scope
+- `loco setup` opt-in dashboard step
+- `loco update` rebuilds dashboard if installed
 - Two new CI jobs: dashboard-tests + api-contract-check
 - Docs: `docs/DASHBOARD.md` and `dashboard/README.md`
 

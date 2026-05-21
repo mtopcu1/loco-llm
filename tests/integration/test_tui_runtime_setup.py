@@ -1,4 +1,4 @@
-"""PTY integration tests for `llm runtime setup` wizard."""
+"""PTY integration tests for `loco runtime setup` wizard."""
 from __future__ import annotations
 
 import sys

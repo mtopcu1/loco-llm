@@ -1,4 +1,4 @@
-"""Integration tests for `llm serve`, `llm switch`. Uses runner injection — no real bash."""
+"""Integration tests for `loco serve`, `loco switch`. Uses runner injection — no real bash."""
 from __future__ import annotations
 
 import os
@@ -124,7 +124,7 @@ def test_serve_refuses_when_runtime_uninstalled(tmp_path: Path) -> None:
     result = runner.invoke(app, ["serve", "cfg-a"], catch_exceptions=False)
     assert result.exit_code != 0
     assert "not installed" in result.stdout.lower()
-    assert "llm runtime install" in result.stdout
+    assert "loco runtime install" in result.stdout
 
 
 def test_serve_readiness_timeout_kills_child_and_clears_state(tmp_path: Path) -> None:
@@ -188,11 +188,11 @@ def test_serve_systemd_rewrites_unit_and_writes_running(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.stdout
     wid.assert_called_once()
     dr.assert_called_once()
-    ru.assert_called_once_with("llm.service")
+    ru.assert_called_once_with("loco.service")
     rec = read_running(_state(tmp_path))
     assert rec is not None
     assert rec.mode == "systemd"
-    assert rec.unit == "llm.service"
+    assert rec.unit == "loco.service"
     assert rec.config_id == "cfg-a"
 
 
@@ -224,7 +224,7 @@ def test_foreground_from_supervisor_does_not_touch_running_json(tmp_path: Path) 
         config_id="cfg-a",
         port=18097,
         started_at="t",
-        unit="llm.service",
+        unit="loco.service",
     )
     write_running(_state(tmp_path), pre)
 
@@ -329,7 +329,7 @@ def test_serve_systemd_noop_when_same_config_already_active(tmp_path: Path) -> N
             config_id="cfg-a",
             port=18100,
             started_at="t",
-            unit="llm.service",
+            unit="loco.service",
         ),
     )
     with (

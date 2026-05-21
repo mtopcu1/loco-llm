@@ -358,13 +358,13 @@ def validate_config_v2(repo: Path, cfg: ConfigRecord) -> tuple[list[str], list[s
             if not primary_path.exists():
                 warnings.append(
                     f"{cfg.id}: model {md_id!r} primary path missing on disk "
-                    f"({primary_path}); run `llm model pull {md_id}`."
+                    f"({primary_path}); run `loco model pull {md_id}`."
                 )
 
     if rt_manifest is not None and not is_installed(settings.runtimes_dir, rt_id):
         warnings.append(
             f"{cfg.id}: runtime {rt_id!r} is not installed; "
-            f"run `llm runtime install {rt_id}` before `llm serve`."
+            f"run `loco runtime install {rt_id}` before `loco serve`."
         )
 
     return errs, warnings

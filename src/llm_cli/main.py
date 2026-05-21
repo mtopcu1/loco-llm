@@ -1,4 +1,4 @@
-"""LocalLLM CLI entrypoint."""
+"""Loco CLI entrypoint."""
 from __future__ import annotations
 
 import subprocess
@@ -22,8 +22,8 @@ from llm_cli.commands.update_cmd import update as update_cmd
 from llm_cli.commands.dashboard_cmd import app as dashboard_app
 
 app = typer.Typer(
-    name="llm",
-    help="LocalLLM — control plane for local LLM runtimes.",
+    name="loco",
+    help="Loco — control plane for local LLM runtimes.",
     no_args_is_help=True,
 )
 
@@ -69,7 +69,7 @@ def _head_suffix() -> str:
 
 def _version_callback(value: bool) -> None:
     if value:
-        typer.echo(f"llm {__version__}{_head_suffix()}")
+        typer.echo(f"loco {__version__}{_head_suffix()}")
         raise typer.Exit()
 
 
@@ -83,7 +83,7 @@ def root(
         help="Print version and exit.",
     ),
 ) -> None:
-    """LocalLLM CLI — manage runtimes, models, configs, and benchmarks."""
+    """Loco CLI — manage runtimes, models, configs, and benchmarks."""
 
 
 app.command(

@@ -1,6 +1,6 @@
 # stub-runtime
 
-Minimal runtime package for discovery, `llm build`, layout validation, and **`llm serve`** smoke tests.
+Minimal runtime package for discovery, `loco build`, layout validation, and **`loco serve`** smoke tests.
 
 - **`serve.sh`** — small Python TCP server on `LLM_SERVE_HOST` / `LLM_SERVE_PORT`; replies with `hello` per connection; exits cleanly on SIGINT/SIGTERM.
 - **`healthcheck.sh`** — exits 0 when that TCP port accepts a connection (used by the CLI readiness loop).

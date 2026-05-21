@@ -1,8 +1,8 @@
 # External Requirements
 
-<!-- AUTO-GENERATED from requirements.yaml — do not edit by hand. Run `llm doctor render-requirements` to regenerate. -->
+<!-- AUTO-GENERATED from requirements.yaml — do not edit by hand. Run `loco doctor render-requirements` to regenerate. -->
 
-These prerequisites must exist on the machine for the LocalLLM CLI and the runtimes' build/serve scripts to function. Run `llm doctor` to verify the current state of each.
+These prerequisites must exist on the machine for the LocalLLM CLI and the runtimes' build/serve scripts to function. Run `loco doctor` to verify the current state of each.
 
 ## Universal
 

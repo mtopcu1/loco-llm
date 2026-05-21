@@ -4,7 +4,7 @@
 
 **Goal:** Replace the PyPI-based install/update model with a curl-installable git-clone pattern (hermes-agent style), strip the publish pipeline and asset-tarball machinery, and reduce CI to one tests workflow plus a release-please workflow that only tags.
 
-**Architecture:** `scripts/install.sh` clones the repo to `$LOCO_LLM_HOME`, checks out the latest semver tag, creates a uv venv with an editable install, and symlinks `llm` onto `$PATH`. `llm update` does the same dance for updates with re-anchor semantics, plus `--branch`/`--tag`/`--check` flags. CI runs pytest on PRs only. `release-please.yml` opens a release PR; merging it creates the git tag + GitHub Release. No PyPI publishing, no scaffold tarball, no `publish.yml`.
+**Architecture:** `scripts/install.sh` clones the repo to `$LOCO_LLM_HOME`, checks out the latest semver tag, creates a uv venv with an editable install, and symlinks `loco` onto `$PATH`. `loco update` does the same dance for updates with re-anchor semantics, plus `--branch`/`--tag`/`--check` flags. CI runs pytest on PRs only. `release-please.yml` opens a release PR; merging it creates the git tag + GitHub Release. No PyPI publishing, no scaffold tarball, no `publish.yml`.
 
 **Tech Stack:** Python 3.11+, Hatchling build backend, GitHub Actions (`googleapis/release-please-action@v4`, `astral-sh/setup-uv@v3`), `uv`, `git`, Conventional Commits.
 
@@ -15,8 +15,8 @@
 ## Background — what exists today (for the engineer with zero context)
 
 - Repo: `github.com/mtopcu1/loco-llm` (moved from `local-llm-scaffold`). Default branch `main`. Maintainer on Windows; product targets WSL2/Linux/macOS.
-- Python Typer CLI in `src/llm_cli/`. Entry point `llm` defined in `pyproject.toml` `[project.scripts]`.
-- Today's install: `scripts/install.sh` does `pipx install loco-llm-cli==<pinned>` from PyPI, then `llm update --scaffold-only` to download a scaffold tarball. We're throwing this away.
+- Python Typer CLI in `src/llm_cli/`. Entry point `loco` defined in `pyproject.toml` `[project.scripts]`.
+- Today's install: `scripts/install.sh` does `pipx install loco-llm-cli==<pinned>` from PyPI, then `loco update --scaffold-only` to download a scaffold tarball. We're throwing this away.
 - Today's update: `src/llm_cli/commands/update_cmd.py` upgrades the pipx wheel + the scaffold tarball. We're throwing this away too.
 - Today's CI: `.github/workflows/ci.yml` (pytest matrix + build-check), `release-please.yml` (release PR + chained publish + version sync check), `publish.yml` (manual fallback). All three need rewriting/removal.
 - Conventional commits: enforced socially via `.cursor/rules/conventional-commits.mdc` + `CONTRIBUTING.md`. Release-please drives version bumps in `pyproject.toml` and `src/llm_cli/__init__.py` based on commit messages.
@@ -301,7 +301,7 @@ These modules cover PyPI version fetching, scaffold tarball install/rollback, an
 
 ---
 
-## Task 3: Rewrite `llm update` (re-anchor flow + flags)
+## Task 3: Rewrite `loco update` (re-anchor flow + flags)
 
 **Files:**
 - Modify: `src/llm_cli/commands/update_cmd.py`
@@ -314,7 +314,7 @@ The new `update` command operates on the git checkout at `scaffold_root()`. Defa
   Replace `tests/unit/test_update_cmd.py` with:
 
   ```python
-  """Tests for git-based llm update."""
+  """Tests for git-based loco update."""
   from __future__ import annotations
 
   import subprocess
@@ -470,7 +470,7 @@ The new `update` command operates on the git checkout at `scaffold_root()`. Defa
   Replace the file with:
 
   ```python
-  """`llm update` — pull the latest tag (or a chosen ref) into the git checkout."""
+  """`loco update` — pull the latest tag (or a chosen ref) into the git checkout."""
   from __future__ import annotations
 
   import re
@@ -578,7 +578,7 @@ The new `update` command operates on the git checkout at `scaffold_root()`. Defa
       if uv is None:
           console.print(
               "[yellow]warning:[/yellow] `uv` not found on PATH; skipping dep sync. "
-              "Install uv and re-run `llm update` to pick up dependency changes."
+              "Install uv and re-run `loco update` to pick up dependency changes."
           )
           return
       subprocess.run([uv, "pip", "install", "-e", str(root)], check=True)
@@ -595,7 +595,7 @@ The new `update` command operates on the git checkout at `scaffold_root()`. Defa
           return None
       if not restart:
           console.print(
-              "[red]error:[/red] a service is running. Stop it first (`llm stop`) "
+              "[red]error:[/red] a service is running. Stop it first (`loco stop`) "
               "or pass --restart to stop and re-start it around the update."
           )
           raise typer.Exit(code=1)
@@ -685,7 +685,7 @@ The new `update` command operates on the git checkout at `scaffold_root()`. Defa
           _restore_service(saved)
           console.print(
               f"[yellow]you are now on branch {branch} — not a stable release.[/yellow] "
-              "Run `llm update` to return to the latest stable tag."
+              "Run `loco update` to return to the latest stable tag."
           )
           return
 
@@ -747,16 +747,16 @@ The new `update` command operates on the git checkout at `scaffold_root()`. Defa
 
   ```bash
   git add src/llm_cli/commands/update_cmd.py tests/unit/test_update_cmd.py
-  git commit -m "feat!: rewrite llm update as git-tag-based with re-anchor semantics
+  git commit -m "feat!: rewrite loco update as git-tag-based with re-anchor semantics
 
-  BREAKING CHANGE: llm update no longer reads from PyPI or installs a scaffold tarball.
+  BREAKING CHANGE: loco update no longer reads from PyPI or installs a scaffold tarball.
   It operates on the git checkout at LOCO_LLM_HOME and pulls the latest semver tag.
   --branch, --tag, --check flags replace the old --scaffold-only / --cli-only model."
   ```
 
 ---
 
-## Task 4: Off-tag warning in `llm doctor` and `--version`
+## Task 4: Off-tag warning in `loco doctor` and `--version`
 
 **Files:**
 - Modify: `src/llm_cli/commands/doctor.py` (add a quick check)
@@ -764,7 +764,7 @@ The new `update` command operates on the git checkout at `scaffold_root()`. Defa
 - Modify: `tests/unit/test_doctor_check.py` (drop scaffold drift, add off-tag check)
 - Modify: `tests/integration/test_cli_help.py` (assert new `--version` shape)
 
-`llm --version` shows the package version with a suffix if HEAD is off-tag. `llm doctor` adds a check that warns if HEAD is not an exact-match tag.
+`loco --version` shows the package version with a suffix if HEAD is off-tag. `loco doctor` adds a check that warns if HEAD is not an exact-match tag.
 
 - [ ] **Step 1: Read the current main.py `--version` callback.**
 
@@ -857,7 +857,7 @@ The new `update` command operates on the git checkout at `scaffold_root()`. Defa
           return (
               "install-channel",
               "warn",
-              "not on a release tag — run `llm update` to re-anchor to the latest stable tag",
+              "not on a release tag — run `loco update` to re-anchor to the latest stable tag",
           )
   ```
 
@@ -897,9 +897,9 @@ The new `update` command operates on the git checkout at `scaffold_root()`. Defa
   git add src/llm_cli/main.py src/llm_cli/commands/doctor.py tests/integration/test_cli_help.py tests/unit/test_doctor_check.py
   git commit -m "feat(cli): warn when running off a release tag
 
-  llm --version now appends '(branch: X)' or '(detached: sha)' when HEAD is
-  not an exact tag match. llm doctor adds an install-channel check that
-  warns and points at \`llm update\` to re-anchor."
+  loco --version now appends '(branch: X)' or '(detached: sha)' when HEAD is
+  not an exact tag match. loco doctor adds an install-channel check that
+  warns and points at \`loco update\` to re-anchor."
   ```
 
 ---
@@ -1009,7 +1009,7 @@ Curl-installable one-liner per spec section 7. POSIX bash, `set -euo pipefail`, 
 
   echo
   echo "loco-llm installed to $LOCO_LLM_HOME (ref: $target)"
-  echo "next: run 'llm setup' to configure"
+  echo "next: run 'loco setup' to configure"
   ```
 
 - [ ] **Step 2: Run shellcheck.**
@@ -1263,22 +1263,22 @@ Drop the chained publish job, the release-pr-check job, all id-token permissions
   ```bash
   curl -fsSL https://raw.githubusercontent.com/mtopcu1/loco-llm/main/scripts/install.sh | bash
   export PATH="$HOME/.local/bin:$PATH"   # if not already
-  llm setup
+  loco setup
   ```
 
   The installer clones the repo to `~/.loco-llm`, checks out the latest stable
-  tag, creates a uv venv, and symlinks `llm`. Run `llm doctor` to verify.
+  tag, creates a uv venv, and symlinks `loco`. Run `loco doctor` to verify.
 
   ### Updating
 
   ```bash
-  llm update              # latest stable tag
-  llm update --check      # report current vs. available, no changes
-  llm update --branch X   # switch to a branch (hotfix testing)
-  llm update --tag vX.Y.Z # pin to a specific tag (rollback)
+  loco update              # latest stable tag
+  loco update --check      # report current vs. available, no changes
+  loco update --branch X   # switch to a branch (hotfix testing)
+  loco update --tag vX.Y.Z # pin to a specific tag (rollback)
   ```
 
-  Bare `llm update` always re-anchors to the latest tag, even if you were on a
+  Bare `loco update` always re-anchors to the latest tag, even if you were on a
   branch.
 
   ### Upgrading from a prior pipx-based install
@@ -1319,7 +1319,7 @@ Drop the chained publish job, the release-pr-check job, all id-token permissions
   ```
 
   No separate `install-dev.sh`. To use this checkout as your runtime install,
-  set `LOCO_LLM_HOME=$(pwd)` or configure `repo_root` in `llm settings`.
+  set `LOCO_LLM_HOME=$(pwd)` or configure `repo_root` in `loco settings`.
   ```
 
 ### `docs/RELEASE_SETUP.md`
@@ -1347,7 +1347,7 @@ Drop the chained publish job, the release-pr-check job, all id-token permissions
   ## 3. There is no PyPI
 
   Distribution is by git tag. Merging the release PR creates the tag and a
-  GitHub Release with the CHANGELOG. `llm update` consumes the tag. No PyPI
+  GitHub Release with the CHANGELOG. `loco update` consumes the tag. No PyPI
   trusted publisher to configure, no wheel to upload, no scaffold tarball.
 
   ## 4. Flow
@@ -1359,7 +1359,7 @@ Drop the chained publish job, the release-pr-check job, all id-token permissions
     rp --> relpr[Release PR opened/updated]
     relpr --> mergerel[Merge release PR, admin OK]
     mergerel --> tag[Tag vX.Y.Z + GitHub Release]
-    tag --> users[users: llm update]
+    tag --> users[users: loco update]
   ```
   ```
 
@@ -1396,13 +1396,13 @@ Drop the chained publish job, the release-pr-check job, all id-token permissions
   shellcheck scripts/install.sh
   ```
 
-- [ ] **Step 4: Smoke-check `llm --version` from this checkout.**
+- [ ] **Step 4: Smoke-check `loco --version` from this checkout.**
 
   ```bash
-  uv run llm --version
+  uv run loco --version
   ```
 
-  Expected: `llm 0.3.2 (branch: feat/git-tag-distribution)` (or similar suffix since you're on a branch).
+  Expected: `loco 0.3.2 (branch: feat/git-tag-distribution)` (or similar suffix since you're on a branch).
 
 - [ ] **Step 5: Push the branch.**
 
@@ -1421,9 +1421,9 @@ Drop the chained publish job, the release-pr-check job, all id-token permissions
 
   Distribution is now git-tag based (hermes-agent pattern):
   - curl install.sh clones to ~/.loco-llm and editable-installs via uv
-  - llm update fetches tags and re-anchors to the latest stable tag
+  - loco update fetches tags and re-anchors to the latest stable tag
   - --branch / --tag / --check flags for hotfixes, pinning, dry-runs
-  - llm doctor + llm --version warn when HEAD is off-tag
+  - loco doctor + loco --version warn when HEAD is off-tag
 
   CI collapsed:
   - ci.yml: one job, PR-only, single Python, uv
@@ -1477,16 +1477,16 @@ Not executable in the PR — do these after the PR merges and release-please cut
   ```bash
   rm -rf ~/.loco-llm ~/.local/bin/llm   # if any leftover
   curl -fsSL https://raw.githubusercontent.com/mtopcu1/loco-llm/main/scripts/install.sh | bash
-  ~/.local/bin/llm --version            # should print: llm 0.4.0
-  ~/.local/bin/llm update --check       # should print: Already on latest stable.
+  ~/.local/bin/loco --version            # should print: llm 0.4.0
+  ~/.local/bin/loco update --check       # should print: Already on latest stable.
   ```
 
 - [ ] **Step 5: Smoke test the hotfix path.**
 
   ```bash
   git -C ~/.loco-llm fetch origin
-  llm update --branch main              # if main is ahead of v0.4.0
-  llm update                            # re-anchors to v0.4.0
+  loco update --branch main              # if main is ahead of v0.4.0
+  loco update                            # re-anchors to v0.4.0
   ```
 
 - [ ] **Step 6: Cut a no-op v0.4.1 to verify the update path.**
@@ -1494,7 +1494,7 @@ Not executable in the PR — do these after the PR merges and release-please cut
   Land a trivial `fix:` commit (e.g. typo in README), merge the release-please PR, then on the test machine:
 
   ```bash
-  llm update
+  loco update
   # expected: "updated to v0.4.1."
   ```
 
@@ -1506,4 +1506,4 @@ Not executable in the PR — do these after the PR merges and release-please cut
 - PowerShell native-Windows installer.
 - `--prerelease` channel support.
 - Compile-to-binary distribution.
-- Automatic post-update verification beyond `llm --version`.
+- Automatic post-update verification beyond `loco --version`.

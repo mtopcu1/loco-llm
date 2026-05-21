@@ -37,5 +37,5 @@ def repo_root() -> Path:
         return resolved.repo_root.resolve()
     raise RepoRootMissing(
         "repo_root is not configured; distributed installs use the managed scaffold. "
-        "For development, run `llm settings edit repo_root` to point at your clone."
+        "For development, run `loco settings edit repo_root` to point at your clone."
     )

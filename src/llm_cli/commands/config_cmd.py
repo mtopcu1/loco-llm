@@ -1,4 +1,4 @@
-"""`llm config` — show, validate, new, setup."""
+"""`loco config` — show, validate, new, setup."""
 from __future__ import annotations
 
 import json
@@ -162,7 +162,7 @@ def do_config_setup(
         if not entries:
             console.print(
                 "[red]error:[/red] no compatible models in registry; "
-                "`llm model pull <hf-url>` first, then `llm config setup`."
+                "`loco model pull <hf-url>` first, then `loco config setup`."
             )
             return None
         if mid is None:

@@ -26,10 +26,10 @@
 - `webapi/` package with FastAPI factory, middleware (Host header, CORS, CSP, security headers, request-id), `webapi/errors.py` (`ApiError` + `ErrorCode` enum), `webapi/streams.py` (`EventHub`), `webapi/static.py` (SPA fallback).
 - All GET-only routes for runtimes, models, configs (incl. read-only `/params` and `/validate`), instance (incl. SSE state + logs), doctor, settings, disk, history, overview, health, version.
 - React shell + read-only pages for everything. Mutation buttons render as disabled with "Available in Plan 2" tooltips. Config detail's Params tab renders a read-only JSON dump.
-- `llm dashboard install / serve / status / stop / uninstall` commands.
-- `llm doctor dashboard` scope.
-- `llm setup` opt-in dashboard step.
-- `llm update` auto-rebuilds dashboard on version drift.
+- `loco dashboard install / serve / status / stop / uninstall` commands.
+- `loco doctor dashboard` scope.
+- `loco setup` opt-in dashboard step.
+- `loco update` auto-rebuilds dashboard on version drift.
 - `dashboard-tests` + `api-contract-check` CI jobs.
 
 This plan **adds** mutations. It does **not** modify routes from Plan 1 except to register additional method handlers (`POST`/`PUT`/`DELETE`) on the same routers.
@@ -661,8 +661,8 @@ git commit -m "feat(webapi): /api/jobs list/get/stream/cancel routes"
 - Create: `tests/webapi/test_routes_runtimes_mutations.py`
 
 Endpoints:
-- `POST /api/runtimes/{id}/install` → `{job_id}` (job runs `llm runtime install <id>`-equivalent via subprocess so we capture stdout to the job log; cleaner than re-implementing the install flow in-process)
-- `POST /api/runtimes/{id}/rebuild` → `{job_id}` (calls `llm runtime rebuild <id>` subprocess; respects `?reset=true`)
+- `POST /api/runtimes/{id}/install` → `{job_id}` (job runs `loco runtime install <id>`-equivalent via subprocess so we capture stdout to the job log; cleaner than re-implementing the install flow in-process)
+- `POST /api/runtimes/{id}/rebuild` → `{job_id}` (calls `loco runtime rebuild <id>` subprocess; respects `?reset=true`)
 - `DELETE /api/runtimes/{id}` → sync; calls `install_record.uninstall_runtime(id, purge=...)`. Refuses with `RUNTIME_IN_USE` if the runtime is currently serving anything.
 
 - [ ] **Step 1: Tests** (one test per endpoint covering happy path + the in-use refusal for DELETE) — pattern from Plan 1.
@@ -714,7 +714,7 @@ git commit -m "feat(webapi): POST /api/runtimes/{id}/install|rebuild + DELETE (s
 - Create: `tests/webapi/test_routes_models_mutations.py`
 
 Endpoints:
-- `POST /api/models/pull` body `{url: str, id?: str, format?: str, include?: list, exclude?: list, force?: bool}` → `{job_id}`. Job subprocesses `llm model pull <url> [...flags]`.
+- `POST /api/models/pull` body `{url: str, id?: str, format?: str, include?: list, exclude?: list, force?: bool}` → `{job_id}`. Job subprocesses `loco model pull <url> [...flags]`.
 - `POST /api/models/add` body `{id: str, path: str, format: str}` → sync; calls `model_registry.add_local(...)`.
 - `DELETE /api/models/{id}?purge=true` → sync; calls `model_registry.uninstall(id, purge=purge)`.
 
@@ -1089,8 +1089,8 @@ git commit -m "feat(dashboard): centralized error→toast mapping by ErrorCode"
 
 ```bash
 # Backend
-llm dashboard install
-llm dashboard serve --no-open
+loco dashboard install
+loco dashboard serve --no-open
 
 # In another terminal:
 curl -X POST http://127.0.0.1:7878/api/runtimes/stub-runtime/install \

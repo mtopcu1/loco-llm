@@ -1,4 +1,4 @@
-"""End-to-end tests for `llm runtime setup`."""
+"""End-to-end tests for `loco runtime setup`."""
 from __future__ import annotations
 
 import shutil
@@ -58,7 +58,7 @@ def test_runtime_setup_custom_writes_all_files(monkeypatch, tmp_path):
         [
             "vllm-custom",
             "vLLM (user-installed)",
-            'vllm serve "$LLM_MODEL_PATH" --host "$LLM_SERVE_HOST" --port "$LLM_SERVE_PORT" $LLM_EXTRA_ARGS',
+            'vloco serve "$LLM_MODEL_PATH" --host "$LLM_SERVE_HOST" --port "$LLM_SERVE_PORT" $LLM_EXTRA_ARGS',
             "",
         ]
     )

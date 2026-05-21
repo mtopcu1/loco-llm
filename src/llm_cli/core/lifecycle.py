@@ -25,7 +25,7 @@ class LifecycleRecord:
     started_at: str  # ISO-8601 UTC, e.g. "2026-05-17T16:00:00Z"
     pid: int | None = None
     log_path: str | None = None  # repo-relative POSIX path; None for systemd
-    unit: str | None = None  # "llm.service" for systemd; None otherwise
+    unit: str | None = None  # "loco.service" for systemd; None otherwise
 
 
 def state_root(settings: "Settings") -> Path:
@@ -307,7 +307,7 @@ def stop_instance() -> None:
         return
     if rec.mode == "systemd":
         try:
-            stop_unit("llm.service")
+            stop_unit("loco.service")
         except RuntimeError as exc:
             raise LifecycleError(f"systemctl stop failed: {exc}") from exc
         clear_running(state_base)

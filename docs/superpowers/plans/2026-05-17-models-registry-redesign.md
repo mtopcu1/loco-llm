@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the per-model `manifest.yaml` + `pull.sh` abstraction with a single `$LLM_MODELS/registry.json` populated by `llm model pull <hf-url>` / `llm model add <id> <path>`; add runtime `accepts_formats` gating and a `${model_path}` template in `serve.params`.
+**Goal:** Replace the per-model `manifest.yaml` + `pull.sh` abstraction with a single `$LLM_MODELS/registry.json` populated by `loco model pull <hf-url>` / `loco model add <id> <path>`; add runtime `accepts_formats` gating and a `${model_path}` template in `serve.params`.
 
 **Architecture:** Four new pure modules (`hf_url.py`, `hf_client.py`, `model_registry.py`, `model_resolve.py`) feed a rewritten `commands/model_cmd.py`. `core/registry.py` loses its model-discovery code, gains `accepts_formats` on `RuntimeManifest`, and tightens `validate_config_v2`. `core/config_resolve.py` learns `${model_path}`. The shipped `llamacpp` and `stub-runtime` manifests get `accepts_formats`; the tracked `stub-runtime__stub-model__default.yaml` config and `models/stub-model/` are deleted.
 
@@ -1829,7 +1829,7 @@ def validate_config_v2(repo: Path, cfg: ConfigRecord) -> tuple[list[str], list[s
     if rt_manifest is not None and not is_installed(settings.runtimes_dir, rt_id):
         warnings.append(
             f"{cfg.id}: runtime {rt_id!r} is not installed; "
-            f"run `llm runtime install {rt_id}` before `llm serve`."
+            f"run `loco runtime install {rt_id}` before `loco serve`."
         )
 
     return errs, warnings
@@ -1943,13 +1943,13 @@ Replace the settings block so model checks run after settings are resolved:
             if not primary_path.exists():
                 warnings.append(
                     f"{cfg.id}: model {md_id!r} primary path missing on disk "
-                    f"({primary_path}); run `llm model pull {md_id}`."
+                    f"({primary_path}); run `loco model pull {md_id}`."
                 )
 
     if rt_manifest is not None and not is_installed(settings.runtimes_dir, rt_id):
         warnings.append(
             f"{cfg.id}: runtime {rt_id!r} is not installed; "
-            f"run `llm runtime install {rt_id}` before `llm serve`."
+            f"run `loco runtime install {rt_id}` before `loco serve`."
         )
 
     return errs, warnings
@@ -2067,7 +2067,7 @@ Expected: FAIL (old command surface still in place).
 
 ```python
 # src/llm_cli/commands/model_cmd.py
-"""`llm model` — list/info/pull/add/uninstall against $LLM_MODELS/registry.json."""
+"""`loco model` — list/info/pull/add/uninstall against $LLM_MODELS/registry.json."""
 from __future__ import annotations
 
 import json as _json
@@ -2343,7 +2343,7 @@ def model_pull(
         if get_entry(models_dir, mid) is not None and not force:
             console.print(
                 f"[red]error:[/red] {mid!r} already registered; "
-                f"use `--force` to overwrite or `llm model uninstall {mid}` first"
+                f"use `--force` to overwrite or `loco model uninstall {mid}` first"
             )
             raise typer.Exit(code=1)
 
@@ -2933,28 +2933,28 @@ Models live in a per-machine registry at `$LLM_MODELS/registry.json` (not in git
 For a single GGUF quant (URL points at the file):
 
 ```bash
-llm model pull \
+loco model pull \
   https://huggingface.co/unsloth/Qwen3.6-235B-A22B-GGUF/blob/main/Qwen3.6-235B-A22B-UD-Q4_K_XL-00001-of-00010.gguf
 ```
 
 For a whole safetensors-style repo:
 
 ```bash
-llm model pull https://huggingface.co/Qwen/Qwen2.5-7B-Instruct
+loco model pull https://huggingface.co/Qwen/Qwen2.5-7B-Instruct
 ```
 
 If the repo is ambiguous (mixed formats, multiple GGUF quants) `pull` will refuse and tell you to add `--format` and/or `--include`:
 
 ```bash
-llm model pull https://huggingface.co/unsloth/Qwen3.6-235B-A22B-GGUF \
+loco model pull https://huggingface.co/unsloth/Qwen3.6-235B-A22B-GGUF \
   --include "*UD-Q4_K_XL*"
 ```
 
 ## Register local weights
 
 ```bash
-llm model add my-finetune /home/me/llm/staging/my-finetune --format safetensors-dir
-llm model add q4-local   /home/me/llm/staging/q4.gguf      --format gguf
+loco model add my-finetune /home/me/llm/staging/my-finetune --format safetensors-dir
+loco model add q4-local   /home/me/llm/staging/q4.gguf      --format gguf
 ```
 
 Files are symlinked into `$LLM_MODELS/<id>/` (copied as a fallback if the FS rejects symlinks). The originals are untouched.
@@ -2975,7 +2975,7 @@ serve:
     ctx: 8192
 ```
 
-`llm config validate` enforces:
+`loco config validate` enforces:
 - `model:` is required when the runtime declares `accepts_formats: [...]` (non-empty).
 - `model:` must be absent when the runtime declares `accepts_formats: []`.
 - The model's `format` must be in the runtime's `accepts_formats`.
@@ -2983,9 +2983,9 @@ serve:
 ## Verify and uninstall
 
 ```bash
-llm model list
-llm model info <id>
-llm model uninstall <id> [--purge]
+loco model list
+loco model info <id>
+loco model uninstall <id> [--purge]
 ```
 
 `--purge` removes the symlinked / downloaded files under `$LLM_MODELS/<id>/` in addition to the registry row.
@@ -3030,20 +3030,20 @@ git commit -m "docs(conventions): models now live in registry.json under data ro
 
 - [ ] **Step 1: Update the model verbs row in the CLI table**
 
-Replace the existing `llm model list/info/pull` rows with:
+Replace the existing `loco model list/info/pull` rows with:
 
 ```markdown
-| `llm model list` | List models in `$LLM_MODELS/registry.json` |
-| `llm model info <id>` | Show full registry entry |
-| `llm model pull <url-or-id>` | Pull from HF (URL) or refresh an existing id; `--format`, `--include`, `--exclude`, `--id`, `--force` |
-| `llm model add <id> <path> --format <fmt>` | Register local weights via symlink |
-| `llm model uninstall <id> [--purge]` | Remove a model (and optionally its files) |
+| `loco model list` | List models in `$LLM_MODELS/registry.json` |
+| `loco model info <id>` | Show full registry entry |
+| `loco model pull <url-or-id>` | Pull from HF (URL) or refresh an existing id; `--format`, `--include`, `--exclude`, `--id`, `--force` |
+| `loco model add <id> <path> --format <fmt>` | Register local weights via symlink |
+| `loco model uninstall <id> [--purge]` | Remove a model (and optionally its files) |
 ```
 
 Update the Getting Started snippet so the model step reads:
 
 ```bash
-llm model pull https://huggingface.co/Qwen/Qwen2.5-7B-Instruct
+loco model pull https://huggingface.co/Qwen/Qwen2.5-7B-Instruct
 ```
 
 - [ ] **Step 2: Commit**
@@ -3069,11 +3069,11 @@ Expected: PASS (skips for Windows-only / systemd-only are fine).
 - [ ] **Step 2: Sanity-test the CLI manually in WSL**
 
 ```bash
-llm model list                                # empty
-llm model pull https://huggingface.co/Qwen/Qwen2.5-7B-Instruct
-llm model info qwen-qwen2.5-7b-instruct
-llm config validate                           # warnings only
-llm model uninstall qwen-qwen2.5-7b-instruct --yes
+loco model list                                # empty
+loco model pull https://huggingface.co/Qwen/Qwen2.5-7B-Instruct
+loco model info qwen-qwen2.5-7b-instruct
+loco config validate                           # warnings only
+loco model uninstall qwen-qwen2.5-7b-instruct --yes
 ```
 
 - [ ] **Step 3: Commit anything that surfaced**
@@ -3090,9 +3090,9 @@ git commit -m "chore: post-implementation cleanups from models redesign"
 
 ## Done criteria
 
-- `llm model pull <hf-url>` populates `$LLM_MODELS/registry.json` and downloads the artifact; ambiguous URLs exit 1 with a hint.
-- `llm model add <id> <path> --format <fmt>` symlinks local weights and registers an entry.
-- `llm config validate` enforces the model-presence rule, format compatibility, and registry membership.
+- `loco model pull <hf-url>` populates `$LLM_MODELS/registry.json` and downloads the artifact; ambiguous URLs exit 1 with a hint.
+- `loco model add <id> <path> --format <fmt>` symlinks local weights and registers an entry.
+- `loco config validate` enforces the model-presence rule, format compatibility, and registry membership.
 - `${model_path}` expands at serve/display time; missing models error loudly.
 - The repo no longer carries `models/<id>/` content; `stub-runtime` config no longer references a model.
 - Docs (`add-a-model.md`, `repo-conventions.md`, `README.md`) describe the new flow.

@@ -1,6 +1,6 @@
 # System Specs
 
-<!-- AUTO-GENERATED: do not edit between markers. Run `llm specs` to regenerate. -->
+<!-- AUTO-GENERATED: do not edit between markers. Run `loco specs` to regenerate. -->
 <!-- llm:specs:start -->
 _Generated: 2026-05-18T14:36:34Z_
 

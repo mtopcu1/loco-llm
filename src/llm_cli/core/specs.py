@@ -1,4 +1,4 @@
-"""Hardware and environment detection for `llm specs`.
+"""Hardware and environment detection for `loco specs`.
 
 Detection functions accept injected `read_text` and `run_command` callables
 so tests can substitute fakes. Each detector degrades gracefully — missing
@@ -259,7 +259,7 @@ SPECS_END_MARKER = "<!-- llm:specs:end -->"
 
 _AUTOGEN_HEADER_COMMENT = (
     "<!-- AUTO-GENERATED: do not edit between markers. "
-    "Run `llm specs` to regenerate. -->"
+    "Run `loco specs` to regenerate. -->"
 )
 
 

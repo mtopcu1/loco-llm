@@ -1,4 +1,4 @@
-"""VRAM-aware heuristics for `llm advisor` (llamacpp v1)."""
+"""VRAM-aware heuristics for `loco advisor` (llamacpp v1)."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -113,7 +113,7 @@ def recommend(
 
 
 def compute(runtime_id: str, *, model_id: str | None = None) -> list[AdvisorHint]:
-    """REST-friendly advisor hints for (runtime_id, model_id), mirroring ``llm advisor``."""
+    """REST-friendly advisor hints for (runtime_id, model_id), mirroring ``loco advisor``."""
     from llm_cli.core import registry
     from llm_cli.core.model_registry import get_entry
     from llm_cli.core.scaffold import scaffold_root

@@ -1,4 +1,4 @@
-# LocalLLM Wizards, Recommendations & `llm advisor`
+# LocalLLM Wizards, Recommendations & `loco advisor`
 
 _Date: 2026-05-18_
 _Status: Approved by user, ready for implementation planning_
@@ -7,22 +7,22 @@ _Status: Approved by user, ready for implementation planning_
 
 After 0.1.0 the CLI can already build runtimes, pull models, validate configs, and serve any of them in three modes. What it cannot do is **walk a user through assembling these pieces**. The only friction left in the zero-to-serving path is the YAML config that wires a runtime to a model, and the rigid four-script contract for authoring a custom (non-official) runtime. Both require opening an editor.
 
-This spec adds **schema-driven interactive wizards** for the two manual steps, plus a thin **`llm advisor`** that surfaces VRAM-aware recommendations from machine specs. The new commands sit alongside the existing one-shot commands — nothing is replaced — and every wizard has a non-interactive flag-form sibling so scripting still works.
+This spec adds **schema-driven interactive wizards** for the two manual steps, plus a thin **`loco advisor`** that surfaces VRAM-aware recommendations from machine specs. The new commands sit alongside the existing one-shot commands — nothing is replaced — and every wizard has a non-interactive flag-form sibling so scripting still works.
 
 ## 2. Problems solved
 
 - **Config authoring is the loudest remaining manual step.** Today the user must hand-author `configs/<runtime>__<model>__<preset>.yaml` and know the runtime's `serve.params` schema, the naming convention, and the `${model_path}` templating. There is no generator.
-- **Authoring a custom runtime is the wrong abstraction.** Today's "drop four scripts and a manifest" assumes the user wants `llm` to build their runtime from source. The far more common case is "I already have vLLM installed; I just want `llm` to manage start/stop/switch." The four-script + build-schema contract turns that into 30 minutes of scaffolding.
-- **The CLI doesn't help with system-aware defaults.** `llm specs` already collects VRAM and GPU info, but no command uses it. Users guess `ctx` and `n_gpu_layers` by trial-and-error.
+- **Authoring a custom runtime is the wrong abstraction.** Today's "drop four scripts and a manifest" assumes the user wants `loco` to build their runtime from source. The far more common case is "I already have vLLM installed; I just want `loco` to manage start/stop/switch." The four-script + build-schema contract turns that into 30 minutes of scaffolding.
+- **The CLI doesn't help with system-aware defaults.** `loco specs` already collects VRAM and GPU info, but no command uses it. Users guess `ctx` and `n_gpu_layers` by trial-and-error.
 - **The runtime manifest co-locates two concerns.** Today's `runtimes/<id>/manifest.yaml` mixes runtime identity / build / dependencies (install-time concerns) with the serve-time parameter schema (config-facing contract). Both an interactive wizard and an eventual webui want the second concern in its own file, with the same shape regardless of `kind`.
 - **Sequential one-shot commands give no end-to-end on-ramp.** A first-time user runs six independent commands with nothing chaining them. There's no single entrypoint that walks them through "settings → runtime → model → config → serve" while still skipping any step they've already done.
 
 ## 3. Goals
 
-- One interactive command per remaining manual step: `llm runtime setup`, `llm config setup`. Existing one-shot commands (`llm runtime install`, etc.) are unchanged.
-- One non-interactive sibling for the new config flow: `llm config new --runtime X --model Y --param k=v …`, sharing the wizard's code path.
-- One advisor: `llm advisor`, in three forms (interactive, against a config id, with `--runtime`/`--model` flags), with `--json` for scripting.
-- Extend `llm setup` to optionally chain into the new wizards (Y/n at each step), threading ids forward. `--default` keeps today's non-interactive behavior.
+- One interactive command per remaining manual step: `loco runtime setup`, `loco config setup`. Existing one-shot commands (`loco runtime install`, etc.) are unchanged.
+- One non-interactive sibling for the new config flow: `loco config new --runtime X --model Y --param k=v …`, sharing the wizard's code path.
+- One advisor: `loco advisor`, in three forms (interactive, against a config id, with `--runtime`/`--model` flags), with `--json` for scripting.
+- Extend `loco setup` to optionally chain into the new wizards (Y/n at each step), threading ids forward. `--default` keeps today's non-interactive behavior.
 - Split `runtimes/<id>/manifest.yaml`'s `serve:` section into a standalone `runtimes/<id>/params.yaml`, the same shape for **both** official and custom runtimes. Add `tier:` and `description:` per param so the wizard can show a common-vs-advanced split with helpful labels.
 - Add `kind: official | custom` to runtime manifests. `kind: custom` runtimes skip `build.sh` + `verify.sh` entirely; the wizard auto-generates a default `healthcheck.sh`.
 - VRAM-aware recommendations for `llamacpp` only (in v1) — narrow, hard-coded, always labeled `(estimate)`.
@@ -30,13 +30,13 @@ This spec adds **schema-driven interactive wizards** for the two manual steps, p
 
 ## 4. Non-goals
 
-- **No model browse / search.** `llm model pull <hf-url>` stays a passthrough to the HF CLI; users discover models on huggingface.co. No curated catalog, no HF API search, no interactive disambiguation of bare repos.
-- **No interactive editing of existing configs.** `llm config edit <id>` is not added. Users either re-run `llm config setup` (overwriting) or hand-edit the YAML.
-- **No inference smoke test after `llm serve`.** Healthcheck still only proves the OpenAI endpoint is reachable, not that the model produces sensible output. Out of scope.
+- **No model browse / search.** `loco model pull <hf-url>` stays a passthrough to the HF CLI; users discover models on huggingface.co. No curated catalog, no HF API search, no interactive disambiguation of bare repos.
+- **No interactive editing of existing configs.** `loco config edit <id>` is not added. Users either re-run `loco config setup` (overwriting) or hand-edit the YAML.
+- **No inference smoke test after `loco serve`.** Healthcheck still only proves the OpenAI endpoint is reachable, not that the model produces sensible output. Out of scope.
 - **No recommendation hook framework for non-llamacpp runtimes.** `core/recommendations.py` contains exactly one hard-coded llamacpp branch in v1. The function signature leaves room for more later, but a generic hook system is deferred.
 - **No typed serve params for custom runtimes via the wizard.** Custom runtimes always emit a `params.yaml` with `extra_args: string` only. Users who want richer typed params for a custom runtime hand-edit the file later — the wizard does not prompt for additional param definitions.
-- **No TUI for read-only commands.** `llm doctor`, `llm specs`, `llm runtime info`, `llm config show`, `llm list` stay as plain output.
-- **No TUI for the existing `llm runtime install` build prompts.** Stays as today's Typer prompts. Could be questionary'd later for symmetry but is not in this scope.
+- **No TUI for read-only commands.** `loco doctor`, `loco specs`, `loco runtime info`, `loco config show`, `loco list` stay as plain output.
+- **No TUI for the existing `loco runtime install` build prompts.** Stays as today's Typer prompts. Could be questionary'd later for symmetry but is not in this scope.
 - **No `--dry-run` flag on wizards.** Useful but deferred; trivial to add later.
 - **No alias / nickname system for long config ids.**
 - **No webui.** This spec is the CLI half of a two-spec arc; the webui is the next milestone and consumes the schemas + advisor JSON that this spec produces.
@@ -113,10 +113,10 @@ extra_args:
 | Field | Required | Default | Purpose |
 |---|---|---|---|
 | `type` | yes | — | `string`, `int`, `float`, `bool`, `enum`, `path` |
-| `required` | no | `false` | Hard error in `llm config validate` if config omits it |
+| `required` | no | `false` | Hard error in `loco config validate` if config omits it |
 | `default` | no | — | Pre-fills wizard; used at serve-time env-build for unset keys |
 | `env` | no | `LLM_<RUNTIME_UPPER>_<KEY_UPPER>` | Env var injected when spawning `serve.sh` |
-| `tier` | no | `common` | `common` or `advanced`; controls visibility in `llm config setup` |
+| `tier` | no | `common` | `common` or `advanced`; controls visibility in `loco config setup` |
 | `description` | no | `""` | One-line text shown next to the wizard prompt and (later) UI tooltip |
 | `values` | yes for `enum` | — | List of allowed enum values |
 
@@ -131,13 +131,13 @@ Top-level field on `manifest.yaml`. Defaults to `official` for backward compatib
 **`kind: custom` semantics:**
 
 - `build:` section is **forbidden** (validation error if present).
-- `requires:` is optional. Wizard offers to add user-supplied checks (e.g. `vllm --version`); empty list is fine.
+- `requires:` is optional. Wizard offers to add user-supplied checks (e.g. `vloco --version`); empty list is fine.
 - `params.yaml` contains only `extra_args` by default (wizard-generated). User may hand-edit later to add more typed params.
 - No `build.sh` or `verify.sh` files exist on disk.
 - A `healthcheck.sh` file is **auto-generated** by the wizard with a default OpenAI-endpoint probe.
 - A `serve.sh` file is wizard-generated from either a template (the user supplies a single bash invocation line, we wrap in boilerplate) or an `$EDITOR` session. `$EDITOR` semantics: we write the boilerplate'd template to a temp file, invoke `$EDITOR <tmpfile>` (or `nano` if unset), wait for editor exit; on exit-0 the file contents become `serve.sh`, on any other exit the wizard aborts with no files written.
 - `.installed` marker is written by the wizard immediately at end (no build to gate on). Shape preserved across kinds; `build_sh_sha256: null`, `verify_passed: null`, `schema_hash: <sha256 of params.yaml bytes>`.
-- `llm runtime install <id>` and `llm runtime rebuild <id>` refuse to act on `kind: custom` runtimes (boundary errors in §5.7).
+- `loco runtime install <id>` and `loco runtime rebuild <id>` refuse to act on `kind: custom` runtimes (boundary errors in §5.7).
 
 **Folder location.** Custom runtimes live under `runtimes/<id>/` in the repo, the same as official ones. `kind` is the distinguisher, not folder layout. They get committed to git so the user's setup is reproducible across machines.
 
@@ -185,7 +185,7 @@ v1 contains exactly one hard-coded `llamacpp` branch. The function returns `None
 
 - Runtime is `llamacpp`.
 - A model is set on the config-in-progress with a known `artifact.total_size_bytes`.
-- `llm specs` detects ≥1 GPU with `vram_gb > 0`.
+- `loco specs` detects ≥1 GPU with `vram_gb > 0`.
 
 **Suggested `ctx`:**
 
@@ -232,20 +232,20 @@ The `text` wrapper is already a thin shim over `rich.prompt.Prompt.ask` — same
 
 All wrappers accept a `default` and an optional `validate` callable, and surface the user's answer as a plain Python value. Tests substitute a fake answers iterator at the module level.
 
-### 5.6 `llm setup` chain orchestration
+### 5.6 `loco setup` chain orchestration
 
-New module `core/chain.py`. Invoked by `llm setup` (non-`--default` path) after the existing settings block is written. Steps, in order:
+New module `core/chain.py`. Invoked by `loco setup` (non-`--default` path) after the existing settings block is written. Steps, in order:
 
-1. **Install a runtime now?** Y/n. If Y → invoke `llm runtime setup`; capture returned `runtime_id`.
-2. **Pull a model now?** Single prompt: *"Hugging Face URL (or empty / `n` to skip):"*. If user supplies a URL, invoke `llm model pull <url>` and capture returned `model_id`. Empty input or `n` skips this step. (Collapsed into one prompt rather than Y/n-then-URL to save a keystroke.)
-3. **Create a config now?** Y/n. If Y → invoke `llm config setup` with `--runtime <runtime_id>` and `--model <model_id>` flags pre-filled from prior steps (omitted if the prior step was skipped); capture returned `config_id`.
-4. **Start serving this config?** Y/n. If Y → invoke `llm serve <config_id>` in background mode.
+1. **Install a runtime now?** Y/n. If Y → invoke `loco runtime setup`; capture returned `runtime_id`.
+2. **Pull a model now?** Single prompt: *"Hugging Face URL (or empty / `n` to skip):"*. If user supplies a URL, invoke `loco model pull <url>` and capture returned `model_id`. Empty input or `n` skips this step. (Collapsed into one prompt rather than Y/n-then-URL to save a keystroke.)
+3. **Create a config now?** Y/n. If Y → invoke `loco config setup` with `--runtime <runtime_id>` and `--model <model_id>` flags pre-filled from prior steps (omitted if the prior step was skipped); capture returned `config_id`.
+4. **Start serving this config?** Y/n. If Y → invoke `loco serve <config_id>` in background mode.
 
 **Skip semantics:** "no" to any step skips just that step and continues to the next. The chain never aborts on a "no."
 
 **Failure semantics:** if an explicit-Y step fails (sub-command exits non-zero), the chain **aborts** with a non-zero exit. We don't silently swallow user-requested failures.
 
-**Threading:** ids returned by sub-commands flow forward as flag values. Any sub-command that produces an id exposes it as the last line of its non-`--json` output (already true for `llm runtime install` and `llm model pull`; new for `llm runtime setup` and `llm config setup`). Chain logic parses that line; sub-commands also return the id via their Typer command function for in-process composition.
+**Threading:** ids returned by sub-commands flow forward as flag values. Any sub-command that produces an id exposes it as the last line of its non-`--json` output (already true for `loco runtime install` and `loco model pull`; new for `loco runtime setup` and `loco config setup`). Chain logic parses that line; sub-commands also return the id via their Typer command function for in-process composition.
 
 ### 5.7 Command surface
 
@@ -253,40 +253,40 @@ New module `core/chain.py`. Invoked by `llm setup` (non-`--default` path) after 
 
 | Command | Role |
 |---|---|
-| `llm setup` *(extended)* | After writing settings, asks Y/n to chain into runtime setup → model pull → config setup → serve. `--default` keeps non-interactive behavior. |
-| `llm runtime setup` | Interactive wizard. Branches into **preset** (delegates to existing `llm runtime install <id>`) or **custom** (authors a no-build runtime from a bring-your-own `serve.sh`). |
-| `llm config setup` | Schema-driven wizard: pick runtime → pick model (compat-filtered via `accepts_formats`) → walk `serve.params` (common, then `[a]dvanced` reveal) → name. |
-| `llm config new --runtime X --model Y --preset N [--param k=v …] [--port N]` | Non-interactive sibling for scripting. Same code path as the wizard, no prompts. |
-| `llm advisor` | Three forms: interactive (pick runtime + model), positional (advise an existing config), and flag form (`--runtime X --model Y`). `--json` available for any form. |
+| `loco setup` *(extended)* | After writing settings, asks Y/n to chain into runtime setup → model pull → config setup → serve. `--default` keeps non-interactive behavior. |
+| `loco runtime setup` | Interactive wizard. Branches into **preset** (delegates to existing `loco runtime install <id>`) or **custom** (authors a no-build runtime from a bring-your-own `serve.sh`). |
+| `loco config setup` | Schema-driven wizard: pick runtime → pick model (compat-filtered via `accepts_formats`) → walk `serve.params` (common, then `[a]dvanced` reveal) → name. |
+| `loco config new --runtime X --model Y --preset N [--param k=v …] [--port N]` | Non-interactive sibling for scripting. Same code path as the wizard, no prompts. |
+| `loco advisor` | Three forms: interactive (pick runtime + model), positional (advise an existing config), and flag form (`--runtime X --model Y`). `--json` available for any form. |
 
 **Unchanged:**
 
 - All `.installed` semantics, `state/running.json`, `state/history.jsonl` formats, model registry, settings format.
-- `llm doctor`, `llm specs`, `llm runtime install|info|list|uninstall|rebuild`, `llm model pull|add|list|info|uninstall`, `llm serve|stop|switch|status|logs`, `llm config show|validate` (validate is extended in §5.10 but the command surface is unchanged).
+- `loco doctor`, `loco specs`, `loco runtime install|info|list|uninstall|rebuild`, `loco model pull|add|list|info|uninstall`, `loco serve|stop|switch|status|logs`, `loco config show|validate` (validate is extended in §5.10 but the command surface is unchanged).
 
 **Boundary errors:**
 
 | Scenario | Behavior |
 |---|---|
-| `llm runtime install <id>` where `manifest.kind == 'custom'` | Error: *"runtime `<id>` is custom; use `llm runtime setup` to re-author. Custom runtimes have no build step."* |
-| `llm runtime rebuild <id>` where `kind == 'custom'` | Error: *"rebuild applies to official runtimes only."* |
-| `llm runtime setup` where `runtimes/<id>/manifest.yaml` already exists on disk | Error: *"runtime `<id>` already exists. `llm runtime uninstall <id> --purge` first, or pick a different id."* (Detection is folder-presence, not `.installed`.) |
-| `llm config setup --runtime <id>` for a runtime id that doesn't exist | Error: *"no runtime named `<id>`"* (don't silently fall back to picker — the flag was an explicit assertion). |
-| `llm config setup --model <id>` for a model id that doesn't exist | Error: *"no model named `<id>` in registry."* |
-| `llm advisor <config-id>` for a config that doesn't exist | Standard "not found" error with did-you-mean suggestion. |
-| `llm advisor --json` (any form) | The `[c] create a config` bonus chain is suppressed — JSON mode is for scripting. |
-| `llm config setup` runtime picker, user picks an `[not installed]` entry | Allowed (matches the existing `llm config validate` warn-and-pass behavior for uninstalled runtimes). Wizard prints an inline yellow warning *"runtime `<id>` is not installed; `llm serve` will refuse until you run `llm runtime setup`"* and continues. The config is saved normally. |
-| `llm config setup` runtime picker when zero runtimes are discovered at all (no folders) | Hard error: *"no runtimes found in `runtimes/`. Try `llm runtime setup`."* |
-| `llm config setup` model picker when zero compatible models | Hard error: *"no models in registry match `accepts_formats: [...]`. Try `llm model pull <hf-url>`."* |
+| `loco runtime install <id>` where `manifest.kind == 'custom'` | Error: *"runtime `<id>` is custom; use `loco runtime setup` to re-author. Custom runtimes have no build step."* |
+| `loco runtime rebuild <id>` where `kind == 'custom'` | Error: *"rebuild applies to official runtimes only."* |
+| `loco runtime setup` where `runtimes/<id>/manifest.yaml` already exists on disk | Error: *"runtime `<id>` already exists. `loco runtime uninstall <id> --purge` first, or pick a different id."* (Detection is folder-presence, not `.installed`.) |
+| `loco config setup --runtime <id>` for a runtime id that doesn't exist | Error: *"no runtime named `<id>`"* (don't silently fall back to picker — the flag was an explicit assertion). |
+| `loco config setup --model <id>` for a model id that doesn't exist | Error: *"no model named `<id>` in registry."* |
+| `loco advisor <config-id>` for a config that doesn't exist | Standard "not found" error with did-you-mean suggestion. |
+| `loco advisor --json` (any form) | The `[c] create a config` bonus chain is suppressed — JSON mode is for scripting. |
+| `loco config setup` runtime picker, user picks an `[not installed]` entry | Allowed (matches the existing `loco config validate` warn-and-pass behavior for uninstalled runtimes). Wizard prints an inline yellow warning *"runtime `<id>` is not installed; `loco serve` will refuse until you run `loco runtime setup`"* and continues. The config is saved normally. |
+| `loco config setup` runtime picker when zero runtimes are discovered at all (no folders) | Hard error: *"no runtimes found in `runtimes/`. Try `loco runtime setup`."* |
+| `loco config setup` model picker when zero compatible models | Hard error: *"no models in registry match `accepts_formats: [...]`. Try `loco model pull <hf-url>`."* |
 
-### 5.8 `llm advisor`
+### 5.8 `loco advisor`
 
 Surface:
 
 ```text
-llm advisor                                # interactive: pick runtime → pick model → advise
-llm advisor <config-id>                    # advise against an existing config
-llm advisor --runtime X --model Y          # non-interactive composed advice
+loco advisor                                # interactive: pick runtime → pick model → advise
+loco advisor <config-id>                    # advise against an existing config
+loco advisor --runtime X --model Y          # non-interactive composed advice
 [any of the above]  [--json]               # JSON output for any form
 ```
 
@@ -296,7 +296,7 @@ llm advisor --runtime X --model Y          # non-interactive composed advice
 - Positional `<config-id>` combined with `--runtime`/`--model` → error.
 - `<config-id>` that doesn't resolve → standard "not found" error.
 
-**Interactive flow (`llm advisor` with no args):**
+**Interactive flow (`loco advisor` with no args):**
 
 1. Numbered runtime picker (lists all discovered runtimes; marks each `[installed]` or `[not installed]`; shows `description`).
 2. Numbered model picker (filtered by chosen runtime's `accepts_formats`; if `accepts_formats: []`, this step is skipped — no model needed).
@@ -317,7 +317,7 @@ GPU: NVIDIA RTX 4090 (24 GB)
 Notes:
   • Estimates based on llama.cpp's typical KV cost; actual VRAM use varies
     with quant and prompt length.
-  • Run  llm config setup  to scaffold a config using these values.
+  • Run  loco config setup  to scaffold a config using these values.
 ```
 
 **`--json` output:**
@@ -341,9 +341,9 @@ Notes:
 > 
 ```
 
-If `[c]`: drops into `llm config setup` with `--runtime`, `--model`, and the suggested param values pre-filled (the user still walks the wizard to confirm or edit). Suppressed in `--json` mode.
+If `[c]`: drops into `loco config setup` with `--runtime`, `--model`, and the suggested param values pre-filled (the user still walks the wizard to confirm or edit). Suppressed in `--json` mode.
 
-`llm config setup` calls into the same recommendations module, so values shown in the wizard and values from `llm advisor` always agree.
+`loco config setup` calls into the same recommendations module, so values shown in the wizard and values from `loco advisor` always agree.
 
 ### 5.9 Wizard rendering specifics
 
@@ -364,7 +364,7 @@ n_gpu_layers [-1]:
 
 Styling (Rich): key in **bold cyan**; em-dash + description in default color; `suggested NNNN` in **bold green**; reason in dim italics; `[default]:` is Rich's native prompt-default syntax.
 
-**Section dividers in `llm config setup`:**
+**Section dividers in `loco config setup`:**
 
 ```text
 ─── Runtime params (common) ──────────────────────────────
@@ -394,7 +394,7 @@ Styling (Rich): key in **bold cyan**; em-dash + description in default color; `s
 
 Arrow to any field → enter → re-prompts that single field with current value pre-filled → returns to review. Arrow to `[Save]` → writes files. Arrow to `[Abort]` → exits with no files written.
 
-### 5.10 `llm config validate` extensions
+### 5.10 `loco config validate` extensions
 
 All existing rules from `2026-05-17-runtime-manifest-and-installs.md` still apply. Additions:
 
@@ -413,8 +413,8 @@ All existing rules from `2026-05-17-runtime-manifest-and-installs.md` still appl
 
 - **Atomic file writes.** All emissions (`manifest.yaml`, `params.yaml`, `serve.sh`, `healthcheck.sh`, `configs/<id>.yaml`, `.installed`) use `tmp + os.replace`. No partial state on failure.
 - **In-memory staging.** Every wizard collects answers in memory; files are written only at final confirmation. Ctrl-C / `[Abort]` = nothing written.
-- **Doctor failure during custom-runtime wizard.** If `llm doctor --runtime <id>` fails *after* wizard completion, files + `.installed` are still written and a clear warning is printed. The existing `.installed` serve-gate keeps `llm serve` from running anyway if prereqs are truly missing at serve time — but the manifest is registered so the user can fix prereqs and proceed without re-running the wizard.
-- **Port-in-use during config setup.** Wizard suggests next free port; user confirms. If the user manually enters a taken port, validation accepts it (validation isn't a port-check); the existing port probe in `llm serve` fails fast at start time.
+- **Doctor failure during custom-runtime wizard.** If `loco doctor --runtime <id>` fails *after* wizard completion, files + `.installed` are still written and a clear warning is printed. The existing `.installed` serve-gate keeps `loco serve` from running anyway if prereqs are truly missing at serve time — but the manifest is registered so the user can fix prereqs and proceed without re-running the wizard.
+- **Port-in-use during config setup.** Wizard suggests next free port; user confirms. If the user manually enters a taken port, validation accepts it (validation isn't a port-check); the existing port probe in `loco serve` fails fast at start time.
 
 ### 5.12 History events
 
@@ -431,10 +431,10 @@ Existing event kinds (`runtime-install`, `runtime-uninstall`, `runtime-rebuild`,
 
 ## 6. CLI flows
 
-### 6.1 `llm setup` chain end-to-end
+### 6.1 `loco setup` chain end-to-end
 
 ```text
-$ llm setup
+$ loco setup
 ─── Settings ─────────────────────────────────────────────
 data_root [~/llm]: 
 [... existing settings prompts ...]
@@ -443,30 +443,30 @@ wrote ~/.config/llm/config.yaml
 ─── Install a runtime now? ───────────────────────────────
 Skip if you've already installed the runtime you want.
 > [Y/n] 
-[delegates to: llm runtime setup → captures <runtime-id>]
+[delegates to: loco runtime setup → captures <runtime-id>]
 
 ─── Pull a model now? ────────────────────────────────────
 Hugging Face URL (or 'n' to skip):
 > [enter to skip / paste url]
-[delegates to: llm model pull <url> → captures <model-id>]
+[delegates to: loco model pull <url> → captures <model-id>]
 
 ─── Create a config now? ─────────────────────────────────
 > [Y/n] 
-[delegates to: llm config setup --runtime <id> --model <id>]
+[delegates to: loco config setup --runtime <id> --model <id>]
 
 ─── Start serving this config? ───────────────────────────
 > [Y/n] 
-[delegates to: llm serve <config-id>]
+[delegates to: loco serve <config-id>]
 
 ─── Done ─────────────────────────────────────────────────
-Setup complete. [If serve happened:  Use  llm status  to see what's running.]
-                [Else:               Next:  llm serve <config-id>  when ready.]
+Setup complete. [If serve happened:  Use  loco status  to see what's running.]
+                [Else:               Next:  loco serve <config-id>  when ready.]
 ```
 
-### 6.2 `llm runtime setup` — custom branch
+### 6.2 `loco runtime setup` — custom branch
 
 ```text
-$ llm runtime setup
+$ loco runtime setup
 
 ─── Runtime setup ───────────────────────────────────────
   [1] Preset — install an official runtime (we build it)
@@ -488,15 +488,15 @@ Serve command — [t]emplate (we wrap in bash) / [e]ditor (full control)
 
 The CLI will inject: LLM_SERVE_HOST, LLM_SERVE_PORT, LLM_MODEL_PATH, LLM_EXTRA_ARGS
 Bare invocation line (we add the bash boilerplate):
-> vllm serve "$LLM_MODEL_PATH" --host "$LLM_SERVE_HOST" --port "$LLM_SERVE_PORT" $LLM_EXTRA_ARGS
+> vloco serve "$LLM_MODEL_PATH" --host "$LLM_SERVE_HOST" --port "$LLM_SERVE_PORT" $LLM_EXTRA_ARGS
 
 Add a 'requires:' check? (skip if not needed)
-> [enter to skip / type command, e.g.] vllm --version
+> [enter to skip / type command, e.g.] vloco --version
   version regex:    > ([\d.]+)
   minimum version:  > 0.8.0
   install hint:     > pip install vllm
 
-Run llm doctor --runtime vllm-custom to verify? [Y/n] > 
+Run loco doctor --runtime vllm-custom to verify? [Y/n] > 
 [runs doctor, prints pass/fail per check]
 
 wrote runtimes/vllm-custom/manifest.yaml
@@ -505,13 +505,13 @@ wrote runtimes/vllm-custom/healthcheck.sh   (executable, default OpenAI probe)
 wrote runtimes/vllm-custom/params.yaml      (extra_args only)
 wrote $LLM_RUNTIMES/vllm-custom/.installed
 
-Next: llm config setup --runtime vllm-custom
+Next: loco config setup --runtime vllm-custom
 ```
 
-### 6.3 `llm config setup` end-to-end
+### 6.3 `loco config setup` end-to-end
 
 ```text
-$ llm config setup
+$ loco config setup
 
 ─── Pick a runtime ─────────────────────────────────────
   [1] llamacpp        [installed]    Accepts: gguf
@@ -564,13 +564,13 @@ config id (auto): llamacpp__unsloth-qwen3.6-35b-a3b__default
 
 wrote configs/llamacpp__unsloth-qwen3.6-35b-a3b__default.yaml
 
-Next: llm serve llamacpp__unsloth-qwen3.6-35b-a3b__default
+Next: loco serve llamacpp__unsloth-qwen3.6-35b-a3b__default
 ```
 
-### 6.4 `llm config new` (non-interactive sibling)
+### 6.4 `loco config new` (non-interactive sibling)
 
 ```bash
-llm config new \
+loco config new \
   --runtime llamacpp \
   --model unsloth-qwen3.6-35b-a3b__ud-q4-k-xl \
   --preset default \
@@ -587,10 +587,10 @@ llm config new \
 - `--param k=v` repeatable. Missing required schema params → error listing them. Unknown params → error.
 - Overwrite-existing prompts (Y/n) unless `--force`.
 
-### 6.5 `llm advisor` worked example
+### 6.5 `loco advisor` worked example
 
 ```text
-$ llm advisor llamacpp__unsloth-qwen3.6-35b-a3b__default
+$ loco advisor llamacpp__unsloth-qwen3.6-35b-a3b__default
 
 Recommendations for llamacpp + unsloth-qwen3.6-35b-a3b__ud-q4-k-xl
 GPU: NVIDIA RTX 4090 (24 GB)
@@ -604,7 +604,7 @@ GPU: NVIDIA RTX 4090 (24 GB)
 Notes:
   • Estimates based on llama.cpp's typical KV cost; actual VRAM use varies
     with quant and prompt length.
-  • Run  llm config setup  to scaffold a config using these values.
+  • Run  loco config setup  to scaffold a config using these values.
 
 [c] create a config with these values   [enter] done
 > 
@@ -621,7 +621,7 @@ Notes:
 | `runtimes/stub-runtime/manifest.yaml` | Remove `serve: {}`; add `kind: official`. |
 | `runtimes/stub-runtime/params.yaml` | **New.** Empty (or omitted entirely — both equivalent). |
 
-Auto-generated by `llm runtime setup` custom branch (per custom runtime, not in this commit):
+Auto-generated by `loco runtime setup` custom branch (per custom runtime, not in this commit):
 
 - `runtimes/<id>/manifest.yaml` (kind: custom)
 - `runtimes/<id>/serve.sh` (executable)
@@ -639,13 +639,13 @@ Existing configs (`configs/*.yaml`) need no shape change.
 | `core/install_record.py` | Modified | Support `kind: custom` records (`build_sh_sha256: null`, `verify_passed: null`, `schema_hash = sha256 of params.yaml bytes`). |
 | `core/recommendations.py` | **New** | VRAM recommendation logic. Single `recommend(runtime_id, param_key, *, model, specs)` entry point with one llamacpp branch. |
 | `core/wizards.py` | **New** | Hybrid TUI primitives (questionary wrappers + plain fallback + tier walker + review screen). The only module importing `questionary`. |
-| `core/chain.py` | **New** | `llm setup` chain orchestration. |
+| `core/chain.py` | **New** | `loco setup` chain orchestration. |
 | `commands/setup.py` | Modified | Invoke `core.chain` after settings write unless `--default`. |
 | `commands/runtime_cmd.py` | Modified | Add `setup` subcommand (preset + custom branches). Refuse `install`/`rebuild` on `kind: custom`. |
 | `commands/config_cmd.py` | Modified | Add `setup` + `new` subcommands. Extend `validate` per §5.10. |
-| `commands/advisor.py` | **New** | `llm advisor` top-level command (3 forms + `--json`). |
+| `commands/advisor.py` | **New** | `loco advisor` top-level command (3 forms + `--json`). |
 | `commands/serve.py` | Unchanged | Existing `.installed` gate works uniformly across kinds. |
-| `main.py` | Modified | Mount new subcommands; mount `llm advisor` at top level. |
+| `main.py` | Modified | Mount new subcommands; mount `loco advisor` at top level. |
 
 ### 7.3 New dependencies (`requirements.txt`)
 
@@ -669,20 +669,20 @@ No other new runtime deps.
 
 All `questionary` calls mocked at the `core.wizards` layer with a fake answers iterator.
 
-- `llm config validate` — passes for new params.yaml shape; errors on missing required, unknown keys, wrong types.
-- `llm runtime setup` custom (template mode) — writes 4 files + `.installed`; manifest has `kind: custom`; `params.yaml` has only `extra_args`.
-- `llm runtime setup` preset — delegates to install; produces same artifacts as direct `llm runtime install <id>`.
-- `llm config setup` end-to-end — pre-fill from flags works; review-and-save writes a valid config that round-trips through `llm config validate`.
-- `llm config new --runtime X --model Y --param k=v` — output identical to wizard with same inputs (snapshot compare).
-- `llm advisor` (all three forms, text + JSON) — produces expected output.
-- `llm setup` chain (all-Y path) — runs through all four sub-steps; captures returned ids correctly.
-- `llm setup` chain with a sub-step failure — aborts with non-zero exit.
+- `loco config validate` — passes for new params.yaml shape; errors on missing required, unknown keys, wrong types.
+- `loco runtime setup` custom (template mode) — writes 4 files + `.installed`; manifest has `kind: custom`; `params.yaml` has only `extra_args`.
+- `loco runtime setup` preset — delegates to install; produces same artifacts as direct `loco runtime install <id>`.
+- `loco config setup` end-to-end — pre-fill from flags works; review-and-save writes a valid config that round-trips through `loco config validate`.
+- `loco config new --runtime X --model Y --param k=v` — output identical to wizard with same inputs (snapshot compare).
+- `loco advisor` (all three forms, text + JSON) — produces expected output.
+- `loco setup` chain (all-Y path) — runs through all four sub-steps; captures returned ids correctly.
+- `loco setup` chain with a sub-step failure — aborts with non-zero exit.
 
 ### 8.3 CLI surface
 
 - New commands register and appear in `--help`.
-- `llm runtime install <custom-id>` exits 1 with the §5.7 boundary message.
-- `llm runtime rebuild <custom-id>` exits 1.
+- `loco runtime install <custom-id>` exits 1 with the §5.7 boundary message.
+- `loco runtime rebuild <custom-id>` exits 1.
 
 ### 8.4 Mock vs real
 
@@ -694,10 +694,10 @@ All `questionary` calls mocked at the `core.wizards` layer with a fake answers i
 
 - **New** `docs/wizards.md` — overview of the 4 new commands, when to use wizard vs one-shot, sample transcripts of the TUI pickers.
 - **New** `docs/add-a-recommendation.md` — single-page guide for adding per-runtime recommendation branches in `core/recommendations.py`.
-- **Rewrite** `docs/add-a-runtime.md` — preset path = "nothing to author, just `llm runtime install <id>`"; custom path = "use `llm runtime setup`; here's the resulting `params.yaml` + `serve.sh` if you want to hand-edit later."
-- **Update** `docs/add-a-config.md` — recommend `llm config setup` as the primary flow; document `llm config new` for scripting; hand-authoring still supported.
+- **Rewrite** `docs/add-a-runtime.md` — preset path = "nothing to author, just `loco runtime install <id>`"; custom path = "use `loco runtime setup`; here's the resulting `params.yaml` + `serve.sh` if you want to hand-edit later."
+- **Update** `docs/add-a-config.md` — recommend `loco config setup` as the primary flow; document `loco config new` for scripting; hand-authoring still supported.
 - **Update** `docs/runtime-lifecycle.md` — note `kind: custom` skips `build.sh`/`verify.sh`; `.installed` is written by the wizard directly.
-- **Update** `README.md` — Getting Started leads with `llm setup` (chain) for first-timers; granular CLI table preserved.
+- **Update** `README.md` — Getting Started leads with `loco setup` (chain) for first-timers; granular CLI table preserved.
 - **Update** `docs/superpowers/specs/2026-05-17-runtime-manifest-and-installs.md` — add a note at the top: "`params.yaml` split + `kind: custom` are designed in `2026-05-18-wizards-and-advisor.md`."
 
 ## 10. Migration
@@ -708,30 +708,30 @@ In a single PR/commit:
 2. Add `kind: official` to `llamacpp` and `stub-runtime` manifests.
 3. Remove `serve: {}` from `stub-runtime/manifest.yaml`. (Create empty `params.yaml` or omit — equivalent.)
 4. Update `core/registry.py` to load both files; reject old shape with clear message.
-5. Existing `.installed` files: **no forced rewrite.** Their `schema_hash` becomes stale on next `llm runtime info`, which surfaces the existing drift warning (*"schema changed since install; rebuild to refresh"*) — correct behavior. Users may optionally run `llm runtime rebuild llamacpp --reset`; no functional impact if they don't.
+5. Existing `.installed` files: **no forced rewrite.** Their `schema_hash` becomes stale on next `loco runtime info`, which surfaces the existing drift warning (*"schema changed since install; rebuild to refresh"*) — correct behavior. Users may optionally run `loco runtime rebuild llamacpp --reset`; no functional impact if they don't.
 6. Existing `configs/*.yaml` — no edits required.
 7. Apply doc updates from §9.
 
-**User-side migration:** none required beyond an optional `llm runtime rebuild` to clear the schema-drift indicator.
+**User-side migration:** none required beyond an optional `loco runtime rebuild` to clear the schema-drift indicator.
 
 ## 11. Open questions (not blockers)
 
 1. **VRAM heuristic accuracy.** The 2 MB/token figure and 60-layer assumption are deliberately coarse for v1. If users report consistently bad estimates for a specific architecture family (e.g., MoE), tighten with a small per-architecture lookup table — but keep this out of v1 to avoid over-engineering.
 2. **Editor escape hatch in custom-runtime wizard.** The `[t]emplate / [e]ditor` branch covers both fast and full-control paths. Watch whether `[e]` is used in practice; if essentially never, drop it.
-3. **`llm runtime setup` for existing official IDs.** Currently errors with "use `llm runtime install`." Could instead detect kind and delegate. Not done in v1 to keep behavior predictable; revisit if it surprises users.
-4. **Should `llm advisor --json` accept `--save <path>`?** Minor convenience; deferred.
+3. **`loco runtime setup` for existing official IDs.** Currently errors with "use `loco runtime install`." Could instead detect kind and delegate. Not done in v1 to keep behavior predictable; revisit if it surprises users.
+4. **Should `loco advisor --json` accept `--save <path>`?** Minor convenience; deferred.
 
 ## 12. Out of scope / future work
 
 - **Model browse / search / curated catalog.** Deferred indefinitely; HF is the catalog.
-- **Inference smoke test after `llm serve`.** Worth doing later as a separate `llm test <config>` or post-readiness probe; not in 0.2.
+- **Inference smoke test after `loco serve`.** Worth doing later as a separate `loco test <config>` or post-readiness probe; not in 0.2.
 - **Recommendation hook framework for non-llamacpp runtimes.** Add per-runtime branches in `core/recommendations.py` as new runtimes get added.
-- **TUI for read-only commands.** Live status, recent history, etc. Could be a `llm tui` dashboard — but that's the webui's territory.
-- **TUI for the existing `llm runtime install` build prompts.** Symmetry-only; defer.
-- **`llm config edit <id>` interactive editing of existing configs.** Add when a user actually asks.
+- **TUI for read-only commands.** Live status, recent history, etc. Could be a `loco tui` dashboard — but that's the webui's territory.
+- **TUI for the existing `loco runtime install` build prompts.** Symmetry-only; defer.
+- **`loco config edit <id>` interactive editing of existing configs.** Add when a user actually asks.
 - **`--dry-run` flag on wizards.** Trivial to add later; defer until requested.
 - **Alias / nickname system for long config ids.**
-- **Webui.** The next milestone after this spec ships. The schemas, the JSON contract from `llm advisor`, and the recommendations module are deliberately webui-shaped.
+- **Webui.** The next milestone after this spec ships. The schemas, the JSON contract from `loco advisor`, and the recommendations module are deliberately webui-shaped.
 
 ## 13. Cross-references
 

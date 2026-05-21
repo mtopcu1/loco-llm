@@ -1,4 +1,4 @@
-"""`llm model` — list/info/pull/add/uninstall against $LLM_MODELS/registry.json."""
+"""`loco model` — list/info/pull/add/uninstall against $LLM_MODELS/registry.json."""
 from __future__ import annotations
 
 import hashlib
@@ -158,7 +158,7 @@ class DuplicateModelRegistrationError(PullModelError):
         self.model_id = model_id
         super().__init__(
             f"{model_id!r} already registered; use --force or "
-            f"`llm model uninstall {model_id}` first"
+            f"`loco model uninstall {model_id}` first"
         )
 
 
@@ -250,7 +250,7 @@ def pull_hf_url_model_id(
 
 
 def do_model_pull(url: str, **kwargs: Any) -> str:
-    """Programmatic HF URL pull (used by `llm setup` chain)."""
+    """Programmatic HF URL pull (used by `loco setup` chain)."""
     return pull_hf_url_model_id(url, **kwargs)
 
 

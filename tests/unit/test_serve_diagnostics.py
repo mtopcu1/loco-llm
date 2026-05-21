@@ -16,7 +16,7 @@ def test_diagnose_unknown_config(tmp_path, monkeypatch):
     msg = diagnose_serve_failure("missing-config-id", exit_code=1)
     assert "exit code 1" in msg or "exited with code 1" in msg
     assert "missing-config-id" in msg
-    assert "llm serve missing-config-id" in msg
+    assert "loco serve missing-config-id" in msg
 
 
 def test_diagnose_runtime_not_installed(tmp_path, monkeypatch):

@@ -84,7 +84,7 @@ def parse_schema(raw: dict[str, Any]) -> list[ParamSpec]:
         if "default" in entry:
             raise ValueError(
                 f"param {key!r}: `default` was removed from params.yaml; "
-                "use llm advisor for suggestions"
+                "use loco advisor for suggestions"
             )
         ptype = _coerce_type(entry.get("type"))
         values: tuple[str, ...] = ()

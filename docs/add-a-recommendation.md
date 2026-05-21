@@ -1,6 +1,6 @@
 # Add a per-runtime recommendation
 
-`llm advisor` and `llm config setup` read suggestions from [`src/llm_cli/core/recommendations.py`](../src/llm_cli/core/recommendations.py). **v1** implements one branch for **`llamacpp`** on **`ctx`** and **`n_gpu_layers`**.
+`loco advisor` and `loco config setup` read suggestions from [`src/llm_cli/core/recommendations.py`](../src/llm_cli/core/recommendations.py). **v1** implements one branch for **`llamacpp`** on **`ctx`** and **`n_gpu_layers`**.
 
 Extend `recommend(...)` with a new runtime id branch. Return **`None`** when prerequisites are missing (no GPU signal, unknown weights size, unsupported param key); callers fall back to schema defaults quietly.
 

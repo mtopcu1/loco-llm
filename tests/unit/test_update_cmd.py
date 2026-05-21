@@ -1,4 +1,4 @@
-"""Tests for git-based llm update."""
+"""Tests for git-based loco update."""
 from __future__ import annotations
 
 import subprocess

@@ -1,4 +1,4 @@
-"""`llm serve` and `llm switch` — start a service in fg/bg/systemd."""
+"""`loco serve` and `loco switch` — start a service in fg/bg/systemd."""
 from __future__ import annotations
 
 import os
@@ -320,36 +320,36 @@ def _do_systemd(
         state_base,
         {
             "action": "systemd-write",
-            "unit": "llm.service",
+            "unit": "loco.service",
             "config_id": cfg.id,
             "changed": changed,
         },
     )
     if changed:
         daemon_reload()
-    restart_unit("llm.service")
+    restart_unit("loco.service")
 
     timeout = _readiness_timeout(cfg.data)
     probe = _make_healthcheck_probe(runtime_path, env)
 
     def combined_probe() -> bool:
-        return systemd_is_active("llm.service") and probe()
+        return systemd_is_active("loco.service") and probe()
 
     if not wait_for_ready(combined_probe, timeout_s=float(timeout), poll_s=1.0):
         try:
-            stop_unit("llm.service")
+            stop_unit("loco.service")
         except RuntimeError:
             pass
         _fail(
             f"{cfg.id} did not become ready in {timeout}s; "
-            "see `journalctl --user -u llm.service -n 50`"
+            "see `journalctl --user -u loco.service -n 50`"
         )
     rec = LifecycleRecord(
         mode="systemd",
         config_id=cfg.id,
         port=port,
         started_at=_utc_now_iso(),
-        unit="llm.service",
+        unit="loco.service",
     )
     write_running(state_base, rec)
     append_history(state_base, {"action": "start", "mode": "systemd", "config_id": cfg.id})
@@ -396,7 +396,7 @@ def _serve_dispatch_impl(
     if not is_installed(settings.runtimes_dir, runtime_id):
         _fail(
             f"runtime {runtime_id!r} is not installed",
-            hint=f"hint:  llm runtime install {runtime_id}",
+            hint=f"hint:  loco runtime install {runtime_id}",
         )
     mf = get_runtime_manifest_merged(runtime_id)
     if mf is None:
@@ -411,7 +411,7 @@ def _serve_dispatch_impl(
         and existing is not None
         and existing.mode == "systemd"
         and existing.config_id == config_id
-        and systemd_is_active("llm.service")
+        and systemd_is_active("loco.service")
     ):
         console.print(f"[green]already serving[/green] {config_id} via systemd")
         return
@@ -419,12 +419,12 @@ def _serve_dispatch_impl(
     if existing and existing.config_id == config_id and not foreground_from_supervisor:
         _fail(
             f"{config_id} already running in {existing.mode}; "
-            "use `llm switch` to change config or `llm stop` first"
+            "use `loco switch` to change config or `loco stop` first"
         )
     if existing and not foreground_from_supervisor:
         _fail(
             f"{existing.config_id} already running in {existing.mode}; "
-            "stop it first or use `llm switch`"
+            "stop it first or use `loco switch`"
         )
 
     if foreground:
@@ -447,7 +447,7 @@ def serve(
         False, "--foreground", help="Run attached to this terminal."
     ),
     systemd: bool = typer.Option(
-        False, "--systemd", help="Bind llm.service to this config."
+        False, "--systemd", help="Bind loco.service to this config."
     ),
     foreground_from_supervisor: bool = typer.Option(
         False, "--foreground-from-supervisor", hidden=True
@@ -496,11 +496,11 @@ def _switch_impl_body(
     reconcile(state_base)
     rec = read_running(state_base)
     if rec is None:
-        _fail(f"nothing running; use `llm serve {config_id}` instead")
+        _fail(f"nothing running; use `loco serve {config_id}` instead")
     if rec.mode == "foreground":
         _fail(
             "foreground sessions can't be switched; "
-            "Ctrl-C in the original terminal and rerun `llm serve <new>`"
+            "Ctrl-C in the original terminal and rerun `loco serve <new>`"
         )
 
     new_cfg = _resolve_cfg(config_id)
@@ -508,7 +508,7 @@ def _switch_impl_body(
     if not is_installed(settings.runtimes_dir, runtime_id):
         _fail(
             f"runtime {runtime_id!r} is not installed",
-            hint=f"hint:  llm runtime install {runtime_id}",
+            hint=f"hint:  loco runtime install {runtime_id}",
         )
     mf = get_runtime_manifest_merged(runtime_id)
     if mf is None:

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Toy TCP listener for smoke tests and `llm serve` integration against stub-runtime.
+# Toy TCP listener for smoke tests and `loco serve` integration against stub-runtime.
 # Responds with a line of "hello" to each connection. Honors SIGINT/SIGTERM.
 set -euo pipefail
 exec python3 - <<'PY'

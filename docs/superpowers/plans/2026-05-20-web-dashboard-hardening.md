@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Land the full security model (`--insecure` + `--i-understand` + `--allowed-host` UX, persistent in-app red banner, `DASHBOARD-SECURITY.md`, doctor exposure check), the update notifier (`llm update --check` badge in the header with one-click update), performance budget enforcement in CI (bundle size, type checks, optional smoke), and the last round of error-UX polish (acting on `fix_hint`, friendlier per-route error messages, full keyboard shortcuts). After this plan merges, the dashboard reaches "v1 complete" per the spec.
+**Goal:** Land the full security model (`--insecure` + `--i-understand` + `--allowed-host` UX, persistent in-app red banner, `DASHBOARD-SECURITY.md`, doctor exposure check), the update notifier (`loco update --check` badge in the header with one-click update), performance budget enforcement in CI (bundle size, type checks, optional smoke), and the last round of error-UX polish (acting on `fix_hint`, friendlier per-route error messages, full keyboard shortcuts). After this plan merges, the dashboard reaches "v1 complete" per the spec.
 
 **Architecture:** No new core infrastructure. This plan adds CLI flags, middleware behavior (custom `--allowed-host` propagation), a couple of small React components (`SecurityBanner` is fully implemented; `UpdateBadge` is new), and one new doc. Most of the work is finishing what previous plans intentionally deferred so they could ship working slices.
 
@@ -20,11 +20,11 @@
 
 ## Background — what Plans 1–4 landed (and what they intentionally deferred to here)
 
-- Plan 1: Host header allow-list, CORS allow-list, CSP, security headers, request-id. `llm dashboard serve --host` validated to `127.0.0.1` / `localhost` / `::1` only — non-localhost is refused with a stub message "non-localhost binding requires --insecure (planned)". `SecurityBanner.tsx` exists but always renders `null`.
+- Plan 1: Host header allow-list, CORS allow-list, CSP, security headers, request-id. `loco dashboard serve --host` validated to `127.0.0.1` / `localhost` / `::1` only — non-localhost is refused with a stub message "non-localhost binding requires --insecure (planned)". `SecurityBanner.tsx` exists but always renders `null`.
 - Plan 2: `ErrorCode` extended; `fix_hint` is captured in `errorToToast.ts` but no action is taken on it.
 - Plan 3: param grid + wizard — no security touch.
 - Plan 4: live metrics — no security touch.
-- All four: `llm update` auto-rebuilds dashboard on version drift, but no in-app notifier exists. Performance budgets are documented in the spec but no CI gate enforces them.
+- All four: `loco update` auto-rebuilds dashboard on version drift, but no in-app notifier exists. Performance budgets are documented in the spec but no CI gate enforces them.
 
 This plan **adds**:
 - Full `--insecure` UX (refusal without `--i-understand`, mandatory `--allowed-host`, persistent banner driven by response header).
@@ -65,7 +65,7 @@ This plan **adds**:
 - `src/llm_cli/core/doctor.py` — add the "last startup used --insecure" check to the `dashboard` scope (parses tail of `server.log`)
 - `src/llm_cli/webapi/app.py` — add `X-LocalLLM-Insecure: true` header on every response when bound non-localhost; serve `/docs/dashboard-security` as rendered markdown
 - `src/llm_cli/webapi/middleware.py` — when allowed_hosts include non-localhost entries, set the `X-LocalLLM-Insecure` flag on the app (read by a small response-header middleware)
-- `src/llm_cli/commands/update_cmd.py` — `llm update --check --json` (machine-readable; existing `--check` stays human-readable)
+- `src/llm_cli/commands/update_cmd.py` — `loco update --check --json` (machine-readable; existing `--check` stays human-readable)
 
 **Modify (React):**
 - `dashboard/src/components/SecurityBanner.tsx` — full implementation (replaces the Plan 1 `null` stub)
@@ -117,7 +117,7 @@ and how to safely expose the dashboard if you actually need to.
 
 **Not defended against:**
 - Other processes on the same machine. Any local process can already
-  shell out to `llm` directly; a localhost-only dashboard adds no new
+  shell out to `loco` directly; a localhost-only dashboard adds no new
   attack surface against that threat model.
 - Attackers with file system access. The dashboard reads and writes the
   same files (`configs/*.yaml`, `state/*`, `~/.config/llm/config.yaml`)
@@ -169,7 +169,7 @@ If you actually need remote access, prefer:
 
   ```bash
   # On `host`:
-  llm dashboard serve --insecure --i-understand \
+  loco dashboard serve --insecure --i-understand \
     --host 100.x.y.z \
     --allowed-host 100.x.y.z:7878
   ```
@@ -193,8 +193,8 @@ the source of truth for which hosts are legitimate.
 
 ```bash
 # 1. Verify the dashboard isn't bound non-localhost right now.
-llm dashboard status
-llm doctor dashboard
+loco dashboard status
+loco doctor dashboard
 
 # 2. Verify no systemd unit or shell rc file bakes in --insecure.
 grep -r 'dashboard.*insecure' ~/.bashrc ~/.zshrc ~/.config/systemd 2>/dev/null
@@ -215,7 +215,7 @@ git commit -m "docs(dashboard): security threat model, --insecure risks, safer a
 
 ---
 
-## Task 2: `llm dashboard serve --insecure --i-understand --allowed-host`
+## Task 2: `loco dashboard serve --insecure --i-understand --allowed-host`
 
 **Files:**
 - Modify: `src/llm_cli/commands/dashboard_cmd.py`
@@ -225,7 +225,7 @@ git commit -m "docs(dashboard): security threat model, --insecure risks, safer a
 CLI surface:
 
 ```text
-llm dashboard serve --insecure --i-understand \
+loco dashboard serve --insecure --i-understand \
                     --allowed-host HOST:PORT [--allowed-host ...]
 ```
 
@@ -301,7 +301,7 @@ If you actually need remote access, prefer:
   • A reverse proxy with TLS and auth in front (out of scope for v1)
 
 If you understand and accept the risk, re-run with --i-understand:
-  llm dashboard serve --insecure --i-understand --allowed-host <host:port>
+  loco dashboard serve --insecure --i-understand --allowed-host <host:port>
 
 See: docs/DASHBOARD-SECURITY.md
 """
@@ -346,7 +346,7 @@ def serve(
     if verdict != "ok":
         typer.secho(
             f"Dashboard is not ready ({verdict}): {reason}. "
-            "Run `llm dashboard install`"
+            "Run `loco dashboard install`"
             + (" --reset" if verdict in ("version_mismatch", "hash_mismatch") else "")
             + ".",
             fg=typer.colors.RED, err=True,
@@ -598,7 +598,7 @@ git commit -m "feat(doctor): warn when recent dashboard startup used --insecure"
 
 ---
 
-## Task 7: `llm update --check --json` machine-readable output
+## Task 7: `loco update --check --json` machine-readable output
 
 **Files:**
 - Modify: `src/llm_cli/commands/update_cmd.py`
@@ -714,7 +714,7 @@ def trigger_update(restart_dashboard: bool = True):
 - [ ] **Step 2: Implement + commit.**
 
 ```bash
-git commit -m "feat(dashboard): UpdateBadge + UpdateDialog with one-click `llm update --restart`"
+git commit -m "feat(dashboard): UpdateBadge + UpdateDialog with one-click `loco update --restart`"
 ```
 
 ---
@@ -850,7 +850,7 @@ Commit: `docs(dashboard): final documentation pass — security, no more 'later 
 ## Task 12: End-to-end smoke + PR
 
 - [ ] **Step 1: Localhost smoke** — start dashboard normally, verify no banner, no "update available" badge when on latest.
-- [ ] **Step 2: Insecure smoke** — `llm dashboard serve --insecure` → refused. `--insecure --i-understand` → refused. `--insecure --i-understand --host 192.168.x.y --allowed-host 192.168.x.y:7878` → starts, banner red in browser, `llm doctor dashboard` warns.
+- [ ] **Step 2: Insecure smoke** — `loco dashboard serve --insecure` → refused. `--insecure --i-understand` → refused. `--insecure --i-understand --host 192.168.x.y --allowed-host 192.168.x.y:7878` → starts, banner red in browser, `loco doctor dashboard` warns.
 - [ ] **Step 3: Update notifier smoke** — fake a higher version in `core/versions.check_for_update()` → badge appears → click → dialog → "Update now" triggers a job (cancel before it actually runs git pull, this is a smoke test).
 - [ ] **Step 4: Bundle size** — `node dashboard/scripts/check-bundle-size.mjs` locally → assert under budget.
 - [ ] **Step 5: All tests green** — `uv run pytest -q && cd dashboard && npm run typecheck && npm run test && npm run build && scripts/regen-api-client.sh --check`.

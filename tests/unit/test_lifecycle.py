@@ -50,11 +50,11 @@ def test_lifecycle_record_systemd_roundtrip() -> None:
         config_id="cfg-a",
         port=8000,
         started_at="2026-05-17T16:00:00Z",
-        unit="llm.service",
+        unit="loco.service",
     )
     assert rec.pid is None
     assert rec.log_path is None
-    assert rec.unit == "llm.service"
+    assert rec.unit == "loco.service"
 
 
 def test_read_running_missing_returns_none(tmp_path: Path) -> None:
@@ -95,7 +95,7 @@ def test_clear_running_is_idempotent(tmp_path: Path) -> None:
         config_id="cfg-a",
         port=1,
         started_at="t",
-        unit="llm.service",
+        unit="loco.service",
     )
     write_running(tmp_path, rec)
     clear_running(tmp_path)
@@ -184,7 +184,7 @@ def test_reconcile_drops_systemd_when_inactive(tmp_path: Path) -> None:
         config_id="cfg-a",
         port=1,
         started_at="t",
-        unit="llm.service",
+        unit="loco.service",
     )
     write_running(tmp_path, rec)
     with patch("llm_cli.core.lifecycle._systemd_is_active", return_value=False):
@@ -198,7 +198,7 @@ def test_reconcile_keeps_systemd_when_active(tmp_path: Path) -> None:
         config_id="cfg-a",
         port=1,
         started_at="t",
-        unit="llm.service",
+        unit="loco.service",
     )
     write_running(tmp_path, rec)
     with patch("llm_cli.core.lifecycle._systemd_is_active", return_value=True):

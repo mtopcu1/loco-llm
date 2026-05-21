@@ -43,7 +43,7 @@ loco dashboard uninstall --purge  # also delete dist/ and node_modules/
 ## Health checks
 
 ```bash
-llm doctor dashboard
+loco doctor dashboard
 ```
 
 Checks Node/npm availability, dashboard install state, dist integrity, server
@@ -51,16 +51,16 @@ PID liveness, and whether the last startup used `--insecure`.
 
 ## Update
 
-When you run `llm update` and the dashboard is installed, it will be rebuilt
+When you run `loco update` and the dashboard is installed, it will be rebuilt
 automatically (best-effort; skipped if node/npm are unavailable). The dashboard
 header also shows an **Update available** badge when a newer CLI release exists;
-click it to run `llm update --restart` from the UI.
+click it to run `loco update --restart` from the UI.
 
 ## Security
 
 The dashboard has **no authentication** and defaults to **localhost-only**
 binding. That is intentional: any process on your machine can already invoke
-`llm` directly.
+`loco` directly.
 
 If you must expose the dashboard beyond loopback, you need all three flags:
 
@@ -71,7 +71,7 @@ loco dashboard serve --insecure --i-understand \
 ```
 
 The UI shows a persistent red banner when the server is started this way.
-`llm doctor dashboard` warns if the last `server.log` startup used
+`loco doctor dashboard` warns if the last `server.log` startup used
 `--insecure`.
 
 Read the full threat model, DNS rebinding defense, and safer alternatives
@@ -87,6 +87,6 @@ For the full design, see
 - SPA static files are served from `dashboard/dist/` via `mount_spa()` in
   `src/llm_cli/webapi/app.py`. If `dist/` is missing, `/` returns HTTP 503 with
   `DASHBOARD_NOT_BUILT` and a fix hint to run `loco dashboard install`.
-- `loco dashboard` commands require `repo_root` (from `llm setup` or
-  `llm settings edit repo_root`). Use the dev loop in `dashboard/README.md` when
+- `loco dashboard` commands require `repo_root` (from `loco setup` or
+  `loco settings edit repo_root`). Use the dev loop in `dashboard/README.md` when
   iterating on the UI without a full CLI install.

@@ -4,20 +4,20 @@
 
 **Goal:** Add release-please-driven versioning, CI, and PyPI / GitHub-Release publishing to LocalLLM, then smoke-test the pipeline by cutting `v0.2.1` (a no-behavior-change patch release).
 
-**Architecture:** Install `release-please` as a GitHub Action that maintains a long-lived release PR, driven by Conventional Commits on `main`. A second workflow runs on `release: published` and uploads a wheel + sdist to PyPI via OIDC trusted publishing, plus a `scaffold-<tag>.tar.gz` + `.sha256` sidecar to the GitHub Release for the future `llm update` command (Plan B) to consume. A standard pytest-based CI workflow runs on every PR.
+**Architecture:** Install `release-please` as a GitHub Action that maintains a long-lived release PR, driven by Conventional Commits on `main`. A second workflow runs on `release: published` and uploads a wheel + sdist to PyPI via OIDC trusted publishing, plus a `scaffold-<tag>.tar.gz` + `.sha256` sidecar to the GitHub Release for the future `loco update` command (Plan B) to consume. A standard pytest-based CI workflow runs on every PR.
 
 **Tech Stack:** Python 3.11+, Hatchling build backend, PyPI (Warehouse) OIDC, GitHub Actions (`release-please-action@v4`, `actions/setup-python@v5`, `pypa/gh-action-pypi-publish@release/v1`, `softprops/action-gh-release@v2`), Conventional Commits.
 
-**Related spec:** `docs/superpowers/specs/2026-05-19-update-distribution-and-versioning-design.md` — sections §10 (versioning automation) and §13 step 1 (release sequencing) are the relevant parts. Plan B (layered model + `llm update` + migration) is deferred until Plan A's smoke release succeeds.
+**Related spec:** `docs/superpowers/specs/2026-05-19-update-distribution-and-versioning-design.md` — sections §10 (versioning automation) and §13 step 1 (release sequencing) are the relevant parts. Plan B (layered model + `loco update` + migration) is deferred until Plan A's smoke release succeeds.
 
 ---
 
 ## Background — what exists today (for the engineer with zero context)
 
-- LocalLLM is a Python Typer CLI (`localllm-cli` package, `llm` binary) installed today via a clone-and-bash flow. Version is hand-edited in `pyproject.toml` and `src/llm_cli/__init__.py`, both currently `"0.2.0"`. No git tags. No CI. No PyPI presence.
+- LocalLLM is a Python Typer CLI (`localllm-cli` package, `loco` binary) installed today via a clone-and-bash flow. Version is hand-edited in `pyproject.toml` and `src/llm_cli/__init__.py`, both currently `"0.2.0"`. No git tags. No CI. No PyPI presence.
 - Repo: `github.com/mtopcu1/local-llm-scaffold`, default branch `main`. PowerShell on the maintainer's Windows host; WSL2 for runtime testing. CI will run on `ubuntu-latest` (Linux), which is fine — the unit tests are Linux/Windows-portable, and the WSL/PTY tests are guarded by the `tui` pytest marker and `sys_platform != 'win32'` (they skip on `ubuntu-latest` cleanly).
 - Build backend is Hatchling (declared in `pyproject.toml`). `python -m build` should produce both `localllm_cli-X.Y.Z-py3-none-any.whl` and `localllm_cli-X.Y.Z.tar.gz` without extra config.
-- This plan adds **no** CLI behavior. Everything here is project tooling. Plan B adds the actual `llm update` command.
+- This plan adds **no** CLI behavior. Everything here is project tooling. Plan B adds the actual `loco update` command.
 
 ## File map
 
@@ -684,7 +684,7 @@ These cannot be automated. Allocate ~15 minutes.
   ```
 
   Notes:
-  - We deliberately do **not** invoke `llm doctor` or `llm specs --check` in CI — they assume runtime hardware that `ubuntu-latest` doesn't have. Plan B will revisit if we want a docs-regen check (`llm doctor render-requirements && git diff --exit-code`).
+  - We deliberately do **not** invoke `loco doctor` or `loco specs --check` in CI — they assume runtime hardware that `ubuntu-latest` doesn't have. Plan B will revisit if we want a docs-regen check (`loco doctor render-requirements && git diff --exit-code`).
   - The `tui` pytest marker is automatically skipped on Linux (the `pexpect>=4.9; sys_platform != 'win32'` extra is *installed*, but most `tui` tests `pytest.skip` themselves outside WSL — verify this assumption in Step 4).
 
 - [ ] **Step 4: Verify locally that the test commands actually work.**
@@ -969,7 +969,7 @@ These cannot be automated. Allocate ~15 minutes.
 
   ## Dev workflow
 
-  _(Coming in Plan B — the layered asset model + `llm update` lands first.)_
+  _(Coming in Plan B — the layered asset model + `loco update` lands first.)_
   ````
 
 - [ ] **Step 2: Verify the file renders cleanly.**
@@ -1057,7 +1057,7 @@ These cannot be automated. Allocate ~15 minutes.
   - PyPI-friendly pyproject metadata + LICENSE
   - CONTRIBUTING.md with Conventional Commits guide
 
-  Plan B (layered model + llm update + migration) follows after this ships and v0.2.1 smoke-releases successfully."
+  Plan B (layered model + loco update + migration) follows after this ships and v0.2.1 smoke-releases successfully."
   ```
 
 - [ ] **Step 3: Watch CI run on the PR.**
@@ -1193,10 +1193,10 @@ These cannot be automated. Allocate ~15 minutes.
   ```bash
   python3 -m venv /tmp/install-check
   /tmp/install-check/bin/pip install localllm-cli==0.2.1
-  /tmp/install-check/bin/llm --version
+  /tmp/install-check/bin/loco --version
   ```
 
-  Expected: `llm 0.2.1`.
+  Expected: `loco 0.2.1`.
 
   Clean up: `rm -rf /tmp/install-check`
 
@@ -1214,7 +1214,7 @@ These cannot be automated. Allocate ~15 minutes.
 
   Expected: `scaffold-v0.2.1.tar.gz: OK` from `sha256sum -c`, and the tar listing shows `runtimes/llamacpp/...`, `configs/...`, `benchmarks/...`, `requirements.yaml` paths.
 
-  This is the critical proof that Plan B's `llm update` command will have valid input to consume.
+  This is the critical proof that Plan B's `loco update` command will have valid input to consume.
 
 - [ ] **Step 11: Document the smoke release result.**
 
@@ -1257,4 +1257,4 @@ When all the following are true, Plan A is done:
 8. [ ] `pipx install localllm-cli==0.2.1` works in a clean env.
 9. [ ] `sha256sum -c scaffold-v0.2.1.tar.gz.sha256` passes against the downloaded tarball.
 
-When all nine are checked, **come back here and request Plan B** (layered asset model + `llm update` command + migration script).
+When all nine are checked, **come back here and request Plan B** (layered asset model + `loco update` command + migration script).

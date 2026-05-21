@@ -5,7 +5,7 @@ _Status: Approved by user — ready for implementation planning_
 
 ## 1. Purpose
 
-Replace sequential one-question-at-a-time param prompts with a **uniform, keyboard- and mouse-friendly grid editor** for every wizard that collects typed parameters. Primary pain point: `llm config setup` step 3 after runtime/model selection, with 15+ common and 90+ advanced serve params.
+Replace sequential one-question-at-a-time param prompts with a **uniform, keyboard- and mouse-friendly grid editor** for every wizard that collects typed parameters. Primary pain point: `loco config setup` step 3 after runtime/model selection, with 15+ common and 90+ advanced serve params.
 
 Runtime/model **selection** stays on existing questionary arrow-key lists. **All param editing** (serve, build, review edits) uses the same grid component and visual language.
 
@@ -28,7 +28,7 @@ Runtime/model **selection** stays on existing questionary arrow-key lists. **All
 
 ## 4. User flows
 
-### 4.1 `llm config setup`
+### 4.1 `loco config setup`
 
 1. **Pick runtime** — questionary `select` (unchanged).
 2. **Pick model** — questionary `select` (unchanged).
@@ -40,7 +40,7 @@ Bound params (`bind: model_path`): shown **readonly** in grid; not editable.
 
 Advisor hints: shown as subtitle line under description when present (`estimate: …`).
 
-### 4.2 `llm runtime install` / rebuild (interactive build params)
+### 4.2 `loco runtime install` / rebuild (interactive build params)
 
 Replace `walk_tier()` sequential `text()` loop with **`ParamGridForm`** over build `ParamSpec` list (same tiers, same advanced toggle).
 
@@ -205,7 +205,7 @@ When `use_plain_prompts()`:
 
 Tests use `force_plain(True)` and stdin mocks (existing pattern).
 
-## 11. Chaining (`llm setup`)
+## 11. Chaining (`loco setup`)
 
 Each grid session is a **modal** `Application.run()` that **must** restore terminal on exit (success, abort, or exception). Sequence:
 

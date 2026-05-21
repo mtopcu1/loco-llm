@@ -169,11 +169,11 @@ def _debug_hints(config_id: str) -> list[str]:
     log_path = _serve_log_path(config_id)
     return [
         f"serve log on disk: {log_path}",
-        f"terminal: llm switch {config_id}",
-        f"tail log: llm logs  (while any instance is running) or: Get-Content -Wait '{log_path}'",
-        "check runtime installed: llm runtime list",
-        "check model on disk: llm model list",
-        "full diagnostics: llm doctor",
+        f"terminal: loco switch {config_id}",
+        f"tail log: loco logs  (while any instance is running) or: Get-Content -Wait '{log_path}'",
+        "check runtime installed: loco runtime list",
+        "check model on disk: loco model list",
+        "full diagnostics: loco doctor",
     ]
 
 

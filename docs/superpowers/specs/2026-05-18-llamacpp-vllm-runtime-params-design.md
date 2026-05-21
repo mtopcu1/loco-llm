@@ -1,4 +1,4 @@
-# llamacpp & vllm runtime params — design spec
+# llamacpp & vloco runtime params — design spec
 
 _Date: 2026-05-18_  
 _Status: Approved by user — ready for implementation planning_
@@ -28,7 +28,7 @@ Builds on the 0.2 schema split (`manifest.yaml` build block + sibling `params.ya
 
 **Primary (v1):** Hand-curated catalogs in-repo. Each param gets human-written `description` and tier assignment.
 
-**Follow-up (recommended):** CI or unit test that diffs declared param keys against `llama-server --help` / `vllm serve --help` and warns on missing or removed flags (non-blocking initially).
+**Follow-up (recommended):** CI or unit test that diffs declared param keys against `llama-server --help` / `vloco serve --help` and warns on missing or removed flags (non-blocking initially).
 
 ## 5. Tier assignment rules
 
@@ -47,7 +47,7 @@ Builds on the 0.2 schema split (`manifest.yaml` build block + sibling `params.ya
 
 ### Problem
 
-`llm config setup` prompts for every serve param, including `gguf_path`, even after the user picks a model. Weights location is already defined by the registry entry.
+`loco config setup` prompts for every serve param, including `gguf_path`, even after the user picks a model. Weights location is already defined by the registry entry.
 
 ### Solution
 
@@ -58,7 +58,7 @@ When a config has **`model:`** set:
 1. **Skip** wizard prompt for bound params.
 2. **Write** `serve.params.<key>: "${model_path}"` in YAML.
 3. **Review screen** shows the binding (e.g. `gguf_path → ${model_path}`); user may still edit that row for a hardcoded override.
-4. **`llm config new --runtime X --model Y`** auto-injects bound params unless `--param key=…` explicitly overrides.
+4. **`loco config new --runtime X --model Y`** auto-injects bound params unless `--param key=…` explicitly overrides.
 
 At **serve** time, existing `expand_path_for_serve()` resolves `${model_path}` to:
 
@@ -69,7 +69,7 @@ At **serve** time, existing `expand_path_for_serve()` resolves `${model_path}` t
 | Runtime | Param key | Notes |
 |---|---|---|
 | llamacpp | `gguf_path` | Primary GGUF file via registry `artifact.primary` |
-| vllm | `model` | Maps to `vllm serve --model`; value `${model_path}` for local safetensors dirs |
+| vllm | `model` | Maps to `vloco serve --model`; value `${model_path}` for local safetensors dirs |
 
 When **no** `model:` (runtimes with empty `accepts_formats`), bound params behave like normal required path params (prompt if interactive).
 
@@ -143,7 +143,7 @@ Source: `llama-server --help` for the pinned `git_ref`.
 
 - Existing configs keep working (subset of keys + `${model_path}` or literals).
 - Replace `gguf_path: null` in tracked examples with `gguf_path: "${model_path}"` when `model:` is set.
-- `llm config validate` — no change to contract; unknown keys still error, missing required keys error unless bound+model satisfies path.
+- `loco config validate` — no change to contract; unknown keys still error, missing required keys error unless bound+model satisfies path.
 
 ### 7.4 Advisor
 
@@ -208,7 +208,7 @@ pip install "vllm==${LLM_BUILD_VLLM_VERSION}"  # or unpinned default
 
 ### 8.4 Serve params
 
-Source: `vllm serve --help`.
+Source: `vloco serve --help`.
 
 **Common (illustrative):**
 
@@ -253,11 +253,11 @@ Add `configs/vllm__<model-id>__default.yaml` once a suitable safetensors registr
 
 ## 11. Success criteria
 
-- [ ] `llm config setup` with llamacpp + registered model does **not** prompt for `gguf_path`; YAML contains `${model_path}`.
-- [ ] `llm config new --runtime llamacpp --model <id>` injects bound params by default.
+- [ ] `loco config setup` with llamacpp + registered model does **not** prompt for `gguf_path`; YAML contains `${model_path}`.
+- [ ] `loco config new --runtime llamacpp --model <id>` injects bound params by default.
 - [ ] llamacpp `params.yaml` covers full `llama-server` surface (common/advanced split documented in file header comment).
 - [ ] llamacpp build schema covers agreed cmake knobs; default install behavior unchanged vs today for `--yes`.
-- [ ] `llm runtime install vllm --yes` succeeds in WSL with pip; `llm serve` works with a safetensors config (manual smoke).
+- [ ] `loco runtime install vllm --yes` succeeds in WSL with pip; `loco serve` works with a safetensors config (manual smoke).
 - [ ] Full pytest green.
 
 ## 12. References

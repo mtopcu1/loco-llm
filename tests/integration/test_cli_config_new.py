@@ -1,4 +1,4 @@
-"""End-to-end tests for `llm config new` (non-interactive)."""
+"""End-to-end tests for `loco config new` (non-interactive)."""
 from __future__ import annotations
 
 import shutil

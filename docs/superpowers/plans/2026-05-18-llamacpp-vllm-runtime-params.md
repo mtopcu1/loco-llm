@@ -560,7 +560,7 @@ git commit -m "test(llamacpp): assert params.yaml env vars appear in serve scrip
 
 ```yaml
 # llamacpp serve params — exhaustive catalog for llama-server.
-# common: shown in llm config setup without "reveal advanced".
+# common: shown in loco config setup without "reveal advanced".
 # Regenerate/check: llama-server --help at manifest build.git_ref.
 ```
 
@@ -736,7 +736,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/_serve_flags.sh"
 : "${LLM_SERVE_PORT:?}"
 
 BIN="${LLM_RUNTIMES}/llamacpp/llama.cpp/build/bin/llama-server"
-[[ -x "${BIN}" ]] || { echo "error: run llm runtime install llamacpp" >&2; exit 1; }
+[[ -x "${BIN}" ]] || { echo "error: run loco runtime install llamacpp" >&2; exit 1; }
 
 ARGS=()
 ARGS+=("${BIN}" --model "${LLM_LLAMACPP_GGUF}")
@@ -941,7 +941,7 @@ extra_args:
   tier: advanced
 ```
 
-- [ ] **Step 2: Advanced tier** — run `"${VENV}/bin/vllm serve --help"` after Task 9 install; add remaining flags (`quantization`, `enable_lora`, `trust_remote_code`, etc.) as `tier: advanced`.
+- [ ] **Step 2: Advanced tier** — run `"${VENV}/bin/vloco serve --help"` after Task 9 install; add remaining flags (`quantization`, `enable_lora`, `trust_remote_code`, etc.) as `tier: advanced`.
 
 - [ ] **Step 3: serve.sh**
 
@@ -989,8 +989,8 @@ def test_runtime_install_vllm_mocks_pip(tmp_path, monkeypatch):
 
 
 def test_config_new_vllm_injects_model_binding(tmp_path, monkeypatch):
-    # seed safetensors model + vllm runtime
-    # llm config new --runtime vllm --model X
+    # seed safetensors model + vloco runtime
+    # loco config new --runtime vllm --model X
     # assert serve.params.model == "${model_path}"
 ```
 
@@ -1038,16 +1038,16 @@ Expected: all pass (existing skips OK).
 
 - [ ] **Step 2: Manual WSL smoke** (human)
 
-- [ ] `llm runtime install llamacpp --yes` with new defaults
-- [ ] `llm config setup --runtime llamacpp --model <id>` — no gguf_path prompt
-- [ ] `llm runtime install vllm --yes` — venv + pip succeed
-- [ ] `llm config validate` green
+- [ ] `loco runtime install llamacpp --yes` with new defaults
+- [ ] `loco config setup --runtime llamacpp --model <id>` — no gguf_path prompt
+- [ ] `loco runtime install vllm --yes` — venv + pip succeed
+- [ ] `loco config validate` green
 
 - [ ] **Step 3: Commit spec/plan if not yet committed**
 
 ```bash
 git add docs/superpowers/specs/2026-05-18-llamacpp-vllm-runtime-params-design.md docs/superpowers/plans/2026-05-18-llamacpp-vllm-runtime-params.md
-git commit -m "docs: llamacpp/vllm runtime params spec and plan"
+git commit -m "docs: llamacpp/vloco runtime params spec and plan"
 ```
 
 ---

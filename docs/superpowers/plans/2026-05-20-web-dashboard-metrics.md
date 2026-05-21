@@ -1024,7 +1024,7 @@ git commit -m "feat(webapi): /api/runtimes summarizes manifest metrics block as 
 
 - [ ] **Step 1: Manual smoke**
   - Start a runtime that has `metrics:` populated (e.g., a real vLLM install).
-  - `llm dashboard serve --no-open`, open browser → Instance page → start the config.
+  - `loco dashboard serve --no-open`, open browser → Instance page → start the config.
   - Within ~10s, see live cards + sparklines populate.
   - Stop the instance → cards show last values; "stream disconnected" message after 10s.
   - Visit the Config detail Overview tab → aggregated metrics visible.

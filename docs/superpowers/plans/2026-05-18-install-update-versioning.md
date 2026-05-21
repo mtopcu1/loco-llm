@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship public curl install, semver releases, and `llm update` for non-git users while keeping the existing git editable dev install.
+**Goal:** Ship public curl install, semver releases, and `loco update` for non-git users while keeping the existing git editable dev install.
 
 **Architecture:** Read-only release tarball (wheel + official `runtimes/`) lives under `~/.local/share/localllm/releases/{version}/` with a `current` symlink. User configs move to `~/llm/configs/`. Settings gain `install.kind` (`bundle` | `source`); path helpers (`scaffold_root()`, `configs_root()`) replace hard-coded `repo_root()` / `repo/configs`. Version from hatch-vcs; updates fetch `releases/stable.json`.
 
@@ -24,7 +24,7 @@
 | `src/llm_cli/core/semver.py` | Parse/compare semver for update checks |
 | `src/llm_cli/core/release_manifest.py` | Fetch/parse `stable.json` |
 | `src/llm_cli/core/bundle_install.py` | Download tarball, verify sha256, extract, symlink `current`, pip install wheel |
-| `src/llm_cli/commands/update.py` | `llm update` / `--check` / `--version` |
+| `src/llm_cli/commands/update.py` | `loco update` / `--check` / `--version` |
 | `scripts/build-release.sh` | Assemble release tarball locally / in CI |
 | `scripts/install.sh` | Public curl installer |
 | `scripts/install-dev.sh` | Contributor editable install (today's `install.sh`) |
@@ -337,7 +337,7 @@ def resolve(values: dict[str, Any]) -> Settings:
         repo_root_raw = values.get("repo_root")
         if not repo_root_raw:
             raise MissingSettingError(
-                "repo_root is not configured; run `llm setup` from inside the repo"
+                "repo_root is not configured; run `loco setup` from inside the repo"
             )
         repo_root = _expand(repo_root_raw)
         scaffold_root = repo_root
@@ -739,7 +739,7 @@ git commit -m "feat: add bundle download, verify, and extract helpers"
 
 ---
 
-## Task 8: `llm update` command
+## Task 8: `loco update` command
 
 **Files:**
 - Create: `src/llm_cli/commands/update_cmd.py`
@@ -798,7 +798,7 @@ app.command("update", help="Upgrade a bundle install to the latest release.")(up
 
 ```bash
 git add src/llm_cli/commands/update_cmd.py src/llm_cli/main.py tests/integration/test_cli_update.py
-git commit -m "feat: add llm update command for bundle installs"
+git commit -m "feat: add loco update command for bundle installs"
 ```
 
 ---
@@ -811,7 +811,7 @@ git commit -m "feat: add llm update command for bundle installs"
 
 - [ ] **Step 1: Write failing test**
 
-Bundle settings fixture → invoke `llm runtime setup`, choose custom path → expect exit 1 with message about dev install.
+Bundle settings fixture → invoke `loco runtime setup`, choose custom path → expect exit 1 with message about dev install.
 
 - [ ] **Step 2: Guard in `_runtime_setup_custom` or wizard entry**
 
@@ -1045,7 +1045,7 @@ Already in Task 3; verify `~/llm/configs` created on setup.
 
 - [ ] **Step 2: setup.py skips repo_root in bundle mode**
 
-When `install.kind` is bundle in existing settings, `llm setup --default` only ensures data dirs and prints paths — does not overwrite `install_root`.
+When `install.kind` is bundle in existing settings, `loco setup --default` only ensures data dirs and prints paths — does not overwrite `install_root`.
 
 When run from dev clone without settings, keep current behavior (writes `repo_root`, `install.kind: source` implicitly).
 
@@ -1065,7 +1065,7 @@ git commit -m "fix: setup respects bundle install settings"
 
 - [ ] **Step 1: Write docs/install.md**
 
-Sections: public install one-liner, `llm update`, directory layout, dev install (`scripts/install-dev.sh`), manual rollback, release tagging for maintainers.
+Sections: public install one-liner, `loco update`, directory layout, dev install (`scripts/install-dev.sh`), manual rollback, release tagging for maintainers.
 
 - [ ] **Step 2: Update README Getting started**
 
@@ -1079,7 +1079,7 @@ curl -fsSL https://raw.githubusercontent.com/mtopcu1/local-llm-scaffold/main/scr
 ./scripts/install-dev.sh
 ```
 
-Add `llm update` to command table.
+Add `loco update` to command table.
 
 - [ ] **Step 3: Update spec status to Approved**
 
@@ -1118,7 +1118,7 @@ python -m pytest -q
 
 1. `bash scripts/build-release.sh 0.2.0-test`
 2. Install from local tarball with env overrides
-3. `llm --version`, `llm list`, `llm update --check`
+3. `loco --version`, `loco list`, `loco update --check`
 4. Dev path: `./scripts/install-dev.sh` still works in git clone
 
 ---
@@ -1132,7 +1132,7 @@ python -m pytest -q
 | §7 Release CI | Tasks 10, 12 |
 | §8 stable.json | Tasks 6, 10, 12 |
 | §9 Install script | Task 11 |
-| §10 llm update | Tasks 7, 8 |
+| §10 loco update | Tasks 7, 8 |
 | §11 Code changes | Tasks 3–9, 13 |
 | §12 Error handling | Tasks 7, 8 (raise with clear messages; no symlink on failure) |
 | §13 Testing | All test steps |
@@ -1154,5 +1154,5 @@ bash scripts/build-release.sh 0.2.0-test
 
 # Public install (after release published)
 curl -fsSL https://raw.githubusercontent.com/mtopcu1/local-llm-scaffold/main/scripts/install.sh | bash
-llm update --check
+loco update --check
 ```

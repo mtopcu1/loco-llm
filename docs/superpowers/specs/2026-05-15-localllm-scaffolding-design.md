@@ -3,20 +3,20 @@
 _Date: 2026-05-15_
 _Status: Approved by user, ready for implementation planning_
 
-> **Updated 2026-05-17:** the `paths.yaml` / `llm init` / `.llm-env` mechanics
+> **Updated 2026-05-17:** the `paths.yaml` / `loco init` / `.llm-env` mechanics
 > in this document are superseded by the settings & setup redesign — see
 > [`2026-05-17-settings-and-setup-redesign.md`](2026-05-17-settings-and-setup-redesign.md).
 
-> **Lifecycle & serve (2026-05-17):** `llm serve`, `llm stop`, `llm switch`,
-> `llm status`, and `llm logs` are specified in
+> **Lifecycle & serve (2026-05-17):** `loco serve`, `loco stop`, `loco switch`,
+> `loco status`, and `loco logs` are specified in
 > [`2026-05-17-lifecycle-and-serve.md`](2026-05-17-lifecycle-and-serve.md).
 > They supersede the original **§7.2 / §7.3** orchestration diagrams here: there is
-> **no** `state/active.yaml`, **no** `llm default` pin, and **one** managed user unit
-> `llm.service` written by `llm serve --systemd`.
+> **no** `state/active.yaml`, **no** `loco default` pin, and **one** managed user unit
+> `loco.service` written by `loco serve --systemd`.
 
 > **Runtime manifests & installs (2026-05-17):** typed runtime `manifest.yaml`
-> schemas, `llm runtime` / `llm model`, `serve.params`, `.installed` gating for serve,
-> and scoped `llm doctor` are specified in
+> schemas, `loco runtime` / `loco model`, `serve.params`, `.installed` gating for serve,
+> and scoped `loco doctor` are specified in
 > [`2026-05-17-runtime-manifest-and-installs.md`](2026-05-17-runtime-manifest-and-installs.md).
 
 ## 1. Purpose
@@ -38,7 +38,7 @@ The repo is **a control plane**, not a data store. It contains text only — man
 - Not a multi-host system. Single workstation only. (Multi-host can be added later without changing the layout.)
 - Not a packaging or distribution system. Other people can read the repo, but it's tuned for one user.
 - Not a runtime — this repo does not implement vLLM, llama.cpp, etc. It orchestrates them.
-- Not a benchmark framework — benchmarks are thin wrappers around existing tools (`vllm bench`, `llama-bench`, `lm-eval`, etc.), not a homegrown workload spec.
+- Not a benchmark framework — benchmarks are thin wrappers around existing tools (`vloco bench`, `llama-bench`, `lm-eval`, etc.), not a homegrown workload spec.
 - Not native Windows. WSL2 is the single execution environment.
 
 ## 4. Execution environment
@@ -133,7 +133,7 @@ models:   ${data_root}/models
 cache:    ${data_root}/cache
 ```
 
-`llm init` reads this, expands `~`, and writes a resolved `.llm-env` that scripts source. Moving to a different drive = edit `paths.yaml` and re-init.
+`loco init` reads this, expands `~`, and writes a resolved `.llm-env` that scripts source. Moving to a different drive = edit `paths.yaml` and re-init.
 
 ### 5.2 Gitignore strategy
 
@@ -244,7 +244,7 @@ Benchmarks are **thin wrappers around preexisting tools**. No homegrown workload
 
 ```yaml
 id: vllm-bench-throughput
-description: Sustained throughput via `vllm bench serve`
+description: Sustained throughput via `vloco bench serve`
 needs_server: true                  # default true; false skips the serve step
 ```
 
@@ -254,7 +254,7 @@ needs_server: true                  # default true; false skips the serve step
 - `LLM_MODEL_ID` — the OpenAI model name to send in requests
 - `LLM_OUTPUT_DIR` — where to write metrics and raw artifacts
 
-The script shells out to whatever tool it wraps (`vllm bench`, `llama-bench`, `lm-eval`, `guidellm`, etc.), dumps native output into `$LLM_OUTPUT_DIR/raw/`, and writes a normalized `$LLM_OUTPUT_DIR/metrics.json` summary.
+The script shells out to whatever tool it wraps (`vloco bench`, `llama-bench`, `lm-eval`, `guidellm`, etc.), dumps native output into `$LLM_OUTPUT_DIR/raw/`, and writes a normalized `$LLM_OUTPUT_DIR/metrics.json` summary.
 
 Example for `llama-bench` (which doesn't need a server — sets `needs_server: false`):
 
@@ -290,7 +290,7 @@ Plus optional `version.sh` (no args, prints one line).
 
 ### 7.2 The orchestrator
 
-One shared orchestrator lives in `scripts/_orchestrator.py` and is invoked by the CLI for both benchmark runs and daily-driver lifecycle. Pseudocode for `llm bench`:
+One shared orchestrator lives in `scripts/_orchestrator.py` and is invoked by the CLI for both benchmark runs and daily-driver lifecycle. Pseudocode for `loco bench`:
 
 ```python
 def bench(benchmark_id, config_id):
@@ -322,14 +322,14 @@ def bench(benchmark_id, config_id):
     finalize_snapshot(output_dir, rc)
 ```
 
-`llm start <config>` and `llm switch <config>` reuse the same serve-spawn + wait-for-ready logic, but instead of running a benchmark they update `state/running.json` and return, leaving the server alive.
+`loco start <config>` and `loco switch <config>` reuse the same serve-spawn + wait-for-ready logic, but instead of running a benchmark they update `state/running.json` and return, leaving the server alive.
 
 ### 7.3 Daily driver via systemd (optional)
 
-`llm default <config-id>` writes `state/active.yaml`.
-`llm default --apply-systemd` additionally writes/updates a user unit at `~/.config/systemd/user/llm.service` that invokes the orchestrator's `llm start` against the active config. Combined with `loginctl enable-linger`, the daily driver starts when WSL boots and survives terminal logout.
+`loco default <config-id>` writes `state/active.yaml`.
+`loco default --apply-systemd` additionally writes/updates a user unit at `~/.config/systemd/user/loco.service` that invokes the orchestrator's `loco start` against the active config. Combined with `loginctl enable-linger`, the daily driver starts when WSL boots and survives terminal logout.
 
-systemd is **not** used for benchmarks — those are ephemeral and orchestrated directly by `llm bench`. systemd is only the auto-start mechanism for the pinned daily driver.
+systemd is **not** used for benchmarks — those are ephemeral and orchestrated directly by `loco bench`. systemd is only the auto-start mechanism for the pinned daily driver.
 
 ## 8. Per-run snapshot
 
@@ -406,7 +406,7 @@ A flat dict of normalized metrics plus a `_meta` block:
 
 ```json
 {
-  "_meta": { "schema_version": 1, "source_tool": "vllm bench serve" },
+  "_meta": { "schema_version": 1, "source_tool": "vloco bench serve" },
   "requests_per_sec": 18.3,
   "tokens_per_sec_in":  812.4,
   "tokens_per_sec_out": 1543.2,
@@ -431,12 +431,12 @@ YAML for things humans edit (comments, multi-line strings); JSON for things mach
 
 ## 10. `specs.md` — auto-generated
 
-`specs.md` is regenerated by `llm specs` from data collected by `scripts/_specs.py`. It has a marked auto block and a preserved notes region.
+`specs.md` is regenerated by `loco specs` from data collected by `scripts/_specs.py`. It has a marked auto block and a preserved notes region.
 
 ```markdown
 # System Specs
 
-<!-- AUTO-GENERATED: do not edit between markers. Run `llm specs` to regenerate. -->
+<!-- AUTO-GENERATED: do not edit between markers. Run `loco specs` to regenerate. -->
 <!-- llm:specs:start -->
 _Generated: 2026-05-15T18:30:00Z_
 
@@ -469,7 +469,7 @@ CUDA runtime: 12.6
 - Resizable BAR enabled in BIOS
 ```
 
-`llm specs` rewrites only the bytes between `<!-- llm:specs:start -->` and `<!-- llm:specs:end -->`. Everything else is preserved verbatim. If markers are missing, the command refuses to overwrite without `--force`.
+`loco specs` rewrites only the bytes between `<!-- llm:specs:start -->` and `<!-- llm:specs:end -->`. Everything else is preserved verbatim. If markers are missing, the command refuses to overwrite without `--force`.
 
 ### Detection sources
 
@@ -537,42 +537,42 @@ Scope rule: **only cross-cutting requirements** go here. Anything specific to a 
 
 ### 11.2 `requirements.md`
 
-Auto-rendered from `requirements.yaml` by `llm doctor render-requirements`. Always reflects the yaml. Committed.
+Auto-rendered from `requirements.yaml` by `loco doctor render-requirements`. Always reflects the yaml. Committed.
 
-## 12. CLI surface — `llm`
+## 12. CLI surface — `loco`
 
 Lives at `scripts/llm`, implemented in Python 3.11+ with Typer. No deep dependencies — pyyaml, httpx, rich, typer, plus stdlib.
 
 ```
-llm init                                 # read paths.yaml, create $LLM_DATA_ROOT layout
-llm list [runtimes|models|configs|benchmarks]   # default: everything
-llm status                               # what's running, daily driver, ports, uptime
-llm doctor                               # checks requirements.yaml + sanity (paths, ports)
-llm doctor render-requirements           # regenerate requirements.md from requirements.yaml
-llm specs                                # regenerate auto block in specs.md
-llm specs --check                        # diff fresh detection against specs.md, nonzero on drift
-llm specs --print                        # print detection only, don't touch the file
+loco init                                 # read paths.yaml, create $LLM_DATA_ROOT layout
+loco list [runtimes|models|configs|benchmarks]   # default: everything
+loco status                               # what's running, daily driver, ports, uptime
+loco doctor                               # checks requirements.yaml + sanity (paths, ports)
+loco doctor render-requirements           # regenerate requirements.md from requirements.yaml
+loco specs                                # regenerate auto block in specs.md
+loco specs --check                        # diff fresh detection against specs.md, nonzero on drift
+loco specs --print                        # print detection only, don't touch the file
 
 # Acquiring things
-llm build <runtime-id>                   # runs runtimes/<id>/build.sh
-llm pull  <model-id>                     # runs models/<id>/pull.sh
+loco build <runtime-id>                   # runs runtimes/<id>/build.sh
+loco pull  <model-id>                     # runs models/<id>/pull.sh
 
 # Daily-driver lifecycle
-llm start  <config-id>                   # stops current, starts new, waits for ready
-llm stop                                 # SIGTERM the running serve
-llm switch <config-id>                   # alias for stop + start
-llm default <config-id>                  # pin in state/active.yaml
-llm default --apply-systemd              # install/update systemd user unit for active
-llm logs [--follow]                      # tail the running serve's log
+loco start  <config-id>                   # stops current, starts new, waits for ready
+loco stop                                 # SIGTERM the running serve
+loco switch <config-id>                   # alias for stop + start
+loco default <config-id>                  # pin in state/active.yaml
+loco default --apply-systemd              # install/update systemd user unit for active
+loco logs [--follow]                      # tail the running serve's log
 
 # Benchmarking
-llm bench <benchmark-id> --config <config-id>
-llm bench <benchmark-id> --matrix 'vllm-cuda__*'     # against multiple configs by glob
-llm results <benchmark-id> [--config <config-id>] [--last N]    # tabular summary
+loco bench <benchmark-id> --config <config-id>
+loco bench <benchmark-id> --matrix 'vllm-cuda__*'     # against multiple configs by glob
+loco results <benchmark-id> [--config <config-id>] [--last N]    # tabular summary
 
 # Diagnostics
-llm config show <config-id>              # render resolved config (defaults applied)
-llm config validate                      # check all configs reference real runtimes+models
+loco config show <config-id>              # render resolved config (defaults applied)
+loco config validate                      # check all configs reference real runtimes+models
 ```
 
 ### 12.1 `--json` flag
@@ -613,7 +613,7 @@ Each HOWTO follows the template: **prerequisites → steps → verification → 
 
 ### 14.2 Requirements are part of the change
 
-When a script or workflow gains a new external dependency, `requirements.yaml` is updated in the same commit. `requirements.md` is regenerated by `llm doctor render-requirements` and committed alongside.
+When a script or workflow gains a new external dependency, `requirements.yaml` is updated in the same commit. `requirements.md` is regenerated by `loco doctor render-requirements` and committed alongside.
 
 ## 15. Out of scope / future work
 

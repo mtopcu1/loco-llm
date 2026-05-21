@@ -34,7 +34,7 @@ def diagnose_serve_failure(config_id: str, *, exit_code: int = 1) -> str:
         if runtime_id and not is_installed(settings.runtimes_dir, runtime_id):
             parts.append(
                 f"runtime {runtime_id!r} is not installed "
-                f"(run: llm runtime install {runtime_id})"
+                f"(run: loco runtime install {runtime_id})"
             )
         model_id = cfg.data.get("model")
         if isinstance(model_id, str):
@@ -53,7 +53,7 @@ def diagnose_serve_failure(config_id: str, *, exit_code: int = 1) -> str:
     rec = read_running(state_base)
     if rec is not None and rec.config_id != config_id:
         parts.append(
-            f"another config is running ({rec.config_id}); stop it or use llm switch"
+            f"another config is running ({rec.config_id}); stop it or use loco switch"
         )
 
     parts.append(f"serve log: {log_path}")
@@ -64,8 +64,8 @@ def diagnose_serve_failure(config_id: str, *, exit_code: int = 1) -> str:
     else:
         parts.append(
             "(no serve log yet — failure likely before serve.sh wrote output; "
-            "run `llm serve <config>` in a terminal)"
+            "run `loco serve <config>` in a terminal)"
         )
-    parts.append(f"terminal: llm serve {config_id}")
-    parts.append("diagnostics: llm doctor")
+    parts.append(f"terminal: loco serve {config_id}")
+    parts.append("diagnostics: loco doctor")
     return "\n".join(parts)

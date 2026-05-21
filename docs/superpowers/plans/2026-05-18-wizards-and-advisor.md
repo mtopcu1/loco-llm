@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship `llm runtime setup`, `llm config setup`, `llm config new`, `llm advisor`, and the `llm setup` Y/n chain on top of a refactored runtime schema (`params.yaml` split, `kind: official | custom`). Implements the spec at `docs/superpowers/specs/2026-05-18-wizards-and-advisor.md`.
+**Goal:** Ship `loco runtime setup`, `loco config setup`, `loco config new`, `loco advisor`, and the `loco setup` Y/n chain on top of a refactored runtime schema (`params.yaml` split, `kind: official | custom`). Implements the spec at `docs/superpowers/specs/2026-05-18-wizards-and-advisor.md`.
 
-**Architecture:** Bottom-up. First, the schema refactor (`params.yaml` extracted from `manifest.yaml`, `kind:` field added) lands with the in-repo migration of `llamacpp` and `stub-runtime`. Then two standalone modules: `core/recommendations.py` (one hard-coded llamacpp branch) and `core/wizards.py` (hybrid questionary + Rich primitives with non-TTY fallback). On top of these, four new commands land: `llm advisor` (uses recommendations), `llm config new` (non-interactive generator), `llm config setup` (wizard using wizards + recommendations), `llm runtime setup` (preset + custom branches). Finally, `core/chain.py` orchestrates `llm setup`'s Y/n chain by calling the new sub-commands as Python functions (every new command exposes a `do_<verb>(...) -> str | None` helper that the chain consumes).
+**Architecture:** Bottom-up. First, the schema refactor (`params.yaml` extracted from `manifest.yaml`, `kind:` field added) lands with the in-repo migration of `llamacpp` and `stub-runtime`. Then two standalone modules: `core/recommendations.py` (one hard-coded llamacpp branch) and `core/wizards.py` (hybrid questionary + Rich primitives with non-TTY fallback). On top of these, four new commands land: `loco advisor` (uses recommendations), `loco config new` (non-interactive generator), `loco config setup` (wizard using wizards + recommendations), `loco runtime setup` (preset + custom branches). Finally, `core/chain.py` orchestrates `loco setup`'s Y/n chain by calling the new sub-commands as Python functions (every new command exposes a `do_<verb>(...) -> str | None` helper that the chain consumes).
 
 **Tech Stack:** Python 3.11+, Typer (CLI), Rich (output), `questionary` (new, ~2.0 for arrow-key TUI), pytest, PyYAML, stdlib `subprocess`/`socket`/`hashlib`.
 
@@ -1498,9 +1498,9 @@ git commit -m "feat(recommendations): llamacpp ctx + n_gpu_layers VRAM heuristic
 
 ---
 
-## Phase 3 — Generators (`llm advisor`, `llm config new`)
+## Phase 3 — Generators (`loco advisor`, `loco config new`)
 
-### Task 10: `llm advisor` flag form (`--runtime --model`) + `--json`
+### Task 10: `loco advisor` flag form (`--runtime --model`) + `--json`
 
 **Files:**
 - Create: `src/llm_cli/commands/advisor.py`
@@ -1511,7 +1511,7 @@ git commit -m "feat(recommendations): llamacpp ctx + n_gpu_layers VRAM heuristic
 
 ```python
 # tests/integration/test_cli_advisor.py
-"""End-to-end tests for `llm advisor`."""
+"""End-to-end tests for `loco advisor`."""
 from __future__ import annotations
 
 import json
@@ -1626,12 +1626,12 @@ Expected: `No such command 'advisor'` or similar Typer failure.
 - [ ] **Step 3: Create `src/llm_cli/commands/advisor.py`**
 
 ```python
-"""`llm advisor` — surface VRAM-aware recommendations.
+"""`loco advisor` — surface VRAM-aware recommendations.
 
 Three invocation forms:
-    llm advisor                              (interactive — Task 11)
-    llm advisor <config-id>                  (positional — Task 11)
-    llm advisor --runtime X --model Y        (flag — this task)
+    loco advisor                              (interactive — Task 11)
+    loco advisor <config-id>                  (positional — Task 11)
+    loco advisor --runtime X --model Y        (flag — this task)
 
 `--json` available for all forms.
 """
@@ -1678,7 +1678,7 @@ def _render_text(
         "  • Estimates based on llama.cpp's typical KV cost; actual VRAM use "
         "varies\n"
         "    with quant and prompt length.\n"
-        "  • Run  llm config setup  to scaffold a config using these values.\n"
+        "  • Run  loco config setup  to scaffold a config using these values.\n"
     )
 
 
@@ -1780,7 +1780,7 @@ def advisor(
         raise typer.Exit(code=rc)
 ```
 
-- [ ] **Step 4: Wire `llm advisor` into `main.py`**
+- [ ] **Step 4: Wire `loco advisor` into `main.py`**
 
 Append to `src/llm_cli/main.py` near the other command registrations:
 
@@ -1811,7 +1811,7 @@ git commit -m "feat(advisor): flag form (--runtime --model) with --json output"
 
 ---
 
-### Task 11: `llm advisor` config-id form + interactive form
+### Task 11: `loco advisor` config-id form + interactive form
 
 **Files:**
 - Modify: `src/llm_cli/commands/advisor.py`
@@ -2012,7 +2012,7 @@ def _interactive_pick() -> tuple[str | None, str | None]:
     if not models:
         console.print(
             f"[red]error:[/red] no models in registry match accepts_formats "
-            f"{list(rt_manifest.accepts_formats)}. Try `llm model pull <hf-url>`."
+            f"{list(rt_manifest.accepts_formats)}. Try `loco model pull <hf-url>`."
         )
         return (None, None)
     model_id = wizards.select("Pick a model", [m.id for m in models])
@@ -2033,7 +2033,7 @@ git commit -m "feat(advisor): positional config-id form + interactive runtime/mo
 
 ---
 
-### Task 12: `llm config new` non-interactive generator
+### Task 12: `loco config new` non-interactive generator
 
 **Files:**
 - Modify: `src/llm_cli/commands/config_cmd.py`
@@ -2043,7 +2043,7 @@ git commit -m "feat(advisor): positional config-id form + interactive runtime/mo
 
 ```python
 # tests/integration/test_cli_config_new.py
-"""End-to-end tests for `llm config new` (non-interactive)."""
+"""End-to-end tests for `loco config new` (non-interactive)."""
 from __future__ import annotations
 
 import shutil
@@ -2329,14 +2329,14 @@ Expected: all green.
 
 ```bash
 git add src/llm_cli/commands/config_cmd.py tests/integration/test_cli_config_new.py
-git commit -m "feat(config): add `llm config new` non-interactive generator"
+git commit -m "feat(config): add `loco config new` non-interactive generator"
 ```
 
 ---
 
-## Phase 4 — Wizards (`llm config setup`, `llm runtime setup`)
+## Phase 4 — Wizards (`loco config setup`, `loco runtime setup`)
 
-### Task 13: `llm config setup` wizard
+### Task 13: `loco config setup` wizard
 
 **Files:**
 - Modify: `src/llm_cli/commands/config_cmd.py`
@@ -2346,7 +2346,7 @@ git commit -m "feat(config): add `llm config new` non-interactive generator"
 
 ```python
 # tests/integration/test_cli_config_setup.py
-"""End-to-end tests for `llm config setup` wizard."""
+"""End-to-end tests for `loco config setup` wizard."""
 from __future__ import annotations
 
 import shutil
@@ -2452,7 +2452,7 @@ def test_config_setup_no_compatible_models(monkeypatch, tmp_path):
 
     result = runner.invoke(app, ["config", "setup"])
     assert result.exit_code != 0
-    assert "llm model pull" in result.output
+    assert "loco model pull" in result.output
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -2471,7 +2471,7 @@ def _pick_runtime(repo: Path) -> str | None:
     if not runtimes:
         console.print(
             "[red]error:[/red] no runtimes found in runtimes/. "
-            "Try `llm runtime setup`."
+            "Try `loco runtime setup`."
         )
         return None
     from llm_cli.core.install_record import is_installed
@@ -2499,7 +2499,7 @@ def _pick_model(repo: Path, rt) -> str | None:
     if not models:
         console.print(
             f"[red]error:[/red] no models in registry match accepts_formats "
-            f"{list(rt.accepts_formats)}. Try `llm model pull <hf-url>`."
+            f"{list(rt.accepts_formats)}. Try `loco model pull <hf-url>`."
         )
         return None
     return wizards.select("Pick a model", [m.id for m in models])
@@ -2648,12 +2648,12 @@ Expected: all green.
 
 ```bash
 git add src/llm_cli/commands/config_cmd.py tests/integration/test_cli_config_setup.py
-git commit -m "feat(config): `llm config setup` wizard with VRAM-aware suggestions"
+git commit -m "feat(config): `loco config setup` wizard with VRAM-aware suggestions"
 ```
 
 ---
 
-### Task 14: `llm runtime setup` — preset branch
+### Task 14: `loco runtime setup` — preset branch
 
 **Files:**
 - Modify: `src/llm_cli/commands/runtime_cmd.py`
@@ -2663,7 +2663,7 @@ git commit -m "feat(config): `llm config setup` wizard with VRAM-aware suggestio
 
 ```python
 # tests/integration/test_cli_runtime_setup.py
-"""End-to-end tests for `llm runtime setup`."""
+"""End-to-end tests for `loco runtime setup`."""
 from __future__ import annotations
 
 import shutil
@@ -2784,12 +2784,12 @@ Expected: green.
 
 ```bash
 git add src/llm_cli/commands/runtime_cmd.py tests/integration/test_cli_runtime_setup.py
-git commit -m "feat(runtime): `llm runtime setup` preset branch (delegates to install)"
+git commit -m "feat(runtime): `loco runtime setup` preset branch (delegates to install)"
 ```
 
 ---
 
-### Task 15: `llm runtime setup` — custom branch (full author wizard)
+### Task 15: `loco runtime setup` — custom branch (full author wizard)
 
 **Files:**
 - Modify: `src/llm_cli/commands/runtime_cmd.py`
@@ -2812,7 +2812,7 @@ def test_runtime_setup_custom_writes_all_files(monkeypatch, tmp_path):
     text_answers = iter([
         "vllm-custom",
         "vLLM (user-installed)",
-        'vllm serve "$LLM_MODEL_PATH" --host "$LLM_SERVE_HOST" --port "$LLM_SERVE_PORT" $LLM_EXTRA_ARGS',
+        'vloco serve "$LLM_MODEL_PATH" --host "$LLM_SERVE_HOST" --port "$LLM_SERVE_PORT" $LLM_EXTRA_ARGS',
         "",  # skip requires
     ])
     select_answers = iter(["Custom — register an existing install", "Template (we wrap in bash)"])
@@ -2916,7 +2916,7 @@ def _setup_custom() -> None:
     if rt_dir.exists():
         console.print(
             f"[red]error:[/red] runtime {rt_id!r} already exists at "
-            f"{rt_dir}. `llm runtime uninstall {rt_id} --purge` first, or "
+            f"{rt_dir}. `loco runtime uninstall {rt_id} --purge` first, or "
             "pick a different id."
         )
         raise typer.Exit(code=1)
@@ -2964,7 +2964,7 @@ def _setup_custom() -> None:
     # Optional requires entry
     requires_block = ""
     req_cmd = wizards.text(
-        "Add a `requires:` check? (e.g. 'vllm --version'; empty to skip)",
+        "Add a `requires:` check? (e.g. 'vloco --version'; empty to skip)",
         default="",
     )
     if req_cmd.strip():
@@ -3027,7 +3027,7 @@ def _setup_custom() -> None:
     console.print(
         f"[green]wrote[/green] {settings.runtimes_dir / rt_id / '.installed'}"
     )
-    console.print(f"\nNext: llm config setup --runtime {rt_id}")
+    console.print(f"\nNext: loco config setup --runtime {rt_id}")
     typer.echo(rt_id)
 
 
@@ -3049,7 +3049,7 @@ Expected: all green.
 
 ```bash
 git add src/llm_cli/commands/runtime_cmd.py tests/integration/test_cli_runtime_setup.py
-git commit -m "feat(runtime): `llm runtime setup` custom branch authors all files + .installed"
+git commit -m "feat(runtime): `loco runtime setup` custom branch authors all files + .installed"
 ```
 
 ---
@@ -3068,7 +3068,7 @@ Append to `tests/integration/test_cli_runtime_setup.py`:
 
 ```python
 def test_runtime_install_refuses_custom_kind(monkeypatch, tmp_path):
-    """Installing a kind: custom runtime via `llm runtime install` errors."""
+    """Installing a kind: custom runtime via `loco runtime install` errors."""
     repo = _seed(tmp_path, monkeypatch)
     # Author a fake custom runtime to disk
     (repo / "runtimes" / "fake-custom").mkdir(parents=True)
@@ -3080,7 +3080,7 @@ def test_runtime_install_refuses_custom_kind(monkeypatch, tmp_path):
     result = runner.invoke(app, ["runtime", "install", "fake-custom"])
     assert result.exit_code != 0
     assert "custom" in result.output.lower()
-    assert "llm runtime setup" in result.output
+    assert "loco runtime setup" in result.output
 
 
 def test_runtime_rebuild_refuses_custom_kind(monkeypatch, tmp_path):
@@ -3159,7 +3159,7 @@ if mf is None:
 if mf.kind == "custom":
     console.print(
         f"[red]error:[/red] runtime {runtime_id!r} is custom; use "
-        "`llm runtime setup` to re-author. Custom runtimes have no build step."
+        "`loco runtime setup` to re-author. Custom runtimes have no build step."
     )
     raise typer.Exit(code=1)
 ```
@@ -3181,7 +3181,7 @@ In `src/llm_cli/commands/advisor.py`, add at module level:
 
 ```python
 def _offer_create_config(runtime_id: str, model_id: str) -> bool:
-    """Ask the user if they want to drop into `llm config setup` now."""
+    """Ask the user if they want to drop into `loco config setup` now."""
     from llm_cli.core import wizards
     return wizards.confirm(
         f"create a config for {runtime_id} + {model_id} now?",
@@ -3214,7 +3214,7 @@ git commit -m "feat: kind-aware install/rebuild boundaries; advisor [c] create-c
 
 ## Phase 5 — Chain orchestration
 
-### Task 17: `core/chain.py` + extend `llm setup`
+### Task 17: `core/chain.py` + extend `loco setup`
 
 **Files:**
 - Create: `src/llm_cli/core/chain.py`
@@ -3226,7 +3226,7 @@ git commit -m "feat: kind-aware install/rebuild boundaries; advisor [c] create-c
 
 ```python
 # tests/unit/test_chain.py
-"""Unit tests for the `llm setup` Y/n chain orchestrator."""
+"""Unit tests for the `loco setup` Y/n chain orchestrator."""
 from __future__ import annotations
 
 from llm_cli.core import chain
@@ -3284,7 +3284,7 @@ def test_chain_threads_ids_forward(monkeypatch):
 
 ```python
 # tests/integration/test_cli_setup_chain.py
-"""Integration test for `llm setup` chain orchestration."""
+"""Integration test for `loco setup` chain orchestration."""
 from __future__ import annotations
 
 from typer.testing import CliRunner
@@ -3295,7 +3295,7 @@ runner = CliRunner()
 
 
 def test_setup_default_skips_chain(monkeypatch):
-    """`llm setup --default` writes settings and does NOT invoke the chain."""
+    """`loco setup --default` writes settings and does NOT invoke the chain."""
     invoked = []
     from llm_cli.core import chain
     monkeypatch.setattr(chain, "run_setup_chain", lambda: invoked.append(1) or 0)
@@ -3306,7 +3306,7 @@ def test_setup_default_skips_chain(monkeypatch):
 
 
 def test_setup_invokes_chain_on_interactive_path(monkeypatch):
-    """`llm setup` (no flags) writes settings and then invokes the chain."""
+    """`loco setup` (no flags) writes settings and then invokes the chain."""
     invoked = []
     from llm_cli.core import chain
     monkeypatch.setattr(chain, "run_setup_chain", lambda: invoked.append(1) or 0)
@@ -3327,7 +3327,7 @@ Expected: `ModuleNotFoundError: No module named 'llm_cli.core.chain'`.
 - [ ] **Step 4: Implement `core/chain.py`**
 
 ```python
-"""`llm setup` chain orchestration.
+"""`loco setup` chain orchestration.
 
 Walks the user through the four post-settings steps as Y/n prompts. Each
 "no" skips that step and proceeds to the next. Each "yes" delegates to the
@@ -3440,12 +3440,12 @@ def run_setup_chain() -> int:
         served = True
         steps_run.append("serve")
         console.print(
-            "\n[green]Setup complete.[/green] Use  llm status  to see what's running."
+            "\n[green]Setup complete.[/green] Use  loco status  to see what's running."
         )
     else:
         console.print(
             f"\n[green]Setup complete.[/green] "
-            + (f"Next: llm serve {config_id}" if config_id else "")
+            + (f"Next: loco serve {config_id}" if config_id else "")
         )
 
     append_history(
@@ -3485,7 +3485,7 @@ _LAST_SETUP_ID = rt_id
 
 In `src/llm_cli/commands/model_cmd.py`, wrap the existing `model_pull` body in a helper function `do_model_pull(url: str) -> str` that returns the model id (the existing command function should now just be a thin Typer wrapper that calls `do_model_pull` and prints the id). Look at the current `model_pull` implementation; lift the side-effect logic into `do_model_pull`, keep the Typer signature, and have the Typer command call the helper.
 
-- [ ] **Step 7: Wire `llm setup` to invoke the chain unless `--default`**
+- [ ] **Step 7: Wire `loco setup` to invoke the chain unless `--default`**
 
 Modify `src/llm_cli/commands/setup.py`. Replace the bottom of the `setup` function (the "Recommended next steps" panel) with:
 
@@ -3500,11 +3500,11 @@ Modify `src/llm_cli/commands/setup.py`. Replace the bottom of the `setup` functi
         # Keep today's non-interactive behavior: print the fixed hint and exit.
         console.print()
         console.print("[bold]Recommended next steps:[/bold]")
-        console.print("  1. llm doctor                  # verify cross-cutting prereqs")
-        console.print("  2. llm runtime setup           # install or register a runtime")
-        console.print("  3. llm model pull <hf-url>     # download a model")
-        console.print("  4. llm config setup            # scaffold a config")
-        console.print("  5. llm serve <config-id>       # start a server")
+        console.print("  1. loco doctor                  # verify cross-cutting prereqs")
+        console.print("  2. loco runtime setup           # install or register a runtime")
+        console.print("  3. loco model pull <hf-url>     # download a model")
+        console.print("  4. loco config setup            # scaffold a config")
+        console.print("  5. loco serve <config-id>       # start a server")
         return
 
     console.print()
@@ -3548,25 +3548,25 @@ Each wizard has a flag-form sibling so scripting still works.
 
 | Goal | Wizard | One-shot |
 |---|---|---|
-| First-time setup, end-to-end | `llm setup` | `llm setup --default` |
-| Install or register a runtime | `llm runtime setup` | `llm runtime install <id>` |
-| Scaffold a launch config | `llm config setup` | `llm config new --runtime X --model Y --param k=v` |
-| See VRAM-aware suggestions | `llm advisor` | `llm advisor --runtime X --model Y --json` |
+| First-time setup, end-to-end | `loco setup` | `loco setup --default` |
+| Install or register a runtime | `loco runtime setup` | `loco runtime install <id>` |
+| Scaffold a launch config | `loco config setup` | `loco config new --runtime X --model Y --param k=v` |
+| See VRAM-aware suggestions | `loco advisor` | `loco advisor --runtime X --model Y --json` |
 
-## `llm setup` — Y/n chain orchestrator
+## `loco setup` — Y/n chain orchestrator
 
-`llm setup` writes machine settings (data root, dirs), then offers four
+`loco setup` writes machine settings (data root, dirs), then offers four
 Y/n steps: install a runtime, pull a model, create a config, start serving.
 Each "no" skips that step; an explicit "yes" that fails aborts the chain.
 
 Pass `--default` to skip both the interactive settings prompts and the chain.
 
-## `llm runtime setup`
+## `loco runtime setup`
 
 Two branches:
 
 - **Preset** — lists official runtimes (those declared `kind: official` in
-  their `manifest.yaml`) and delegates to `llm runtime install <id>` for the
+  their `manifest.yaml`) and delegates to `loco runtime install <id>` for the
   picked one. Same interactive build-param prompts as today.
 - **Custom** — authors a new runtime in `runtimes/<id>/` from a single
   `serve.sh` invocation. No build step, no `verify.sh`. The CLI auto-generates
@@ -3575,33 +3575,33 @@ Two branches:
 A `kind: custom` runtime is committed to the repo just like an official one;
 the distinguisher is the `kind:` field, not folder layout.
 
-## `llm config setup`
+## `loco config setup`
 
 Walks runtime → model (filtered by `accepts_formats`) → params → save.
 Common-tier params are walked first; advanced are hidden behind a confirm.
-Recommendations from `llm advisor` (currently llamacpp only) are inlined
+Recommendations from `loco advisor` (currently llamacpp only) are inlined
 next to relevant prompts as `suggested NNN (reason)`.
 
-The non-interactive sibling is `llm config new`. Both share the same code
+The non-interactive sibling is `loco config new`. Both share the same code
 path; the wizard just collects the same flag values via prompts.
 
-## `llm advisor`
+## `loco advisor`
 
-VRAM-aware recommendations from `llm specs` + the model's on-disk size.
+VRAM-aware recommendations from `loco specs` + the model's on-disk size.
 
 Three forms:
 
 ```text
-llm advisor                                # interactive: pick runtime → pick model
-llm advisor <config-id>                    # advise against an existing config
-llm advisor --runtime X --model Y          # non-interactive
+loco advisor                                # interactive: pick runtime → pick model
+loco advisor <config-id>                    # advise against an existing config
+loco advisor --runtime X --model Y          # non-interactive
 ```
 
 `--json` available for any form. All outputs are estimates and labeled as
 such.
 
 After the text-form output, a one-shot `[c] create a config with these
-values` prompt drops you into `llm config setup` with the runtime, model,
+values` prompt drops you into `loco config setup` with the runtime, model,
 and suggested values pre-filled. `--json` suppresses this prompt.
 
 ## TUI behavior
@@ -3622,7 +3622,7 @@ or when `--quiet` is passed.
 ```markdown
 # Add a per-runtime recommendation
 
-`llm advisor` and `llm config setup` use `src/llm_cli/core/recommendations.py`
+`loco advisor` and `loco config setup` use `src/llm_cli/core/recommendations.py`
 to compute VRAM-aware suggestions per param. v1 ships with one hard-coded
 `llamacpp` branch for `ctx` and `n_gpu_layers`.
 
@@ -3692,17 +3692,17 @@ Read each of the three files in turn to understand the current structure. Each f
 
 The new structure should cover both branches:
 
-**Preset (official)** — when you want `llm` to build a runtime from source
+**Preset (official)** — when you want `loco` to build a runtime from source
 1. Drop a `runtimes/<id>/manifest.yaml` with `kind: official`, `accepts_formats:`, optional `requires:`, and a `build:` schema.
 2. Drop a `runtimes/<id>/params.yaml` with your serve-time knobs (each entry needs `type:` and optionally `default`, `required`, `env`, `tier`, `description`).
 3. Drop `runtimes/<id>/build.sh`, `runtimes/<id>/serve.sh`, `runtimes/<id>/healthcheck.sh`, optionally `runtimes/<id>/verify.sh`.
-4. `llm runtime install <id>` builds and verifies.
+4. `loco runtime install <id>` builds and verifies.
 
 **Custom** — when you already have the server installed and just want lifecycle management
-1. `llm runtime setup`, pick "Custom".
+1. `loco runtime setup`, pick "Custom".
 2. Wizard prompts for id, display name, accepted formats, serve command (template or `$EDITOR`), optional `requires:` check.
 3. Wizard writes `manifest.yaml` (with `kind: custom`), `params.yaml` (just `extra_args`), `serve.sh`, default `healthcheck.sh`, and `.installed` immediately.
-4. `llm serve <config-id>` works right away.
+4. `loco serve <config-id>` works right away.
 
 **Env contract** — list LLM_SERVE_HOST, LLM_SERVE_PORT, LLM_MODEL_PATH, LLM_MODEL_ID, plus `params.yaml`-declared `env:` names.
 
@@ -3712,14 +3712,14 @@ Replace the existing file with the new content (keep the same heading levels and
 
 - [ ] **Step 3: Update `docs/add-a-config.md`**
 
-Reorder the content: lead with `llm config setup` (the wizard), then document `llm config new` for scripting, then show the hand-authoring shape last as the "minimal yaml" reference. Mention the `${model_path}` template explicitly. Reference `accepts_formats` compatibility.
+Reorder the content: lead with `loco config setup` (the wizard), then document `loco config new` for scripting, then show the hand-authoring shape last as the "minimal yaml" reference. Mention the `${model_path}` template explicitly. Reference `accepts_formats` compatibility.
 
 - [ ] **Step 4: Update `docs/runtime-lifecycle.md`**
 
 Add a section explaining `kind: custom` semantics:
 - No `build.sh` or `verify.sh`.
-- `.installed` written immediately at end of `llm runtime setup`.
-- `llm runtime install` and `llm runtime rebuild` refuse to act on custom runtimes.
+- `.installed` written immediately at end of `loco runtime setup`.
+- `loco runtime install` and `loco runtime rebuild` refuse to act on custom runtimes.
 - Drift indicators based on `build_sh_sha256` always skip custom runtimes.
 
 - [ ] **Step 5: Commit**
@@ -3749,37 +3749,37 @@ Inside WSL2:
 ```bash
 # 1. Verify external prerequisites
 cat requirements.md
-# (or after install:) llm doctor
+# (or after install:) loco doctor
 
 # 2. Install the CLI into a venv
 ./install.sh
 export PATH="$HOME/.local/bin:$PATH"   # if not already
 
 # 3. Run the interactive setup (settings + Y/n chain into runtime / model / config / serve)
-llm setup
+loco setup
 ```
 
 For an existing setup, the granular commands still work as before:
 
 ```bash
-llm runtime setup       # interactive picker (preset or custom)
-llm runtime install llamacpp --yes      # non-interactive preset install
-llm model pull https://huggingface.co/Qwen/Qwen2.5-7B-Instruct
-llm config setup        # interactive
-llm config new --runtime llamacpp --model qwen2-7b --param gguf_path='${model_path}'
-llm serve llamacpp__qwen2-7b__default
+loco runtime setup       # interactive picker (preset or custom)
+loco runtime install llamacpp --yes      # non-interactive preset install
+loco model pull https://huggingface.co/Qwen/Qwen2.5-7B-Instruct
+loco config setup        # interactive
+loco config new --runtime llamacpp --model qwen2-7b --param gguf_path='${model_path}'
+loco serve llamacpp__qwen2-7b__default
 ```
 ```
 
-- [ ] **Step 2: Add the `llm advisor` and `llm runtime setup` / `llm config setup` / `llm config new` rows to the CLI commands table in `README.md`**
+- [ ] **Step 2: Add the `loco advisor` and `loco runtime setup` / `loco config setup` / `loco config new` rows to the CLI commands table in `README.md`**
 
 Find the existing table (search for `| Command | Purpose |`). Add four new rows:
 
 ```markdown
-| `llm runtime setup` | Interactive wizard. Picks preset (delegates to `llm runtime install`) or custom (authors a no-build runtime with bring-your-own `serve.sh`). |
-| `llm config setup` | Interactive wizard. Picks runtime → model → walks params → saves config. |
-| `llm config new --runtime X --model Y --param k=v` | Non-interactive sibling of `llm config setup`. |
-| `llm advisor [--runtime X --model Y \| <config-id>]` | VRAM-aware suggestions for `ctx` and `n_gpu_layers` (llamacpp only in 0.2). `--json` for scripting. |
+| `loco runtime setup` | Interactive wizard. Picks preset (delegates to `loco runtime install`) or custom (authors a no-build runtime with bring-your-own `serve.sh`). |
+| `loco config setup` | Interactive wizard. Picks runtime → model → walks params → saves config. |
+| `loco config new --runtime X --model Y --param k=v` | Non-interactive sibling of `loco config setup`. |
+| `loco advisor [--runtime X --model Y \| <config-id>]` | VRAM-aware suggestions for `ctx` and `n_gpu_layers` (llamacpp only in 0.2). `--json` for scripting. |
 ```
 
 - [ ] **Step 3: Add cross-reference note to the prior runtime-manifest spec**
@@ -3796,7 +3796,7 @@ Open `docs/superpowers/specs/2026-05-17-runtime-manifest-and-installs.md`. Near 
 
 ```bash
 git add README.md docs/superpowers/specs/2026-05-17-runtime-manifest-and-installs.md
-git commit -m "docs: README leads with `llm setup` chain; cross-ref the new spec"
+git commit -m "docs: README leads with `loco setup` chain; cross-ref the new spec"
 ```
 
 ---
@@ -3819,19 +3819,19 @@ Expected: all green. If anything fails, fix it before continuing.
 
 Walk through these manually and tick off:
 
-- [ ] `llm --version` prints `0.2.0`.
-- [ ] `llm setup --default` writes settings and prints the fixed hint panel.
-- [ ] `llm setup` (interactive) walks the chain; saying "no" to every step exits 0 cleanly.
-- [ ] `llm runtime setup` lists `llamacpp` and `stub-runtime` under the preset branch; install one without errors.
-- [ ] `llm runtime setup` custom branch with template mode writes `manifest.yaml` + `serve.sh` + `healthcheck.sh` + `params.yaml` + `.installed`.
-- [ ] `llm runtime install <custom-id>` errors with the kind-custom message.
-- [ ] `llm config setup` picks a runtime, picks a model, walks params with `[estimate ...]` showing on `ctx` + `n_gpu_layers` for llamacpp, writes a valid YAML.
-- [ ] `llm config new --runtime llamacpp --model <mid> --param gguf_path='${model_path}'` writes the same shape.
-- [ ] `llm advisor --runtime llamacpp --model <mid>` prints estimates.
-- [ ] `llm advisor --runtime llamacpp --model <mid> --json` outputs valid JSON.
-- [ ] `llm advisor <config-id>` reads the config and prints estimates; offers `[c] create a config` chain.
-- [ ] `llm config validate` is green on the new configs.
-- [ ] `llm serve <new-config>` starts; `llm stop` cleans up.
+- [ ] `loco --version` prints `0.2.0`.
+- [ ] `loco setup --default` writes settings and prints the fixed hint panel.
+- [ ] `loco setup` (interactive) walks the chain; saying "no" to every step exits 0 cleanly.
+- [ ] `loco runtime setup` lists `llamacpp` and `stub-runtime` under the preset branch; install one without errors.
+- [ ] `loco runtime setup` custom branch with template mode writes `manifest.yaml` + `serve.sh` + `healthcheck.sh` + `params.yaml` + `.installed`.
+- [ ] `loco runtime install <custom-id>` errors with the kind-custom message.
+- [ ] `loco config setup` picks a runtime, picks a model, walks params with `[estimate ...]` showing on `ctx` + `n_gpu_layers` for llamacpp, writes a valid YAML.
+- [ ] `loco config new --runtime llamacpp --model <mid> --param gguf_path='${model_path}'` writes the same shape.
+- [ ] `loco advisor --runtime llamacpp --model <mid>` prints estimates.
+- [ ] `loco advisor --runtime llamacpp --model <mid> --json` outputs valid JSON.
+- [ ] `loco advisor <config-id>` reads the config and prints estimates; offers `[c] create a config` chain.
+- [ ] `loco config validate` is green on the new configs.
+- [ ] `loco serve <new-config>` starts; `loco stop` cleans up.
 
 - [ ] **Step 4: Commit the version bump**
 

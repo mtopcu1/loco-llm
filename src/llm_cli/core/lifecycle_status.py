@@ -11,7 +11,7 @@ from llm_cli.core.systemd_unit import is_active as systemd_is_active
 
 
 def service_is_running(state_base: Path) -> bool:
-    """True if ``llm status`` would report an active service."""
+    """True if ``loco status`` would report an active service."""
     reconcile(state_base)
     rec = read_running(state_base)
     if rec is None:

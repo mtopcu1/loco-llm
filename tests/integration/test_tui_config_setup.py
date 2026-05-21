@@ -1,4 +1,4 @@
-"""PTY integration tests for `llm config setup` param grid wizard."""
+"""PTY integration tests for `loco config setup` param grid wizard."""
 from __future__ import annotations
 
 import sys

@@ -27,7 +27,7 @@ LocalLLM is a **well-architected personal control plane** for WSL2 local LLM ser
 
 - **Ship as 0.2 personal preview / lab tool** — core flows (setup → runtime → model → config → serve) are implemented, tested, and documented. Recent param grid UX is a real differentiator.
 - **Do not label “production-ready”** until slug validation, systemd unit safety, and `extra_args` shell splitting are addressed (estimated 1–3 focused days).
-- **Do not market “benchmark them”** until `llm bench` exists — README/tagline ahead of CLI.
+- **Do not market “benchmark them”** until `loco bench` exists — README/tagline ahead of CLI.
 
 ---
 
@@ -49,11 +49,11 @@ Findings below distinguish **“fix before any shared/production use”** vs **�
 
 | ID | Severity | Issue | Location | Impact |
 |----|----------|-------|----------|--------|
-| S-1 | **Critical** | `config_id` embedded in systemd unit via `.format()` without validation | `src/llm_cli/core/systemd_unit.py` | Newlines/special chars in config id could inject extra systemd directives → persistent user-level code execution on `llm serve --systemd` |
+| S-1 | **Critical** | `config_id` embedded in systemd unit via `.format()` without validation | `src/llm_cli/core/systemd_unit.py` | Newlines/special chars in config id could inject extra systemd directives → persistent user-level code execution on `loco serve --systemd` |
 | S-2 | **Critical** | Custom runtime `serve.sh` runs user-authored shell (`bash -c "$INVOCATION_LINE"`) | `src/llm_cli/commands/runtime_cmd.py` | By design for BYO runtimes; dangerous if runtimes/configs come from untrusted sources |
 | S-3 | **High** | Config/runtime/model IDs used in path joins without slug validation | `config_cmd.py`, `model_cmd.py`, `install_record.py` | `../` or slashes in ids could write/read outside `configs/`, `models/`, `runtimes/` |
 | S-4 | **High** | Serve script path built as `runtimes/{runtime_id}/serve.sh` instead of resolved manifest path | `src/llm_cli/commands/serve.py` | Crafted runtime id in config could exec scripts outside repo |
-| S-5 | **High** | `running.json` `log_path` not confined to `state/logs/` | `lifecycle_cmds.py`, `lifecycle.py` | Tampered state file → `llm logs` reads arbitrary files |
+| S-5 | **High** | `running.json` `log_path` not confined to `state/logs/` | `lifecycle_cmds.py`, `lifecycle.py` | Tampered state file → `loco logs` reads arbitrary files |
 | S-6 | **High** | `extra_args` expanded unquoted in serve scripts | `runtimes/llamacpp/serve.sh`, `runtimes/vllm/serve.sh` | YAML config author can inject shell metacharacters at serve time |
 
 **Actionable steps (priority order):**
@@ -61,7 +61,7 @@ Findings below distinguish **“fix before any shared/production use”** vs **�
 1. **Add `validate_slug(id: str)`** — regex e.g. `^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$`; reject `/`, `\`, `..`, whitespace, newlines. Apply to `config_id`, `runtime_id`, `model_id` at CLI entry and wizard save.
 2. **Systemd unit:** stop using `.format(config_id=…)`; use `systemd-escape` semantics or hard slug check before write.
 3. **Serve paths:** resolve `serve.sh` from `RuntimeRecord.path` (discovered directory), not string concat with config’s runtime field alone.
-4. **`llm logs`:** after `resolve()`, require `log_file.is_relative_to(repo / "state" / "logs")`.
+4. **`loco logs`:** after `resolve()`, require `log_file.is_relative_to(repo / "state" / "logs")`.
 5. **`extra_args`:** pass via env array or append to `"${ARGS[@]}"` without unquoted word-split (or document as trusted-author-only and block in validated configs).
 
 ---
@@ -73,15 +73,15 @@ Findings below distinguish **“fix before any shared/production use”** vs **�
 | S-7 | High | Full `os.environ.copy()` inherited by serve subprocesses | Secrets in parent env leak to child bash/HF processes |
 | S-8 | High | Arbitrary `env:` names from `params.yaml` (`LD_PRELOAD`, etc.) | Allowlist `LLM_*` prefix for official runtimes |
 | S-9 | High | `LLM_BUILD_EXTRA_PIP_PACKAGES` shell-split in vllm `build.sh` | Arbitrary pip/shell during install |
-| S-10 | Medium | `llm doctor` runs `requires.verify.cmd` from repo YAML | Trusted repo assumption; risky on cloned untrusted repos |
+| S-10 | Medium | `loco doctor` runs `requires.verify.cmd` from repo YAML | Trusted repo assumption; risky on cloned untrusted repos |
 | S-11 | Medium | vLLM `trust_remote_code` param exposed | Dangerous combined with non-loopback bind |
 | S-12 | Medium | No enforcement of `127.0.0.1` bind; API keys optional | Misconfiguration exposes unauthenticated inference API |
 
 **Actionable steps:**
 
 6. **Env hygiene:** default serve env to explicit allowlist; opt-in `--inherit-env` for power users.
-7. **Bind warnings:** `llm serve` warns if host ≠ loopback and no API key set.
-8. **Custom runtime gate:** `llm runtime setup` / serve prints explicit trust warning; optional `--official-only` mode for paranoid installs.
+7. **Bind warnings:** `loco serve` warns if host ≠ loopback and no API key set.
+8. **Custom runtime gate:** `loco runtime setup` / serve prints explicit trust warning; optional `--official-only` mode for paranoid installs.
 9. **Remove unused `httpx` dependency** or use it — reduces supply-chain surface (`pyproject.toml`).
 
 ---
@@ -189,7 +189,7 @@ Findings below distinguish **“fix before any shared/production use”** vs **�
 | Weakness | Recommendation |
 |----------|----------------|
 | Long config/runtime command files | Extract validation helpers to `core/` |
-| Benchmark discovery without bench CLI | Either implement or hide from `llm list` until ready |
+| Benchmark discovery without bench CLI | Either implement or hide from `loco list` until ready |
 | Duplicate Windows path listings in git | Harmless noise |
 
 **Verdict:** A new contributor can follow **setup → serve** in a day; param grid/TUI needs half a day extra. **Maintainability: 8/10.**
@@ -202,10 +202,10 @@ Findings below distinguish **“fix before any shared/production use”** vs **�
 
 **Strengths:**
 
-- **`llm setup` chain** — sensible Y/n defaults, duplicate-model menu, history logging
+- **`loco setup` chain** — sensible Y/n defaults, duplicate-model menu, history logging
 - **Param grid (0.2)** — list/detail, meta step, advisor hints in detail, plain fallback for CI
-- **`llm advisor` → config setup** — closes “what should ctx be?” loop
-- **`llm doctor`** — prerequisites + systemd linger advisory
+- **`loco advisor` → config setup** — closes “what should ctx be?” loop
+- **`loco doctor`** — prerequisites + systemd linger advisory
 - **Stub runtime** — fast smoke without weights
 
 **Friction (vs Ollama / LM Studio):**
@@ -216,7 +216,7 @@ Findings below distinguish **“fix before any shared/production use”** vs **�
 | Runtime → model → config layers | Steep mental model for newcomers |
 | Long config ids | `llamacpp__model__default` vs `qwen2.5:7b` |
 | `--help` doesn’t teach the journey | Wizards table buried in docs |
-| No `llm serve` default | Always need full config id |
+| No `loco serve` default | Always need full config id |
 | Post-serve output minimal | No base URL / sample curl |
 | Benchmarks listed but not runnable | Feels incomplete |
 | Advisor narrow (llamacpp ctx/layers) | vLLM users see empty recommendations |
@@ -229,13 +229,13 @@ Findings below distinguish **“fix before any shared/production use”** vs **�
 
 | # | Improvement | Effort | Impact |
 |---|-------------|--------|--------|
-| U-1 | **`llm quickstart`** or richer root `--help` | Small | High for onboarding |
+| U-1 | **`loco quickstart`** or richer root `--help` | Small | High for onboarding |
 | U-2 | **Post-serve ready card** (base URL, curl, model name) | Small | High |
-| U-3 | **`llm status` shows** host, port, model, runtime, URL | Small | High |
+| U-3 | **`loco status` shows** host, port, model, runtime, URL | Small | High |
 | U-4 | **First-run param grid hint** (3 lines: Enter, Ctrl+S, Esc) | Tiny | Medium |
 | U-5 | **Early cwd/WSL detection** with actionable errors | Medium | High |
 | U-6 | **Rename/clarify `setup --default`** (“settings only, no chain”) | Tiny | Medium |
-| U-7 | **`llm config edit <id>`** reusing param grid | Medium | High |
+| U-7 | **`loco config edit <id>`** reusing param grid | Medium | High |
 | U-8 | **Skip HF URL prompt** when stub runtime chosen in chain | Tiny | Low |
 
 ---
@@ -248,9 +248,9 @@ Prioritized by **fit with existing code** × **user wow**.
 
 | Feature | Why it’s a bomb | Already in repo |
 |---------|-----------------|-----------------|
-| **`llm bench` + `llm results`** | Fulfills README promise; reproducible quant comparisons | `benchmarks/`, `discover_benchmarks`, stub-bench, design specs |
-| **`llm history`** | Timeline of setup/advisor/serve/debug | `state/history.jsonl`, `append_history` everywhere |
-| **`llm config edit <id>`** | Re-open grid on existing YAML | `edit_params`, `validate_params`, atomic write |
+| **`loco bench` + `loco results`** | Fulfills README promise; reproducible quant comparisons | `benchmarks/`, `discover_benchmarks`, stub-bench, design specs |
+| **`loco history`** | Timeline of setup/advisor/serve/debug | `state/history.jsonl`, `append_history` everywhere |
+| **`loco config edit <id>`** | Re-open grid on existing YAML | `edit_params`, `validate_params`, atomic write |
 | **Post-serve ready card** | Instant “it works” moment | host/port in config, healthcheck patterns |
 | **Expand advisor (vLLM, fit check)** | “Will this model fit?” before 20GB download | `detect_all`, model sizes, `recommendations.py` extensibility |
 
@@ -258,15 +258,15 @@ Prioritized by **fit with existing code** × **user wow**.
 
 | Feature | Why it’s a bomb |
 |---------|-----------------|
-| **`llm run <model-id>`** | Ollama-shaped shortcut: auto config + serve if one compatible runtime |
-| **`llm model search` / HF picker** | `hf_client` metadata + pull pipeline exists |
-| **`llm default <config-id>`** | `llm serve` with no args — preference file, not second daemon |
+| **`loco run <model-id>`** | Ollama-shaped shortcut: auto config + serve if one compatible runtime |
+| **`loco model search` / HF picker** | `hf_client` metadata + pull pipeline exists |
+| **`loco default <config-id>`** | `loco serve` with no args — preference file, not second daemon |
 | **Drift-aware doctor → one-key rebuild** | `install_record` schema hash + `runtime rebuild` |
 | **Bench-driven advisor loop** | Bench results feed param suggestions — unique tuning story |
 
 ### Tier C — Bigger bets
 
-- **`llm chat`** thin REPL over OpenAI-compatible endpoint
+- **`loco chat`** thin REPL over OpenAI-compatible endpoint
 - **TUI dashboard** (`list` + `status` + `history` + grid)
 - **Config preset library** (`configs/presets/`, `--preset throughput`)
 
@@ -286,19 +286,19 @@ Review this list later; items grouped by theme.
 
 - [ ] **U-2, U-3:** Post-serve ready card + richer status
 - [ ] **U-1:** Quickstart in help
-- [ ] **Feature:** `llm history` (read `history.jsonl`)
-- [ ] **Feature or hide:** benchmarks in `llm list` until `llm bench` ships
+- [ ] **Feature:** `loco history` (read `history.jsonl`)
+- [ ] **Feature or hide:** benchmarks in `loco list` until `loco bench` ships
 
 ### P2 — Quality & confidence (1 week)
 
 - [ ] **Tests 10–13:** cov gate, list_cmd, TUI characterization, slug tests
 - [ ] **S-7–S-9:** env allowlist, bind warnings, pip install hardening
-- [ ] **U-7:** `llm config edit`
+- [ ] **U-7:** `loco config edit`
 
 ### P3 — Differentiation (next milestone)
 
-- [ ] **`llm bench` / `llm results`**
-- [ ] **`llm run <model>`**
+- [ ] **`loco bench` / `loco results`**
+- [ ] **`loco run <model>`**
 - [ ] **Advisor vLLM + serve-fit check**
 - [ ] **HF model picker wizard**
 
@@ -334,7 +334,7 @@ Review this list later; items grouped by theme.
 
 ### Suggested release framing
 
-> **v0.2.0 — Personal preview.** Reproducible local LLM configs, wizards, llamacpp/vllm runtimes, systemd serve. Single-user WSL2 lab tool. Not hardened for untrusted input or network exposure.
+> **v0.2.0 — Personal preview.** Reproducible local LLM configs, wizards, llamacpp/vloco runtimes, systemd serve. Single-user WSL2 lab tool. Not hardened for untrusted input or network exposure.
 
 ### What you’ve nailed
 
@@ -347,7 +347,7 @@ Review this list later; items grouped by theme.
 ### What would move the needle most
 
 1. **Slug validation everywhere** (security + peace of mind)
-2. **`llm bench` + `llm history`** (promise + debuggability)
+2. **`loco bench` + `loco history`** (promise + debuggability)
 3. **Post-serve ready card** (first-run delight)
 4. **pytest-cov + 3 TUI tests** (confidence to keep iterating UX)
 

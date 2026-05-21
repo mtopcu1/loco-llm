@@ -110,7 +110,7 @@ The workflow was **partially completed**. Runtimes were cleared (already uninsta
 | F1 | blocker | Serve | `repo_root` None breaks serve | `loco serve` / instance start fails: `'NoneType' object has no attribute 'as_posix'` in `_settings_tokens` when `repo_root` unset in user config. | CLI traceback; job `INTERNAL_ERROR` before settings fix |
 | F2 | blocker | Dashboard SPA | Deep links return 404 JSON | `/models`, `/configs/new`, `/instance` hard refresh → `{"detail":"Not Found"}`. In-app links work. Fix exists in repo (`SPAStaticFiles`) but **not in running dist**. | Browser + navigate |
 | F3 | bug | Jobs | Cancelled model_pull leaves `hf download` running | Job status `cancelled` but child `hf download` processes continue. | `ps aux` PIDs 3183, 3376 |
-| F4 | bug | Runtime install | vllm dashboard install fails on Py3.14 | Default `vllm==0.8.5` incompatible with Python 3.14 venv; no UI to pass `vllm_version`. | Job log `cc9b3b7c…` |
+| F4 | bug | Runtime install | vloco dashboard install fails on Py3.14 | Default `vllm==0.8.5` incompatible with Python 3.14 venv; no UI to pass `vllm_version`. | Job log `cc9b3b7c…` |
 | F5 | ux | Runtime install | No build-parameter UI | Install always `loco runtime install <id> --yes`; cannot pick cpu/cuda flavor or vllm version from dashboard. | `runtimes.py` install route |
 | F6 | ux | Models | No in-progress row in models table | Active pulls only visible in Jobs tray; table stays empty. | Models page during pulls |
 | F7 | ux | Instance | Start/switch dropdown stale or incomplete | New configs missing from start list until refresh; switch list empty while running. | Instance snapshot |
@@ -132,7 +132,7 @@ The workflow was **partially completed**. Runtimes were cleared (already uninsta
 ## API / console notes
 
 - Orphan downloads: `hf download HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive …` ×2 after cancel.  
-- Successful serve PIDs: `llama-server` on 8080/8081; vllm process during vllm config run (stopped cleanly).  
+- Successful serve PIDs: `llama-server` on 8080/8081; vllm process during vloco config run (stopped cleanly).  
 
 ---
 

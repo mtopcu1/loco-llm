@@ -12,7 +12,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/_serve_flags.sh"
 
 BIN="${LLM_RUNTIMES}/llamacpp/llama.cpp/build/bin/llama-server"
 if [[ ! -x "${BIN}" ]]; then
-  echo "error: llama-server not found at ${BIN}; run llm runtime install llamacpp" >&2
+  echo "error: llama-server not found at ${BIN}; run loco runtime install llamacpp" >&2
   exit 1
 fi
 

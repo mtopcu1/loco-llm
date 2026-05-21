@@ -1,4 +1,4 @@
-"""Errors from `llm serve` / `llm switch` with user-visible messages."""
+"""Errors from `loco serve` / `loco switch` with user-visible messages."""
 
 
 class ServeError(Exception):

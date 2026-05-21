@@ -1,4 +1,4 @@
-"""PTY integration tests for `llm runtime install` opt-in param grid."""
+"""PTY integration tests for `loco runtime install` opt-in param grid."""
 from __future__ import annotations
 
 import sys

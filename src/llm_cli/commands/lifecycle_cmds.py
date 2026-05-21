@@ -1,4 +1,4 @@
-"""`llm stop`, `llm status`, `llm logs`."""
+"""`loco stop`, `loco status`, `loco logs`."""
 from __future__ import annotations
 
 import json
@@ -70,7 +70,7 @@ def stop() -> None:
         return
     if rec.mode == "systemd":
         try:
-            stop_unit("llm.service")
+            stop_unit("loco.service")
         except RuntimeError as exc:
             console.print(f"[yellow]warning:[/yellow] systemctl stop failed: {exc}")
         clear_running(state_base)
@@ -147,7 +147,7 @@ def status(
     console.print(f"port:   {rec.port}")
     if rec.mode == "systemd":
         console.print(f"unit:   {rec.unit}")
-        u = rec.unit or "llm.service"
+        u = rec.unit or "loco.service"
         console.print(f"journalctl: journalctl --user -u {u}")
     else:
         console.print(f"pid:    {rec.pid}")
@@ -168,7 +168,7 @@ def logs(
         console.print("nothing running")
         raise typer.Exit(code=1)
     if rec.mode == "systemd":
-        cmd = ["journalctl", "--user", "-u", rec.unit or "llm.service", "-n", str(lines)]
+        cmd = ["journalctl", "--user", "-u", rec.unit or "loco.service", "-n", str(lines)]
         if follow:
             cmd.append("-f")
         raise typer.Exit(code=subprocess.call(cmd))

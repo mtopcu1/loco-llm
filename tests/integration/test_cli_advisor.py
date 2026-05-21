@@ -1,4 +1,4 @@
-"""End-to-end tests for `llm advisor`."""
+"""End-to-end tests for `loco advisor`."""
 from __future__ import annotations
 
 import json

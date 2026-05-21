@@ -1,4 +1,4 @@
-"""`llm settings ...` - inspect and edit user-level settings."""
+"""`loco settings ...` - inspect and edit user-level settings."""
 from __future__ import annotations
 
 import shlex
@@ -53,7 +53,7 @@ def show() -> None:
 
 @settings_app.command("env")
 def env() -> None:
-    """Print `export LLM_*=...` lines for `eval "$(llm settings env)"`."""
+    """Print `export LLM_*=...` lines for `eval "$(loco settings env)"`."""
     resolved = resolve(load_settings())
     for var, attr in _ENV_MAPPING:
         val = getattr(resolved, attr)
@@ -90,7 +90,7 @@ def edit(
         if meta.get("required") and meta.get("default") is None:
             console.print(
                 f"[red]error:[/red] {key!r} has no built-in default; "
-                f"use `llm settings edit {key}` to set a new value."
+                f"use `loco settings edit {key}` to set a new value."
             )
             raise typer.Exit(code=1)
         if meta["default"] is None:

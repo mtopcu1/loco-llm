@@ -1,4 +1,4 @@
-"""Integration tests for `llm stop`, `llm status`, `llm logs`."""
+"""Integration tests for `loco stop`, `loco status`, `loco logs`."""
 from __future__ import annotations
 
 import json
@@ -116,7 +116,7 @@ def test_stop_systemd_calls_systemctl_stop(tmp_path: Path) -> None:
             config_id="cfg-a",
             port=1,
             started_at="t",
-            unit="llm.service",
+            unit="loco.service",
         ),
     )
     with (
@@ -125,7 +125,7 @@ def test_stop_systemd_calls_systemctl_stop(tmp_path: Path) -> None:
     ):
         result = runner.invoke(app, ["stop"], catch_exceptions=False)
     assert result.exit_code == 0
-    su.assert_called_once_with("llm.service")
+    su.assert_called_once_with("loco.service")
     assert read_running(repo) is None
 
 
@@ -198,7 +198,7 @@ def test_status_systemd_text(tmp_path: Path) -> None:
             config_id="cfg-a",
             port=18080,
             started_at="2026-05-17T16:00:00Z",
-            unit="llm.service",
+            unit="loco.service",
         ),
     )
     with (
@@ -208,7 +208,7 @@ def test_status_systemd_text(tmp_path: Path) -> None:
         result = runner.invoke(app, ["status"], catch_exceptions=False)
     assert result.exit_code == 0
     assert "running" in result.stdout.lower()
-    assert "llm.service" in result.stdout
+    assert "loco.service" in result.stdout
     assert "journalctl" in result.stdout.lower()
 
 
@@ -256,7 +256,7 @@ def test_logs_systemd_invokes_journalctl(tmp_path: Path) -> None:
             config_id="cfg-a",
             port=1,
             started_at="t",
-            unit="llm.service",
+            unit="loco.service",
         ),
     )
     with (
@@ -267,5 +267,5 @@ def test_logs_systemd_invokes_journalctl(tmp_path: Path) -> None:
     assert result.exit_code == 0
     cmd = call.call_args[0][0]
     assert cmd[:3] == ["journalctl", "--user", "-u"]
-    assert "llm.service" in cmd
+    assert "loco.service" in cmd
     assert "-n" in cmd and "20" in cmd
