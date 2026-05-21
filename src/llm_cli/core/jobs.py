@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import asyncio
 import os
+import signal
 import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -17,6 +19,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
+from llm_cli.core.lifecycle import state_dir, state_root
 from llm_cli.core.settings import resolve_settings
 from llm_cli.webapi.streams import EventHub
 
@@ -60,12 +63,50 @@ class Job:
 
 
 def _jobs_dir() -> Path:
-    p = resolve_settings().repo_root
-    if p is None:
-        raise RuntimeError("repo_root not configured")
-    d = p / "state" / "jobs"
+    settings = resolve_settings()
+    d = state_dir(state_root(settings)) / "jobs"
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def job_log_path(job_id: str) -> Path:
+    return _jobs_dir() / f"{job_id}.log"
+
+
+def _subprocess_popen_kwargs() -> dict:
+    """Isolate job children in a new process group so cancel can kill the full tree."""
+    kw: dict = {
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.STDOUT,
+        "text": True,
+    }
+    if sys.platform != "win32":
+        kw["start_new_session"] = True
+    return kw
+
+
+def _terminate_process_tree(proc: subprocess.Popen) -> None:
+    if proc.poll() is not None:
+        return
+    if sys.platform == "win32":
+        subprocess.run(
+            ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+            capture_output=True,
+            check=False,
+        )
+        return
+    try:
+        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+    except ProcessLookupError:
+        proc.terminate()
+    deadline = time.time() + 10.0
+    while time.time() < deadline and proc.poll() is None:
+        time.sleep(0.1)
+    if proc.poll() is None:
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except ProcessLookupError:
+            proc.kill()
 
 
 class _JobRegistry:
@@ -118,7 +159,7 @@ class _JobRegistry:
         coro_factory: Callable[[Callable[[dict], Awaitable[None]]], Awaitable[Any]],
     ) -> str:
         job_id = uuid.uuid4().hex
-        log_path = _jobs_dir() / f"{job_id}.log"
+        log_path = job_log_path(job_id)
         j = Job(
             id=job_id,
             kind=kind,
@@ -188,7 +229,7 @@ class _JobRegistry:
         cwd: str | Path | None = None,
     ) -> str:
         job_id = uuid.uuid4().hex
-        log_path = _jobs_dir() / f"{job_id}.log"
+        log_path = job_log_path(job_id)
         j = Job(
             id=job_id,
             kind=kind,
@@ -202,15 +243,14 @@ class _JobRegistry:
             log_f = log_path.open("a", buffering=1, encoding="utf-8")
             try:
                 full_env = os.environ.copy()
+                full_env.setdefault("PYTHONUNBUFFERED", "1")
                 if env:
                     full_env.update(env)
                 proc = subprocess.Popen(
                     argv,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
                     env=full_env,
                     cwd=str(cwd) if cwd else None,
+                    **_subprocess_popen_kwargs(),
                 )
                 self._procs[job_id] = proc
                 with self._lock:
@@ -267,19 +307,8 @@ class _JobRegistry:
                 return False
             j.status = "cancelled"
         proc = self._procs.get(job_id)
-        if proc is not None and proc.poll() is None:
-            try:
-                proc.terminate()
-            except ProcessLookupError:
-                return True
-            deadline = time.time() + 10.0
-            while time.time() < deadline and proc.poll() is None:
-                time.sleep(0.1)
-            if proc.poll() is None:
-                try:
-                    proc.kill()
-                except ProcessLookupError:
-                    pass
+        if proc is not None:
+            _terminate_process_tree(proc)
         self._publish_status(job_id)
         return True
 

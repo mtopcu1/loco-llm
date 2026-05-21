@@ -18,10 +18,11 @@ Settings file: `{LOCO_HOME}/config.yaml` (default `~/.loco/config.yaml`). See [G
 
 | Command | Purpose |
 |---------|---------|
-| `loco update` | Fetch and checkout latest release tag in `LOCO_INSTALL`; reinstall editable package. |
-| `loco update --check` | Report current vs available version; no changes. |
+| `loco update` | Refresh current branch or tag in `LOCO_INSTALL`; reinstall editable package. |
+| `loco update --check` | Report current vs latest release tag; no changes. |
+| `loco update --stable` | Switch to latest release tag (leave a feature branch). |
 | `loco update --tag vX.Y.Z` | Pin install checkout to a tag. |
-| `loco update --branch <name>` | Track a branch tip (testing). |
+| `loco update --branch <name>` | Switch to a branch and pull its tip (testing). |
 | `loco update --restart` | After upgrade, restart running serve/dashboard if applicable. |
 
 Installer flags (`--tag`, `--branch`, `--data-home`, `--dir`): [INSTALLATION.md](INSTALLATION.md).

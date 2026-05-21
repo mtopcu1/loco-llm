@@ -36,7 +36,7 @@ Branding and layout: [`docs/superpowers/specs/2026-05-20-hermes-layout-and-brand
 
 ### Off-tag operation
 
-`loco update --branch` is for hotfixes. Bare `loco update` **re-anchors** to the latest semver tag.
+`loco update --branch` switches to a branch. Bare `loco update` **refreshes the current ref** (branch tip or latest tag). Use `loco update --stable` to switch to the latest semver tag.
 
 ## CLI layers
 

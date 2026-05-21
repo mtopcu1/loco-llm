@@ -34,7 +34,15 @@ curl -fsSL .../scripts/install.sh | bash -s -- --data-home /opt/loco-data
 | `--data-home <path>` | User data root (default `~/.loco`) |
 | `--dir <path>` | Git install root (default `$DATA_HOME/install`) |
 | `--tag vX.Y.Z` | Pin to a specific release tag |
-| `--branch <name>` | Track a branch tip instead of latest tag (testing) |
+| `--branch <name>` | Track a branch tip (fetch + ff-only pull; for feature branches) |
+| `--commit <sha>` | Pin to a commit on origin (detached HEAD; short or full SHA) |
+
+Only one of `--branch`, `--tag`, or `--commit` may be used. Omit all three to install the latest semver tag.
+
+```bash
+curl -fsSL .../install.sh | bash -s -- --branch feat/my-fix
+curl -fsSL .../install.sh | bash -s -- --commit abc1234
+```
 
 Environment:
 

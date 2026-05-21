@@ -15,13 +15,16 @@ export PATH="$HOME/.local/bin:$PATH"
 
 By default this checks out the **latest release tag** into `~/.loco/install`, creates `~/.loco/config.yaml`, and seeds example configs.
 
-**Pin a release or track a branch** (pass args after `bash -s --`):
+**Pin a release, branch, or commit** (pass args after `bash -s --`):
 
 ```bash
 curl -fsSL .../install.sh | bash -s -- --tag v0.2.0
 curl -fsSL .../install.sh | bash -s -- --branch feat/my-fix
+curl -fsSL .../install.sh | bash -s -- --commit abc1234
 curl -fsSL .../install.sh | bash -s -- --data-home /opt/loco --dir /opt/loco/install
 ```
+
+Use only one of `--tag`, `--branch`, or `--commit`. Default: latest release tag.
 
 Details: [Installation](docs/INSTALLATION.md). Day-to-day upgrades: [Update](docs/UPDATE.md) (`loco update`, `loco update --tag`, `loco update --branch`).
 

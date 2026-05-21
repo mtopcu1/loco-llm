@@ -121,9 +121,12 @@ _TOKEN_RE = re.compile(r"\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
 
 
 def _settings_tokens(s: Settings) -> dict[str, str]:
+    from llm_cli.core.scaffold import install_root
+
+    repo = s.repo_root if s.repo_root is not None else install_root()
     return {
         "data_root": s.data_root.as_posix(),
-        "repo_root": s.repo_root.as_posix(),
+        "repo_root": repo.as_posix(),
         "runtimes_dir": s.runtimes_dir.as_posix(),
         "models_dir": s.models_dir.as_posix(),
         "cache_dir": s.cache_dir.as_posix(),

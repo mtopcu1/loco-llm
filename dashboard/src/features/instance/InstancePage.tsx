@@ -9,9 +9,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSSE } from '@/hooks/useSSE'
 import { MetricsTab } from '@/features/metrics/MetricsTab'
 import { InstanceControls } from './InstanceControls'
+import { InstanceChat } from './InstanceChat'
 import { LogsView } from './LogsView'
 
-type InstanceState = { running: boolean; config_id?: string; mode?: string }
+type InstanceState = {
+  running: boolean
+  config_id?: string
+  mode?: string
+  port?: number
+}
 
 export function InstancePage() {
   const queryClient = useQueryClient()
@@ -61,8 +67,16 @@ export function InstancePage() {
                 <dt className="font-mono text-zinc-500 w-32">mode</dt>
                 <dd>{state.mode ?? '—'}</dd>
               </div>
+              {state.port != null && (
+                <div className="flex gap-4">
+                  <dt className="font-mono text-zinc-500 w-32">port</dt>
+                  <dd>{state.port}</dd>
+                </div>
+              )}
             </dl>
           </Card>
+
+          <InstanceChat configId={state.config_id!} port={state.port} />
 
           <Tabs defaultValue="logs">
             <TabsList>

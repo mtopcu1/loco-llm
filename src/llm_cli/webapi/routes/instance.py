@@ -175,6 +175,20 @@ def start_instance(body: StartInstanceBody):
             status_code=404,
         )
 
+    root = _state_root()
+    lifecycle.reconcile(root)
+    existing = lifecycle.read_running(root)
+    if existing is not None:
+        raise ApiError(
+            ErrorCode.INSTANCE_ALREADY_RUNNING,
+            f"Config '{existing.config_id}' is already running; stop it first or use switch",
+            details={
+                "config_id": existing.config_id,
+                "requested_config_id": body.config_id,
+            },
+            status_code=409,
+        )
+
     async def factory(report):
         await _instance_start_coro(body.config_id, body.mode, report)
 

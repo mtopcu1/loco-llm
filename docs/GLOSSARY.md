@@ -43,7 +43,7 @@ Quick links to terms used across loco-llm docs. Anchors match GitHub heading slu
 | Term | Meaning | More |
 |------|---------|------|
 | [Release tag](#install-and-release) | Semver `v*.*.*` on `main`; default for `install.sh` and `loco update`. | [UPDATE.md](UPDATE.md), [RELEASE.md](RELEASE.md) |
-| [Re-anchor](#install-and-release) | `loco update` without flags returns to latest tag even after `--branch`. | [UPDATE.md](UPDATE.md) |
+| [Re-anchor](#install-and-release) | `loco update --stable` switches to the latest release tag (e.g. after `--branch`). | [UPDATE.md](UPDATE.md) |
 
 ## Repository (contributors)
 

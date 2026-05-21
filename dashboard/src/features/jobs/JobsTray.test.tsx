@@ -39,8 +39,8 @@ describe('JobsTray', () => {
         <JobsTray />
       </div>,
     )
-    await waitFor(() => expect(screen.getByText(/runtime_install/)).toBeInTheDocument())
-    expect(screen.queryByText(/model_pull/)).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText(/runtime install/i)).toBeInTheDocument())
+    expect(screen.queryByText(/pull model/i)).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '×' }))
   })
 })

@@ -3,9 +3,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException
 
 
 class SPAStaticFiles(StaticFiles):
@@ -13,11 +14,14 @@ class SPAStaticFiles(StaticFiles):
 
     async def get_response(self, path: str, scope):
         try:
-            return await super().get_response(path, scope)
-        except HTTPException as e:
-            if e.status_code == 404:
-                return await super().get_response("index.html", scope)
-            raise
+            response = await super().get_response(path, scope)
+        except HTTPException as exc:
+            if exc.status_code != 404 or path in ("", "index.html"):
+                raise
+            return await super().get_response("index.html", scope)
+        if response.status_code == 404 and path not in ("", "index.html"):
+            return await super().get_response("index.html", scope)
+        return response
 
 
 def mount_spa(app: FastAPI, dist_dir: Path) -> None:

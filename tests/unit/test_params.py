@@ -142,6 +142,20 @@ def test_expand_path_tokens(tmp_path):
     )
 
 
+def test_expand_path_repo_root_none_uses_install_root(tmp_path, monkeypatch):
+    install = tmp_path / "install"
+    install.mkdir()
+    monkeypatch.setenv("LOCO_INSTALL", str(install))
+    s = Settings(
+        data_root=tmp_path / "data",
+        repo_root=None,
+        runtimes_dir=tmp_path / "data" / "runtimes",
+        models_dir=tmp_path / "data" / "models",
+        cache_dir=tmp_path / "data" / "cache",
+    )
+    assert expand_path("${repo_root}/runtimes", s) == str((install / "runtimes").as_posix())
+
+
 def test_expand_path_home(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     s = _settings(tmp_path)

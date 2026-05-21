@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
+
+from fastapi import APIRouter
+from sse_starlette.sse import EventSourceResponse
+
 from llm_cli.core import jobs as jobs_module
 from llm_cli.webapi.errors import ApiError, ErrorCode
-from sse_starlette.sse import EventSourceResponse
-from fastapi import APIRouter
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -26,6 +29,30 @@ def get_job(job_id: str):
         )
 
 
+async def iter_job_stream_events(job_id: str, sub):
+    """Yield SSE event dicts for a job (snapshot, log tail, live updates)."""
+    try:
+        job = jobs_module.registry().get(job_id)
+    except KeyError:
+        return
+    yield {
+        "event": "snapshot",
+        "data": json.dumps(job.as_dict(), sort_keys=True),
+    }
+    log_path = jobs_module.job_log_path(job_id)
+    if log_path.is_file():
+        text = log_path.read_text(encoding="utf-8", errors="replace")
+        for line in text.splitlines():
+            if line:
+                yield {
+                    "event": "update",
+                    "data": json.dumps({"log": line}, sort_keys=True),
+                }
+    if job.status in ("queued", "running"):
+        async for ev in sub.events():
+            yield {"event": "update", "data": json.dumps(ev, sort_keys=True)}
+
+
 @router.get("/{job_id}/stream")
 async def stream_job(job_id: str):
     try:
@@ -38,16 +65,7 @@ async def stream_job(job_id: str):
             status_code=404,
         )
     sub = jobs_module.registry().subscribe(job_id)
-
-    async def event_source():
-        try:
-            yield {"event": "snapshot", "data": jobs_module.registry().get(job_id).as_dict()}
-        except KeyError:
-            return
-        async for ev in sub.events():
-            yield {"event": "update", "data": ev}
-
-    return EventSourceResponse(event_source())
+    return EventSourceResponse(iter_job_stream_events(job_id, sub))
 
 
 @router.post("/{job_id}/cancel")

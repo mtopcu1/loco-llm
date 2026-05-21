@@ -1,4 +1,4 @@
-"""`loco update` — pull the latest tag (or a chosen ref) into the git checkout."""
+"""`loco update` — refresh the current install ref (branch tip, tag, or chosen ref)."""
 from __future__ import annotations
 
 import json
@@ -262,6 +262,41 @@ def _restore_service(saved) -> None:
     )
 
 
+def _apply_update(
+    root: Path,
+    *,
+    restart: bool,
+    fetch_refspec: str | None = None,
+) -> object | None:
+    """Stash if needed, update checkout, sync deps, restore service. Returns saved record."""
+    saved = _maybe_restart_around_update(restart)
+    if _working_tree_dirty(root):
+        _run_git(root, "stash", "push", "-u", "-m", "llm-update")
+        console.print("[yellow]stashed local changes[/yellow]")
+    if fetch_refspec:
+        _fetch_remote(root, refspec=fetch_refspec)
+    return saved
+
+
+def _finish_update(root: Path, *, saved) -> None:
+    _sync_deps(root)
+    _restore_service(saved)
+    _post_update_hooks()
+
+
+def _update_branch_tip(root: Path, branch: str, *, restart: bool) -> None:
+    saved = _apply_update(root, restart=restart, fetch_refspec=branch)
+    _checkout_branch(root, branch)
+    _ff_pull(root, branch)
+    _finish_update(root, saved=saved)
+
+
+def _update_to_tag(root: Path, tag: str, *, restart: bool) -> None:
+    saved = _apply_update(root, restart=restart)
+    _checkout(root, tag)
+    _finish_update(root, saved=saved)
+
+
 def _post_update_hooks() -> None:
     """Run best-effort post-update hooks."""
     from llm_cli.core import dashboard as dash
@@ -321,14 +356,19 @@ def update(
         "--restart",
         help="Stop a running service before update and re-serve afterward.",
     ),
+    stable: bool = typer.Option(
+        False,
+        "--stable",
+        help="Switch to the latest release tag (leave feature branches).",
+    ),
 ) -> None:
-    """Pull the latest tagged release (or a chosen ref) into the local checkout."""
+    """Refresh the install checkout: current branch/tag by default, or a chosen ref."""
     if json_output and not check:
         console.print("[red]error:[/red] --json is only valid with --check.")
         raise typer.Exit(code=1)
-    if sum(bool(x) for x in (branch, tag, check)) > 1:
+    if sum(bool(x) for x in (branch, tag, check, stable)) > 1:
         console.print(
-            "[red]error:[/red] --branch, --tag, and --check are mutually exclusive."
+            "[red]error:[/red] --branch, --tag, --check, and --stable are mutually exclusive."
         )
         raise typer.Exit(code=1)
 
@@ -376,67 +416,98 @@ def update(
 
     if branch is not None:
         try:
-            saved = _maybe_restart_around_update(restart)
-            if _working_tree_dirty(root):
-                _run_git(root, "stash", "push", "-u", "-m", "llm-update")
-                console.print("[yellow]stashed local changes[/yellow]")
-            _checkout_branch(root, branch)
-            _ff_pull(root, branch)
-            _sync_deps(root)
-            _restore_service(saved)
-            _post_update_hooks()
+            _update_branch_tip(root, branch, restart=restart)
         except GitCommandError as exc:
             _report_git_error(exc, action="update", branch=branch)
             raise typer.Exit(code=1) from None
         console.print(
-            f"[yellow]you are now on branch {branch} — not a stable release.[/yellow] "
-            "Run `loco update` to return to the latest stable tag."
+            f"[yellow]you are on branch {branch} — not a stable release.[/yellow] "
+            "Run `loco update --stable` to switch to the latest release tag."
         )
         return
 
     if tag is not None:
         try:
-            saved = _maybe_restart_around_update(restart)
-            if _working_tree_dirty(root):
-                _run_git(root, "stash", "push", "-u", "-m", "llm-update")
-                console.print("[yellow]stashed local changes[/yellow]")
-            _checkout(root, tag)
-            _sync_deps(root)
-            _restore_service(saved)
-            _post_update_hooks()
+            _update_to_tag(root, tag, restart=restart)
         except GitCommandError as exc:
             _report_git_error(exc, action="update", tag=tag)
             raise typer.Exit(code=1) from None
         console.print(f"[green]pinned to {tag}.[/green]")
         return
 
-    latest = _latest_tag(root)
-    if latest is None:
-        console.print(
-            "[red]error:[/red] no semver tags on origin; cannot re-anchor. "
-            "Use `--branch main` if you intend to track an untagged branch."
-        )
-        raise typer.Exit(code=1)
-
-    if state["kind"] == "branch":
-        console.print(
-            f"[yellow]currently on branch {state['ref']}; "
-            f"switching back to latest stable tag {latest}.[/yellow]"
-        )
-    if state["kind"] == "tag" and state["ref"] == latest:
-        console.print(f"Already on latest stable ({latest}).")
+    if stable:
+        latest = _latest_tag(root)
+        if latest is None:
+            console.print(
+                "[red]error:[/red] no semver tags on origin; cannot switch to stable. "
+                "Use `--branch <name>` to track a branch instead."
+            )
+            raise typer.Exit(code=1)
+        if state["kind"] == "tag" and state["ref"] == latest:
+            try:
+                saved = _apply_update(root, restart=restart)
+                _finish_update(root, saved=saved)
+            except GitCommandError as exc:
+                _report_git_error(exc, action="update")
+                raise typer.Exit(code=1) from None
+            console.print(f"Already on latest stable ({latest}); dependencies synced.")
+            return
+        try:
+            _update_to_tag(root, latest, restart=restart)
+        except GitCommandError as exc:
+            _report_git_error(exc, action="update")
+            raise typer.Exit(code=1) from None
+        if state["kind"] == "branch":
+            console.print(
+                f"[yellow]switched from branch {state['ref']} to latest stable {latest}.[/yellow]"
+            )
+        else:
+            console.print(f"[green]updated to {latest}.[/green]")
         return
 
+    # Default: refresh whatever ref is currently checked out.
+    if state["kind"] == "branch" and state["ref"]:
+        try:
+            _update_branch_tip(root, state["ref"], restart=restart)
+        except GitCommandError as exc:
+            _report_git_error(exc, action="update", branch=state["ref"])
+            raise typer.Exit(code=1) from None
+        console.print(f"[green]updated branch {state['ref']} to latest tip.[/green]")
+        return
+
+    if state["kind"] == "tag":
+        latest = _latest_tag(root)
+        if latest is None:
+            console.print(
+                "[red]error:[/red] no semver tags on origin. "
+                "Use `--branch <name>` to track a branch."
+            )
+            raise typer.Exit(code=1)
+        if state["ref"] == latest:
+            try:
+                saved = _apply_update(root, restart=restart)
+                _finish_update(root, saved=saved)
+            except GitCommandError as exc:
+                _report_git_error(exc, action="update")
+                raise typer.Exit(code=1) from None
+            console.print(f"Already on latest stable ({latest}); dependencies synced.")
+            return
+        try:
+            _update_to_tag(root, latest, restart=restart)
+        except GitCommandError as exc:
+            _report_git_error(exc, action="update")
+            raise typer.Exit(code=1) from None
+        console.print(f"[green]updated to {latest}.[/green]")
+        return
+
+    # Detached HEAD: sync deps only; do not move the checkout.
     try:
-        saved = _maybe_restart_around_update(restart)
-        if _working_tree_dirty(root):
-            _run_git(root, "stash", "push", "-u", "-m", "llm-update")
-            console.print("[yellow]stashed local changes[/yellow]")
-        _checkout(root, latest)
-        _sync_deps(root)
-        _restore_service(saved)
-        _post_update_hooks()
+        saved = _apply_update(root, restart=restart)
+        _finish_update(root, saved=saved)
     except GitCommandError as exc:
         _report_git_error(exc, action="update")
         raise typer.Exit(code=1) from None
-    console.print(f"[green]updated to {latest}.[/green]")
+    console.print(
+        f"[yellow]detached at {state['sha'][:7]}; dependencies synced only.[/yellow] "
+        "Checkout a branch or tag, or use `--stable` / `--tag`."
+    )

@@ -96,15 +96,38 @@ def test_update_bare_advances_to_latest_tag(fake_clone):
     assert "updated to v0.4.1" in result.stdout.lower()
 
 
-def test_update_bare_reanchors_from_branch(fake_clone):
+def test_update_bare_stays_on_branch_and_pulls(fake_clone):
     subprocess.run(
         ["git", "-C", str(fake_clone), "checkout", "-q", "-b", "hotfix/x"],
         check=True,
     )
     result = runner.invoke(app, ["update"])
     assert result.exit_code == 0
-    assert "switching back to latest stable" in result.stdout.lower()
+    assert "updated branch hotfix/x" in result.stdout.lower()
+    head = subprocess.run(
+        ["git", "-C", str(fake_clone), "rev-parse", "--abbrev-ref", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    assert head == "hotfix/x"
+
+
+def test_update_stable_reanchors_from_branch(fake_clone):
+    subprocess.run(
+        ["git", "-C", str(fake_clone), "checkout", "-q", "-b", "hotfix/x"],
+        check=True,
+    )
+    result = runner.invoke(app, ["update", "--stable"])
+    assert result.exit_code == 0
     assert "v0.4.1" in result.stdout
+    head = subprocess.run(
+        ["git", "-C", str(fake_clone), "describe", "--tags", "--exact-match"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    assert head == "v0.4.1"
 
 
 def test_update_branch_flag_checks_out_branch(fake_clone):

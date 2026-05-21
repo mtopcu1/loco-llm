@@ -52,6 +52,33 @@ def test_install_runtime_returns_job_id(test_client, seed_runtime, monkeypatch):
 
 
 @pytest.mark.webapi
+def test_install_vllm_passes_default_build_params(test_client, seed_runtime, monkeypatch):
+    seed_runtime("vllm")
+    captured: dict = {}
+
+    def fake_start(**kwargs):
+        captured.update(kwargs)
+        return "vllm-job"
+
+    monkeypatch.setattr(
+        "llm_cli.webapi.routes.runtimes.jobs_module.registry",
+        lambda: type("R", (), {"start_subprocess": lambda self, **kw: fake_start(**kw)})(),
+    )
+    r = test_client.post("/api/runtimes/vllm/install", headers={"Host": "testserver"})
+    assert r.status_code == 200
+    assert captured["argv"][-8:] == [
+        "runtime",
+        "install",
+        "vllm",
+        "--yes",
+        "-p",
+        "vllm_version=0.21.0",
+        "-p",
+        "pip_extra=cuda",
+    ]
+
+
+@pytest.mark.webapi
 def test_install_runtime_404(test_client):
     r = test_client.post("/api/runtimes/missing/install", headers={"Host": "testserver"})
     assert r.status_code == 404

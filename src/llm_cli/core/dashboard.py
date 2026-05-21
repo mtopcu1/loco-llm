@@ -17,6 +17,8 @@ from typing import Literal
 
 import yaml
 
+from llm_cli.core.lifecycle import state_dir, state_root
+from llm_cli.core.scaffold import install_root
 from llm_cli.core.settings import resolve_settings
 
 InstallVerdict = tuple[
@@ -35,14 +37,8 @@ class InstalledRecord:
 
 
 def dashboard_root() -> Path:
-    """Repo-relative path to the dashboard/ source directory."""
-    settings = resolve_settings()
-    if settings.repo_root is None:
-        raise RuntimeError(
-            "repo_root not configured. Run `llm setup` or set repo_root via "
-            "`llm settings edit repo_root`."
-        )
-    return settings.repo_root / "dashboard"
+    """Install-root path to the dashboard/ source directory."""
+    return install_root() / "dashboard"
 
 
 def dist_dir() -> Path:
@@ -113,9 +109,7 @@ def verify_installed(cli_version: str) -> InstallVerdict:
 
 def _state_dashboard_dir() -> Path:
     settings = resolve_settings()
-    if settings.repo_root is None:
-        raise RuntimeError("repo_root not configured")
-    d = settings.repo_root / "state" / "dashboard"
+    d = state_dir(state_root(settings)) / "dashboard"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -202,6 +196,7 @@ def run_install(
             raise RuntimeError(
                 f"managed venv not found at {root.parent / '.venv'}; rerun install.sh first."
             )
+        install_root = root.parent
         subprocess.check_call(
             [
                 uv,
@@ -209,10 +204,10 @@ def run_install(
                 "install",
                 "--python",
                 str(venv_python),
-                "fastapi>=0.115,<1.0",
-                "uvicorn[standard]>=0.30,<1.0",
-                "sse-starlette>=2.1,<3.0",
-            ]
+                "-e",
+                f"{install_root}[dashboard]",
+            ],
+            cwd=str(install_root),
         )
 
     if not skip_frontend:
@@ -248,6 +243,18 @@ def run_install(
     )
     write_installed_record(record)
     return record
+
+
+def _tail_log(path: Path, *, max_lines: int = 24) -> str:
+    if not path.is_file():
+        return ""
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return ""
+    if not lines:
+        return ""
+    return "\n".join(lines[-max_lines:])
 
 
 def _port_in_use(host: str, port: int) -> bool:
@@ -304,6 +311,10 @@ def start_server_background(
     log_path = server_log_path()
     log_fd = log_path.open("ab")
     env = os.environ.copy()
+    from llm_cli.core.scaffold import data_home, install_root
+
+    env.setdefault("LOCO_HOME", str(data_home()))
+    env.setdefault("LOCO_INSTALL", str(install_root()))
     _apply_server_env(env, allowed_hosts=allowed_hosts, insecure=insecure)
 
     cmd = [
@@ -348,10 +359,14 @@ def start_server_background(
             last_err = str(exc)
 
         if proc.poll() is not None:
-            raise RuntimeError(
+            tail = _tail_log(log_path)
+            msg = (
                 f"Dashboard server exited during startup (last error: {last_err}). "
                 f"See {log_path} for details."
             )
+            if tail:
+                msg += f"\n--- log tail ---\n{tail}"
+            raise RuntimeError(msg)
         time.sleep(0.25)
 
     proc.terminate()

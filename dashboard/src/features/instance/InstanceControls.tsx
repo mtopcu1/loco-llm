@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -43,7 +43,13 @@ export function InstanceControls() {
       if (error) throw new Error('Failed to load configs')
       return (data ?? []) as Array<{ id: string }>
     },
+    refetchOnMount: 'always',
   })
+
+  useEffect(() => {
+    void qc.invalidateQueries({ queryKey: ['configs'] })
+    void qc.invalidateQueries({ queryKey: ['instance'] })
+  }, [qc])
 
   const stop = useMutation({
     mutationFn: async () => {

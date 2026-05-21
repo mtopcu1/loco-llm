@@ -2,11 +2,18 @@
 # Public one-line installer for loco-llm.
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/mtopcu1/loco-llm/main/scripts/install.sh | bash
-# Options:
-#   --data-home <path>  user data root (default: $HOME/.loco)
-#   --dir <path>        git install root (default: $DATA_HOME/install)
-#   --branch <name>     clone+checkout a branch instead of the latest tag
-#   --tag <vX.Y.Z>      pin to a specific tag
+# Options (pass after bash -s --):
+#   --data-home <path>   user data root (default: $HOME/.loco)
+#   --dir <path>         git install root (default: $DATA_HOME/install)
+#   --branch <name>      track a branch tip (fetches + ff-only pull)
+#   --tag <vX.Y.Z>       pin to a release tag
+#   --commit <sha>       pin to a commit (detached HEAD; fetches from origin)
+# Default with no ref flag: latest semver tag on origin.
+#
+# Examples:
+#   bash -s -- --branch feat/ux-improvements
+#   bash -s -- --tag v1.3.0
+#   bash -s -- --commit abc1234
 set -euo pipefail
 
 REPO_URL="https://github.com/mtopcu1/loco-llm.git"
@@ -16,6 +23,7 @@ LOCO_INSTALL="${LOCO_INSTALL:-${LOCO_LLM_HOME:-}}"
 PYTHON_MIN="3.11"
 REF_BRANCH=""
 REF_TAG=""
+REF_COMMIT=""
 die() { echo "error: $*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"; }
 
@@ -25,9 +33,20 @@ while [ $# -gt 0 ]; do
     --dir)       LOCO_INSTALL="$2"; shift 2 ;;
     --branch)    REF_BRANCH="$2"; shift 2 ;;
     --tag)       REF_TAG="$2"; shift 2 ;;
-    *)           die "unknown argument: $1" ;;
+    --commit)    REF_COMMIT="$2"; shift 2 ;;
+    -h|--help)
+      sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+      exit 0
+      ;;
+    *)           die "unknown argument: $1 (try --help)" ;;
   esac
 done
+
+ref_flags=0
+[ -n "$REF_BRANCH" ] && ref_flags=$((ref_flags + 1))
+[ -n "$REF_TAG" ] && ref_flags=$((ref_flags + 1))
+[ -n "$REF_COMMIT" ] && ref_flags=$((ref_flags + 1))
+[ "$ref_flags" -gt 1 ] && die "use only one of --branch, --tag, --commit"
 
 if [ -z "$LOCO_INSTALL" ]; then
   LOCO_INSTALL="$LOCO_HOME/install"
@@ -69,18 +88,24 @@ cd "$LOCO_INSTALL"
 if [ -n "$REF_BRANCH" ]; then
   target="$REF_BRANCH"
   echo "==> checking out branch $target"
+  git fetch origin "$target"
+  git checkout "$target"
+  git pull --ff-only origin "$target"
 elif [ -n "$REF_TAG" ]; then
   target="$REF_TAG"
   echo "==> checking out tag $target"
+  git fetch origin "refs/tags/${target}:refs/tags/${target}" 2>/dev/null || git fetch origin --tags
+  git checkout "$target"
+elif [ -n "$REF_COMMIT" ]; then
+  target="$REF_COMMIT"
+  echo "==> checking out commit $target"
+  git fetch origin "$target"
+  git checkout "$target"
 else
   target="$(git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)"
-  [ -n "$target" ] || die "no semver tags found on origin; pass --branch or --tag"
+  [ -n "$target" ] || die "no semver tags found on origin; pass --branch, --tag, or --commit"
   echo "==> checking out latest tag $target"
-fi
-
-git checkout "$target"
-if [ -n "$REF_BRANCH" ]; then
-  git pull --ff-only origin "$target"
+  git checkout "$target"
 fi
 
 echo "==> creating venv at $LOCO_INSTALL/.venv"

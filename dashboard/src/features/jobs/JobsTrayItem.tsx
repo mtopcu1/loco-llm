@@ -2,11 +2,14 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import type { JobRecord } from '@/hooks/useJobs'
 import { useAppStore } from '@/store'
+import { jobTitle, shortenUrl } from '@/lib/jobLabel'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 function contextSummary(context: Record<string, unknown> | undefined): string {
   if (!context) return ''
+  const url = context.url
+  if (typeof url === 'string') return shortenUrl(url, 48)
   return Object.entries(context)
     .map(([k, v]) => `${k}: ${String(v)}`)
     .join(', ')
@@ -53,7 +56,7 @@ export function JobsTrayItem({ job, compact }: Props) {
       tabIndex={0}
     >
       <div className="flex-1 min-w-0">
-        <div className="font-medium truncate">{job.kind}</div>
+        <div className="font-medium truncate">{jobTitle(job.kind, job.context)}</div>
         <div className="text-zinc-500 truncate">{contextSummary(job.context)}</div>
         {job.progress?.stage && (
           <div className="text-zinc-400 truncate">{job.progress.stage}</div>
