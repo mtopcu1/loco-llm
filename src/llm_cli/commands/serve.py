@@ -262,7 +262,9 @@ def _do_foreground(
         _, code = spawn_foreground(
             inner=inner, env=env, on_started=lambda _pid: None
         )
-        raise typer.Exit(code=code)
+        if code != 0:
+            _fail(f"foreground serve exited with code {code}")
+        return
 
     logs_dir(state_base).mkdir(parents=True, exist_ok=True)
     log_path = (logs_dir(state_base) / f"{cfg.id}.log").as_posix()
@@ -295,7 +297,8 @@ def _do_foreground(
         append_history(
             state_base, {"action": "stop", "mode": "foreground", "config_id": cfg.id}
         )
-    raise typer.Exit(code=code)
+    if code != 0:
+        _fail(f"foreground serve exited with code {code}")
 
 
 def _do_systemd(
@@ -360,7 +363,29 @@ def serve_dispatch(
     systemd: bool = False,
     foreground_from_supervisor: bool = False,
 ) -> None:
-    """Programmatic serve entry (raises typer.Exit)."""
+    """Programmatic serve entry (raises ServeError on failure)."""
+    try:
+        _serve_dispatch_impl(
+            config_id,
+            foreground=foreground,
+            systemd=systemd,
+            foreground_from_supervisor=foreground_from_supervisor,
+        )
+    except ServeError:
+        raise
+    except typer.Exit as exc:
+        from llm_cli.core.serve_diagnostics import diagnose_serve_failure
+
+        _fail(diagnose_serve_failure(config_id, exit_code=exc.exit_code))
+
+
+def _serve_dispatch_impl(
+    config_id: str,
+    *,
+    foreground: bool = False,
+    systemd: bool = False,
+    foreground_from_supervisor: bool = False,
+) -> None:
     if foreground and systemd:
         _fail("--foreground and --systemd are mutually exclusive")
     settings = resolve(load_settings())
@@ -451,6 +476,19 @@ def switch(
 
 
 def _switch_impl(
+    config_id: str,
+) -> None:
+    try:
+        _switch_impl_body(config_id)
+    except ServeError:
+        raise
+    except typer.Exit as exc:
+        from llm_cli.core.serve_diagnostics import diagnose_serve_failure
+
+        _fail(diagnose_serve_failure(config_id, exit_code=exc.exit_code))
+
+
+def _switch_impl_body(
     config_id: str,
 ) -> None:
     settings = resolve(load_settings())

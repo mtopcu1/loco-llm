@@ -20,9 +20,11 @@ export function useJob(id: string | null) {
     enabled: !!id,
   })
 
+  const active =
+    snapshot.data?.status === 'queued' || snapshot.data?.status === 'running'
   const sse = useSSE<JobStreamEvent>({
     url: id ? `/api/jobs/${id}/stream` : '',
-    enabled: !!id && !!snapshot.data,
+    enabled: !!id && !!snapshot.data && active,
     eventNames: ['snapshot', 'update'],
   })
 

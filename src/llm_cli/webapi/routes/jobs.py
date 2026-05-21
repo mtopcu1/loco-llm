@@ -40,7 +40,7 @@ async def iter_job_stream_events(job_id: str, sub):
         "data": json.dumps(job.as_dict(), sort_keys=True),
     }
     log_path = jobs_module.job_log_path(job_id)
-    if log_path.is_file():
+    if job.status in ("queued", "running") and log_path.is_file():
         text = log_path.read_text(encoding="utf-8", errors="replace")
         for line in text.splitlines():
             if line:
@@ -51,6 +51,24 @@ async def iter_job_stream_events(job_id: str, sub):
     if job.status in ("queued", "running"):
         async for ev in sub.events():
             yield {"event": "update", "data": json.dumps(ev, sort_keys=True)}
+
+
+@router.get("/{job_id}/log")
+def get_job_log(job_id: str):
+    try:
+        jobs_module.registry().get(job_id)
+    except KeyError:
+        raise ApiError(
+            ErrorCode.JOB_NOT_FOUND,
+            f"Job '{job_id}' not found",
+            details={"job_id": job_id},
+            status_code=404,
+        )
+    log_path = jobs_module.job_log_path(job_id)
+    if not log_path.is_file():
+        return {"lines": []}
+    text = log_path.read_text(encoding="utf-8", errors="replace")
+    return {"lines": text.splitlines()}
 
 
 @router.get("/{job_id}/stream")

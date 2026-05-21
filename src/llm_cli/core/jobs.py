@@ -216,10 +216,14 @@ class _JobRegistry:
                     j2.status = "failed"
                     j2.finished_at = datetime.now(tz=UTC)
                     j2.error = {"code": "INTERNAL_ERROR", "message": str(e), "details": {}}
-                err_line = f"error: {e}"
-                log.write(err_line + "\n")
-                log.flush()
-                self._publish_log_line(job_id, err_line)
+                already_reported = (
+                    j2.progress is not None and j2.progress.stage == "failed"
+                )
+                if not already_reported:
+                    err_line = f"error: {e}"
+                    log.write(err_line + "\n")
+                    log.flush()
+                    self._publish_log_line(job_id, err_line)
             finally:
                 self._publish_status(job_id)
                 log.close()

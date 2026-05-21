@@ -337,9 +337,10 @@ def serve_instance(config_id: str, *, mode: str) -> None:
     except ServeError as exc:
         raise LifecycleError(exc.message) from exc
     except typer.Exit as exc:
+        from llm_cli.core.serve_diagnostics import diagnose_serve_failure
+
         raise LifecycleError(
-            f"serve failed (exit {exc.exit_code}); see job log or "
-            f"state/logs for details"
+            diagnose_serve_failure(config_id, exit_code=exc.exit_code)
         ) from exc
 
 
@@ -355,7 +356,8 @@ def switch_instance(config_id: str) -> None:
     except ServeError as exc:
         raise LifecycleError(exc.message) from exc
     except typer.Exit as exc:
+        from llm_cli.core.serve_diagnostics import diagnose_serve_failure
+
         raise LifecycleError(
-            f"switch failed (exit {exc.exit_code}); see job log or "
-            f"state/logs for details"
+            diagnose_serve_failure(config_id, exit_code=exc.exit_code)
         ) from exc

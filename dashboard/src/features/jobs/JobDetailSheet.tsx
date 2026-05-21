@@ -29,31 +29,43 @@ export function JobDetailSheet() {
   const qc = useQueryClient()
   const [logLines, setLogLines] = useState<string[]>([])
   const logEndRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
-    if (!jobId) return
+    if (!jobId) {
+      setLogLines([])
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const res = await fetch(`/api/jobs/${jobId}/log`)
+      if (cancelled || !res.ok) return
+      const body = (await res.json()) as { lines?: string[] }
+      setLogLines(body.lines ?? [])
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [jobId, job.data?.status, job.data?.finished_at])
+
+  const jobActive = job.data?.status === 'queued' || job.data?.status === 'running'
+  useEffect(() => {
+    if (!jobId || !jobActive) return
+    setLogLines([])
     const es = new EventSource(`/api/jobs/${jobId}/stream`)
     const onUpdate = (raw: MessageEvent) => {
       try {
-        const data = JSON.parse(String(raw.data)) as { log?: string; status?: string }
+        const data = JSON.parse(String(raw.data)) as { log?: string }
         const line = data.log
         if (line) {
           setLogLines((prev) => [...prev, line])
-        }
-        if (data.status) {
-          void qc.invalidateQueries({ queryKey: ['jobs', jobId] })
         }
       } catch {
         /* ignore */
       }
     }
-    es.addEventListener('snapshot', onUpdate)
     es.addEventListener('update', onUpdate)
     return () => es.close()
-  }, [jobId, qc])
-
-  useEffect(() => {
-    setLogLines([])
-  }, [jobId])
+  }, [jobId, jobActive])
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' })

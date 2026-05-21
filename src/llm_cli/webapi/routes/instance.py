@@ -180,8 +180,14 @@ def _debug_hints(config_id: str) -> list[str]:
 async def _report_instance_failure(config_id: str, report, exc: BaseException) -> None:
     await report({"stage": "failed"})
     msg = str(exc).strip()
-    for line in msg.splitlines():
-        await report({"log": f"error: {line}" if line else "error: (unknown)"})
+    if msg:
+        seen: set[str] = set()
+        for line in msg.splitlines():
+            line = line.strip()
+            if not line or line in seen:
+                continue
+            seen.add(line)
+            await report({"log": f"error: {line}"})
     await report({"log": "--- serve log tail ---"})
     tail = _serve_log_tail_lines(config_id)
     for line in tail:
