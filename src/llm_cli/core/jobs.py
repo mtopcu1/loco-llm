@@ -21,7 +21,7 @@ from typing import Any, Literal
 
 from llm_cli.core.lifecycle import state_dir, state_root
 from llm_cli.core.settings import resolve_settings
-from llm_cli.webapi.streams import EventHub
+from llm_cli.core.events import EventHub
 
 JobKind = Literal[
     "runtime_install",

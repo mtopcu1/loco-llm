@@ -64,8 +64,9 @@ def test_stop_background_sigterms_pid_and_clears(tmp_path: Path) -> None:
 
     with (
         patch("llm_cli.commands.lifecycle_cmds.reconcile", lambda _repo: None),
-        patch("llm_cli.commands.lifecycle_cmds.os.kill", new=fake_kill),
-        patch("llm_cli.commands.lifecycle_cmds._wait_pid_gone", return_value=True),
+        patch("llm_cli.core.lifecycle.is_alive", return_value=True),
+        patch("llm_cli.core.process_control.os.kill", new=fake_kill),
+        patch("llm_cli.core.process_control.wait_pid_gone", return_value=True),
     ):
         result = runner.invoke(app, ["stop"], catch_exceptions=False)
     assert result.exit_code == 0
@@ -94,16 +95,17 @@ def test_stop_background_escalates_to_sigkill_if_pid_persists(tmp_path: Path) ->
 
     with (
         patch("llm_cli.commands.lifecycle_cmds.reconcile", lambda _repo: None),
-        patch("llm_cli.commands.lifecycle_cmds.os.kill", new=fake_kill),
+        patch("llm_cli.core.lifecycle.is_alive", return_value=True),
+        patch("llm_cli.core.process_control.os.kill", new=fake_kill),
         patch(
-            "llm_cli.commands.lifecycle_cmds._wait_pid_gone",
+            "llm_cli.core.process_control.wait_pid_gone",
             side_effect=[False, True],
         ),
     ):
         result = runner.invoke(app, ["stop"], catch_exceptions=False)
     assert result.exit_code == 0
     assert signal.SIGTERM in sigs
-    assert lifecycle_cmds._SIGKILL in sigs
+    assert int(getattr(signal, "SIGKILL", 9)) in sigs
 
 
 def test_stop_systemd_calls_systemctl_stop(tmp_path: Path) -> None:
@@ -120,7 +122,7 @@ def test_stop_systemd_calls_systemctl_stop(tmp_path: Path) -> None:
         ),
     )
     with (
-        patch("llm_cli.commands.lifecycle_cmds.stop_unit") as su,
+        patch("llm_cli.core.systemd_unit.stop_unit") as su,
         patch("llm_cli.core.lifecycle._systemd_is_active", return_value=True),
     ):
         result = runner.invoke(app, ["stop"], catch_exceptions=False)

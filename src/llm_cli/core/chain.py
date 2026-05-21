@@ -53,7 +53,7 @@ def _duplicate_model_menu(existing_id: str) -> str:
 
 def _pull_with_new_model_id(url: str) -> str | None:
     """Prompt until unique id or user-visible failure; returns None on aborted pull."""
-    from llm_cli.commands.model_cmd import (
+    from llm_cli.core.model_pull import (
         DuplicateModelRegistrationError,
         PullModelError,
     )
@@ -98,7 +98,7 @@ def _pull_with_new_model_id(url: str) -> str | None:
 
 def _interactive_model_pull_for_setup(url: str) -> str | None:
     """Pull HF URL or resolve duplicate registration interactively."""
-    from llm_cli.commands.model_cmd import DuplicateModelRegistrationError
+    from llm_cli.core.model_pull import DuplicateModelRegistrationError
 
     try:
         return _do_model_pull(url)
@@ -134,7 +134,7 @@ def _do_config_setup(
 
 
 def _do_serve(config_id: str) -> int:
-    from llm_cli.commands.serve import serve_dispatch
+    from llm_cli.core.serve import serve_dispatch
 
     try:
         serve_dispatch(config_id)
@@ -151,7 +151,7 @@ def _do_dashboard_install() -> None:
 
 def run_setup_chain() -> int:
     """Interactive post-settings chain (runtime → model URL → config → serve)."""
-    from llm_cli.commands.model_cmd import PullModelError
+    from llm_cli.core.model_pull import PullModelError
     from llm_cli.core.lifecycle import append_history, state_root
     from llm_cli.core.settings import load_settings, resolve
 

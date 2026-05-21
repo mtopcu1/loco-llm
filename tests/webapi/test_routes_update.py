@@ -63,16 +63,16 @@ def test_trigger_update_starts_job(test_client, webapi_repo, monkeypatch, tmp_pa
     monkeypatch.setattr(jobs_module, "_jobs_dir", lambda: tmp_path)
     captured: dict = {}
 
-    def fake_start(*, kind, context, argv, env=None, cwd=None):
+    def fake_start(*, kind, context, coro_factory):
         captured["kind"] = kind
-        captured["argv"] = argv
         captured["context"] = context
+        captured["coro_factory"] = coro_factory
         return "job-1"
 
-    monkeypatch.setattr(jobs_module.registry(), "start_subprocess", fake_start)
+    monkeypatch.setattr(jobs_module.registry(), "start_async", fake_start)
     r = test_client.post("/api/update?restart_dashboard=true", headers={"Host": "testserver"})
     assert r.status_code == 200
     assert r.json()["job_id"] == "job-1"
     assert captured["kind"] == "update"
-    assert "update" in captured["argv"]
-    assert "--restart" in captured["argv"]
+    assert captured["context"]["restart_dashboard"] is True
+    assert callable(captured["coro_factory"])

@@ -46,3 +46,33 @@ def current() -> dict[str, Any]:
         "port": rec.port,
         "mode": rec.mode,
     }
+
+
+def running_mode() -> str | None:
+    """Mode of the running instance, or None when nothing is running."""
+    cur = current()
+    if not cur.get("running"):
+        return None
+    mode = cur.get("mode")
+    return str(mode) if isinstance(mode, str) else None
+
+
+def running_config_id() -> str | None:
+    """Config id of the running instance, or None."""
+    cur = current()
+    if not cur.get("running"):
+        return None
+    config_id = cur.get("config_id")
+    return str(config_id) if isinstance(config_id, str) else None
+
+
+def running_runtime_and_config() -> tuple[str | None, str | None]:
+    """Return (runtime_id, config_id) when a service is running, else (None, None)."""
+    cur = current()
+    if not cur.get("running"):
+        return None, None
+    runtime_id = cur.get("runtime_id")
+    config_id = cur.get("config_id")
+    rt = str(runtime_id) if isinstance(runtime_id, str) else None
+    cfg = str(config_id) if isinstance(config_id, str) else None
+    return rt, cfg

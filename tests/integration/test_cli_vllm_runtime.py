@@ -64,7 +64,7 @@ def test_runtime_list_includes_vllm(monkeypatch, tmp_path) -> None:
     assert "vllm" in result.stdout
 
 
-@patch("llm_cli.commands.runtime_cmd.run_runtime_bash", return_value=0)
+@patch("llm_cli.core.runtime_install.run_runtime_bash", return_value=0)
 def test_runtime_install_vllm_mocks_bash_pip(mock_run_runtime_bash, monkeypatch, tmp_path) -> None:
     _seed_repo(tmp_path, monkeypatch)
 

@@ -141,8 +141,8 @@ def test_config_show_resolves_env(tmp_path: Path) -> None:
     assert "/m.gguf" in result.stdout
 
 
-@patch("llm_cli.commands.runtime_cmd._run_build_script", return_value=0)
-@patch("llm_cli.commands.runtime_cmd._run_verify_script", return_value=0)
+@patch("llm_cli.core.runtime_install._run_build_script", return_value=0)
+@patch("llm_cli.core.runtime_install._run_verify_script", return_value=0)
 def test_runtime_install_calls_build_and_verify(
     mock_verify, mock_build, tmp_path: Path
 ) -> None:

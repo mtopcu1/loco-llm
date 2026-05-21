@@ -32,7 +32,13 @@ from llm_cli.core.params import derive_env_name, validate_params
 from llm_cli.core.repo import scaffold_root
 from llm_cli.core.scaffold import user_runtimes_dir
 from llm_cli.core.settings import Settings, load_settings, resolve
+from llm_cli.core import runtime_install as rt_install
+from llm_cli.core.runtime_install import RuntimeInstallError
 from llm_cli.core.wsl import run_runtime_bash
+
+# Patch points for tests (delegate to core.runtime_install).
+_run_build_script = rt_install._run_build_script
+_run_verify_script = rt_install._run_verify_script
 
 console = Console()
 runtime_app = typer.Typer(
@@ -421,57 +427,13 @@ def _install_impl(
     param: list[str],
     yes: bool,
 ) -> InstallRecord:
-    manifest = _get_runtime_manifest(runtime_id)
-    runtime_rec = registry.get_runtime_merged(runtime_id)
-    if runtime_rec is None:
-        console.print(f"[red]error:[/red] unknown runtime {runtime_id!r}")
-        raise typer.Exit(code=1)
-    if manifest.kind == "custom":
-        console.print(
-            f"[red]error:[/red] runtime {runtime_id!r} is kind: custom — it has no "
-            "build step. Use `loco runtime setup` to re-register or edit files under "
-            f"{manifest.path}."
+    try:
+        return rt_install.install_runtime(
+            runtime_id, param=list(param), yes=yes, settings=settings
         )
-        raise typer.Exit(code=1)
-    build_params = _resolve_build_params(
-        runtime_id, manifest.build_schema, flags=param, yes=yes
-    )
-    _pre_flight(runtime_id, build_params)
-
-    build_env = _build_env(runtime_id, manifest.build_schema, build_params)
-    build_rc = _run_build_script(
-        settings=settings, runtime_path=runtime_rec.path, env=build_env
-    )
-    if build_rc != 0:
-        console.print(f"[red]build failed[/red] (exit {build_rc})")
-        raise typer.Exit(code=build_rc)
-
-    verify_rc = _run_verify_script(
-        settings=settings, runtime_path=runtime_rec.path, env=build_env
-    )
-    if verify_rc not in (None, 0):
-        console.print(f"[red]verify failed[/red] (exit {verify_rc})")
-        raise typer.Exit(code=verify_rc)
-
-    record = InstallRecord(
-        runtime_id=runtime_id,
-        installed_at=_utc_now_iso(),
-        build_params=build_params,
-        build_sh_sha256=file_sha256(manifest.path / "build.sh"),
-        verify_passed=True if verify_rc == 0 else None,
-        schema_hash=schema_hash(manifest.raw.get("build") or {}),
-        kind=manifest.kind,
-    )
-    write_record(settings.runtimes_dir, record)
-    append_history(
-        state_root(settings),
-        {
-            "action": "runtime-install",
-            "id": runtime_id,
-            "build_params": build_params,
-        },
-    )
-    return record
+    except RuntimeInstallError as exc:
+        console.print(f"[red]error:[/red] {exc.message}")
+        raise typer.Exit(code=exc.exit_code) from exc
 
 
 @runtime_app.command("setup", help="Interactive wizard to install or register a runtime.")
@@ -672,19 +634,16 @@ def runtime_rebuild(
         )
         raise typer.Exit(code=1)
 
-    record = read_record(settings.runtimes_dir, runtime_id)
-
-    flags: list[str] = []
-    if record is not None and not reset:
-        flags.extend(f"{key}={value}" for key, value in record.build_params.items())
-    flags.extend(param)
-
-    clear_record(settings.runtimes_dir, runtime_id)
-    new_record = _install_impl(
-        settings=settings, runtime_id=runtime_id, param=flags, yes=yes
-    )
-    append_history(
-        state_root(settings), {"action": "runtime-rebuild", "id": runtime_id, "reset": reset}
-    )
+    try:
+        new_record = rt_install.rebuild_runtime(
+            runtime_id,
+            reset=reset,
+            param=list(param),
+            yes=yes,
+            settings=settings,
+        )
+    except RuntimeInstallError as exc:
+        console.print(f"[red]error:[/red] {exc.message}")
+        raise typer.Exit(code=exc.exit_code) from exc
     summary = ", ".join(f"{k}={v}" for k, v in new_record.build_params.items())
     console.print(f"[green]rebuilt[/green] {runtime_id} ({summary or 'no params'})")

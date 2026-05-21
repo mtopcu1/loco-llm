@@ -402,7 +402,12 @@ def _atomic_write_yaml(path: Path, doc: dict[str, Any]) -> None:
         raise
 
 
-def write_config(data: dict[str, Any], *, overwrite: bool = False) -> ConfigRecord:
+def write_config(
+    data: dict[str, Any],
+    *,
+    overwrite: bool = False,
+    via: str = "dashboard",
+) -> ConfigRecord:
     """Write a config to the user layer after validation."""
     config_id = str(data.get("id", "")).strip()
     if not config_id:
@@ -428,13 +433,13 @@ def write_config(data: dict[str, Any], *, overwrite: bool = False) -> ConfigReco
         {
             "action": "config-create" if not overwrite else "config-update",
             "id": config_id,
-            "via": "dashboard",
+            "via": via,
         },
     )
     return cfg
 
 
-def delete_config(config_id: str) -> None:
+def delete_config(config_id: str, *, via: str = "dashboard") -> None:
     """Delete a user-layer config file."""
     settings = resolve_settings()
     out_path = configs_dir(settings) / f"{config_id}.yaml"
@@ -445,5 +450,5 @@ def delete_config(config_id: str) -> None:
 
     append_history(
         state_root(settings),
-        {"action": "config-delete", "id": config_id, "via": "dashboard"},
+        {"action": "config-delete", "id": config_id, "via": via},
     )

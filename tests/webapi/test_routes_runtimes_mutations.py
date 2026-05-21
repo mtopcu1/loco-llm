@@ -4,6 +4,7 @@ import pytest
 import yaml
 
 from llm_cli.core.lifecycle import LifecycleRecord, write_running
+from llm_cli.core.runtime_install import default_build_param_tokens
 from llm_cli.core.settings import resolve_settings
 
 
@@ -40,11 +41,12 @@ def test_install_runtime_returns_job_id(test_client, seed_runtime, monkeypatch):
     def fake_start(**kwargs):
         assert kwargs["kind"] == "runtime_install"
         assert kwargs["context"]["runtime_id"] == "stub-rt"
+        assert callable(kwargs["coro_factory"])
         return fake_id
 
     monkeypatch.setattr(
         "llm_cli.webapi.routes.runtimes.jobs_module.registry",
-        lambda: type("R", (), {"start_subprocess": lambda self, **kw: fake_start(**kw)})(),
+        lambda: type("R", (), {"start_async": lambda self, **kw: fake_start(**kw)})(),
     )
     r = test_client.post("/api/runtimes/stub-rt/install", headers={"Host": "testserver"})
     assert r.status_code == 200
@@ -52,28 +54,9 @@ def test_install_runtime_returns_job_id(test_client, seed_runtime, monkeypatch):
 
 
 @pytest.mark.webapi
-def test_install_vllm_passes_default_build_params(test_client, seed_runtime, monkeypatch):
-    seed_runtime("vllm")
-    captured: dict = {}
-
-    def fake_start(**kwargs):
-        captured.update(kwargs)
-        return "vllm-job"
-
-    monkeypatch.setattr(
-        "llm_cli.webapi.routes.runtimes.jobs_module.registry",
-        lambda: type("R", (), {"start_subprocess": lambda self, **kw: fake_start(**kw)})(),
-    )
-    r = test_client.post("/api/runtimes/vllm/install", headers={"Host": "testserver"})
-    assert r.status_code == 200
-    assert captured["argv"][-8:] == [
-        "runtime",
-        "install",
-        "vllm",
-        "--yes",
-        "-p",
+def test_install_vllm_default_build_params():
+    assert default_build_param_tokens("vllm") == [
         "vllm_version=0.21.0",
-        "-p",
         "pip_extra=cuda",
     ]
 
@@ -95,7 +78,7 @@ def test_rebuild_runtime_returns_job_id(test_client, seed_runtime, monkeypatch):
         lambda: type(
             "R",
             (),
-            {"start_subprocess": lambda self, **kw: fake_id},
+            {"start_async": lambda self, **kw: fake_id},
         )(),
     )
     r = test_client.post(

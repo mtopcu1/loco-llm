@@ -262,72 +262,53 @@ class LifecycleError(Exception):
         super().__init__(message)
 
 
-def stop_instance() -> None:
-    """Stop whatever is running (idempotent). Raises LifecycleError on failure."""
-    import signal
-    import time
+def stop_instance(*, strict_systemd: bool = True) -> str | None:
+    """Stop whatever is running (idempotent).
 
+    Returns the stopped config id, or None when nothing was running.
+    Raises LifecycleError when ``strict_systemd`` is true and systemctl stop fails.
+    """
+    from llm_cli.core.process_control import stop_background_pid
     from llm_cli.core.settings import load_settings, resolve
     from llm_cli.core.systemd_unit import stop_unit
-
-    _SIGKILL = int(getattr(signal, "SIGKILL", 9))
-
-    def _wait_pid_gone(pid: int, timeout_s: float = 10.0, poll_s: float = 0.2) -> bool:
-        deadline = time.monotonic() + timeout_s
-        while is_alive(pid):
-            if time.monotonic() >= deadline:
-                return False
-            time.sleep(poll_s)
-        return True
 
     settings = resolve(load_settings())
     state_base = state_root(settings)
     reconcile(state_base)
     rec = read_running(state_base)
     if rec is None:
-        return
+        return None
     if rec.mode in ("foreground", "background"):
         if rec.pid is None:
             clear_running(state_base)
-            return
-        try:
-            _os.kill(rec.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-        if not _wait_pid_gone(rec.pid, timeout_s=10.0):
-            try:
-                _os.kill(rec.pid, _SIGKILL)
-            except ProcessLookupError:
-                pass
-            _wait_pid_gone(rec.pid, timeout_s=2.0)
+            return rec.config_id
+        stop_background_pid(rec.pid)
         clear_running(state_base)
         append_history(
             state_base, {"action": "stop", "mode": rec.mode, "config_id": rec.config_id}
         )
-        return
+        return rec.config_id
     if rec.mode == "systemd":
         try:
             stop_unit("loco.service")
         except RuntimeError as exc:
-            raise LifecycleError(f"systemctl stop failed: {exc}") from exc
+            if strict_systemd:
+                raise LifecycleError(f"systemctl stop failed: {exc}") from exc
         clear_running(state_base)
         append_history(
             state_base, {"action": "stop", "mode": "systemd", "config_id": rec.config_id}
         )
-        return
+        return rec.config_id
     raise LifecycleError(f"unknown mode {rec.mode!r}")
 
 
 def serve_instance(config_id: str, *, mode: str) -> None:
     """Start a config in background or systemd mode."""
-    import typer
-
-    from llm_cli.commands.serve import serve_dispatch
+    from llm_cli.core.serve import serve_dispatch
+    from llm_cli.core.serve_errors import ServeError
 
     if mode not in ("background", "systemd"):
         raise LifecycleError(f"unsupported mode {mode!r}")
-    from llm_cli.core.serve_errors import ServeError
-
     try:
         serve_dispatch(
             config_id,
@@ -336,28 +317,14 @@ def serve_instance(config_id: str, *, mode: str) -> None:
         )
     except ServeError as exc:
         raise LifecycleError(exc.message) from exc
-    except typer.Exit as exc:
-        from llm_cli.core.serve_diagnostics import diagnose_serve_failure
-
-        raise LifecycleError(
-            diagnose_serve_failure(config_id, exit_code=exc.exit_code)
-        ) from exc
 
 
 def switch_instance(config_id: str) -> None:
     """Switch the running service to another config."""
-    import typer
-
-    from llm_cli.commands.serve import _switch_impl
+    from llm_cli.core.serve import switch_impl
     from llm_cli.core.serve_errors import ServeError
 
     try:
-        _switch_impl(config_id)
+        switch_impl(config_id)
     except ServeError as exc:
         raise LifecycleError(exc.message) from exc
-    except typer.Exit as exc:
-        from llm_cli.core.serve_diagnostics import diagnose_serve_failure
-
-        raise LifecycleError(
-            diagnose_serve_failure(config_id, exit_code=exc.exit_code)
-        ) from exc

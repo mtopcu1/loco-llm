@@ -11,7 +11,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
-from llm_cli.core import jobs as jobs_module, lifecycle, registry
+from llm_cli.core import jobs as jobs_module, lifecycle, lifecycle_status, registry
 from llm_cli.core.settings import resolve_settings
 from llm_cli.webapi.errors import ApiError, ErrorCode
 
@@ -142,13 +142,6 @@ async def stream_instance_logs():
     return StreamingResponse(_events(), media_type="text/event-stream")
 
 
-def _read_running_mode() -> str | None:
-    root = _state_root()
-    lifecycle.reconcile(root)
-    rec = lifecycle.read_running(root)
-    return rec.mode if rec is not None else None
-
-
 def _serve_log_path(config_id: str) -> Path:
     return lifecycle.logs_dir(_state_root()) / f"{config_id}.log"
 
@@ -259,7 +252,7 @@ def start_instance(body: StartInstanceBody):
 
 @router.post("/instance/stop", tags=["instance"])
 def stop_instance_route():
-    mode = _read_running_mode()
+    mode = lifecycle_status.running_mode()
     if mode == "foreground":
         raise ApiError(
             ErrorCode.INSTANCE_FOREGROUND_NOT_STOPPABLE,
@@ -272,7 +265,7 @@ def stop_instance_route():
 
 @router.post("/instance/switch", tags=["instance"])
 def switch_instance_route(body: SwitchInstanceBody):
-    mode = _read_running_mode()
+    mode = lifecycle_status.running_mode()
     if mode == "foreground":
         raise ApiError(
             ErrorCode.INSTANCE_FOREGROUND_NOT_SWITCHABLE,

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 from typing import Any
 
 from fastapi import APIRouter, Query
@@ -8,13 +7,10 @@ from pydantic import BaseModel, Field
 
 from llm_cli.core import jobs as jobs_module, model_registry
 from llm_cli.core.settings import resolve_settings
+from llm_cli.webapi.job_runners import model_pull_job
 from llm_cli.webapi.errors import ApiError, ErrorCode
 
 router = APIRouter()
-
-
-def _llm_argv(*args: str) -> list[str]:
-    return [sys.executable, "-m", "llm_cli", *args]
 
 
 def _entry_payload(entry: model_registry.RegistryEntry) -> dict[str, Any]:
@@ -59,21 +55,21 @@ class AddLocalModelBody(BaseModel):
 
 @router.post("/models/pull", tags=["models"])
 def pull_model(body: PullModelBody):
-    argv = _llm_argv("model", "pull", body.url)
-    if body.format:
-        argv.extend(["--format", body.format])
-    for pat in body.include:
-        argv.extend(["--include", pat])
-    for pat in body.exclude:
-        argv.extend(["--exclude", pat])
-    if body.id:
-        argv.extend(["--id", body.id])
-    if body.force:
-        argv.append("--force")
-    job_id = jobs_module.registry().start_subprocess(
+    async def factory(report):
+        await model_pull_job(
+            url=body.url,
+            fmt=body.format,
+            include=body.include,
+            exclude=body.exclude,
+            id_override=body.id,
+            force=body.force,
+            report=report,
+        )
+
+    job_id = jobs_module.registry().start_async(
         kind="model_pull",
         context={"url": body.url, "id": body.id},
-        argv=argv,
+        coro_factory=factory,
     )
     return {"job_id": job_id}
 
