@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.6.0](https://github.com/mtopcu1/loco-llm/compare/v1.5.0...v1.6.0) (2026-05-21)
+
+
+### Features
+
+* **dashboard:** instance chat test, UX fixes, and workflow hardening ([39b78db](https://github.com/mtopcu1/loco-llm/commit/39b78db6dd1c24093690a8cee6e32fbda1fd163c))
+* **dashboard:** instance chat test, UX fixes, and workflow hardening ([91cc3b8](https://github.com/mtopcu1/loco-llm/commit/91cc3b8f7c6a629b8070789501739cf433fbd411))
+* **install:** add --commit ref flag and fix hermes path resolution ([511099d](https://github.com/mtopcu1/loco-llm/commit/511099db726bbcab6e5e02a9beac99c8d8a1dffb))
+* **update:** refresh current ref by default and add --stable ([c327079](https://github.com/mtopcu1/loco-llm/commit/c327079cfdde48eee2223258c097ff64652f8559))
+
+
+### Bug Fixes
+
+* **ci:** align workflow tests with pytest job rename ([65a8e01](https://github.com/mtopcu1/loco-llm/commit/65a8e01030ae258e72855ec783aee1043ecf1eb1))
+* **ci:** avoid hanging job stream on terminal jobs ([1254b82](https://github.com/mtopcu1/loco-llm/commit/1254b820fea86989d063026c80059e6b6dbd9bfa))
+* **ci:** parallelize pytest and finish under runner cutoff ([44b0116](https://github.com/mtopcu1/loco-llm/commit/44b0116c993c4f96c17c2f4a7caf73ae01985e1f))
+* **ci:** regenerate openapi client and update JobsTray test ([c4617e5](https://github.com/mtopcu1/loco-llm/commit/c4617e5967d494b7edf98809bdc0efb570c62ada))
+* **ci:** run pytest serial on runner to avoid xdist cancel ([1b74a74](https://github.com/mtopcu1/loco-llm/commit/1b74a745ef65dc4341c4372603fd6f4e60587005))
+* **ci:** shard pytest into core and webapi jobs ([a053320](https://github.com/mtopcu1/loco-llm/commit/a0533203e742019a67350ebf4036aca07d1c047f))
+* **dashboard:** install full dashboard extra including prometheus-client ([6e64109](https://github.com/mtopcu1/loco-llm/commit/6e641098db40f6bf64c2e44e3165fb2baabcbee0))
+* **jobs:** isolate subprocess groups so cancel does not kill pytest ([1c3846e](https://github.com/mtopcu1/loco-llm/commit/1c3846e1c8bd508590b1cb12bc8ca054238ccb0b))
+* **tests:** shorten job cancel subprocess sleep for CI ([52af429](https://github.com/mtopcu1/loco-llm/commit/52af4291c78313a81f9b7d36c03bbe952c31c2ec))
+
 ## [1.5.0](https://github.com/mtopcu1/loco-llm/compare/v1.4.0...v1.5.0) (2026-05-20)
 
 
