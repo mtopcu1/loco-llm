@@ -2,8 +2,9 @@ name: ci
 on:
   pull_request:
     branches: [main]
+
 jobs:
-  pytest:
+  pytest-core:
     if: ${{ !startsWith(github.head_ref, 'release-please--') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -16,22 +17,57 @@ jobs:
         run: |
           uv venv
           uv pip install -e ".[dev,dashboard]"
-      - name: Run pytest
+      - name: Run pytest (unit + integration)
         env:
           CI: "true"
           NO_COLOR: "1"
           TERM: "dumb"
         run: |
-          echo "=== runner diagnostics ==="
-          uname -a
-          nproc
-          free -h || true
-          echo "=== pytest ==="
-          uv run pytest -v --tb=long -ra -o addopts= --junitxml=pytest-results.xml --durations=15
+          uv run pytest tests/unit tests/integration -v --tb=long -ra -o addopts= \
+            --junitxml=pytest-core.xml --durations=15
       - name: Upload pytest results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pytest-results
-          path: pytest-results.xml
+          name: pytest-core-results
+          path: pytest-core.xml
           if-no-files-found: ignore
+
+  pytest-webapi:
+    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - name: Set up Python
+        run: uv python install 3.11
+      - name: Install
+        run: |
+          uv venv
+          uv pip install -e ".[dev,dashboard]"
+      - name: Run pytest (webapi)
+        env:
+          CI: "true"
+          NO_COLOR: "1"
+          TERM: "dumb"
+        run: |
+          uv run pytest tests/webapi -v --tb=long -ra -o addopts= \
+            --junitxml=pytest-webapi.xml --durations=15
+      - name: Upload pytest results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-webapi-results
+          path: pytest-webapi.xml
+          if-no-files-found: ignore
+
+  pytest:
+    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
+    needs: [pytest-core, pytest-webapi]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require both pytest shards
+        run: |
+          test "${{ needs.pytest-core.result }}" = "success"
+          test "${{ needs.pytest-webapi.result }}" = "success"
