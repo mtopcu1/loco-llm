@@ -65,6 +65,8 @@ class TestReleasePleaseWorkflow:
 
 
 class TestCIWorkflow:
+    CI_JOB = "pytest"
+
     def test_triggers_on_pull_request_only(self):
         doc = _load("ci.yml")
         on = _get_on(doc)
@@ -73,13 +75,19 @@ class TestCIWorkflow:
 
     def test_skips_release_please_branches(self):
         doc = _load("ci.yml")
-        job_if = doc["jobs"]["test"].get("if", "")
+        job_if = doc["jobs"][self.CI_JOB].get("if", "")
         assert "release-please--" in job_if
 
     def test_uses_uv_and_runs_pytest(self):
         doc = _load("ci.yml")
-        steps = doc["jobs"]["test"]["steps"]
+        steps = doc["jobs"][self.CI_JOB]["steps"]
         uses = [s.get("uses", "") for s in steps]
         runs = [s.get("run", "") for s in steps]
         assert any(u.startswith("astral-sh/setup-uv@") for u in uses)
         assert any("pytest" in cmd for cmd in runs)
+
+
+class TestDashboardTestsWorkflow:
+    def test_job_is_dashboard(self):
+        doc = _load("dashboard-tests.yml")
+        assert "dashboard" in doc["jobs"]
