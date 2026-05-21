@@ -65,6 +65,8 @@ class TestReleasePleaseWorkflow:
 
 
 class TestCIWorkflow:
+    CI_JOB = "pytest"
+
     def test_triggers_on_pull_request_only(self):
         doc = _load("ci.yml")
         on = _get_on(doc)
@@ -73,22 +75,16 @@ class TestCIWorkflow:
 
     def test_skips_release_please_branches(self):
         doc = _load("ci.yml")
-        for job_name in ("pytest-core", "pytest-webapi", "pytest"):
-            job_if = doc["jobs"][job_name].get("if", "")
-            assert "release-please--" in job_if
+        job_if = doc["jobs"][self.CI_JOB].get("if", "")
+        assert "release-please--" in job_if
 
-    def test_sharded_pytest_jobs_use_uv(self):
+    def test_uses_uv_and_runs_pytest(self):
         doc = _load("ci.yml")
-        for job_name in ("pytest-core", "pytest-webapi"):
-            steps = doc["jobs"][job_name]["steps"]
-            uses = [s.get("uses", "") for s in steps]
-            runs = [s.get("run", "") for s in steps]
-            assert any(u.startswith("astral-sh/setup-uv@") for u in uses)
-            assert any("pytest" in cmd for cmd in runs)
-
-    def test_pytest_gate_job_waits_for_shards(self):
-        doc = _load("ci.yml")
-        assert doc["jobs"]["pytest"]["needs"] == ["pytest-core", "pytest-webapi"]
+        steps = doc["jobs"][self.CI_JOB]["steps"]
+        uses = [s.get("uses", "") for s in steps]
+        runs = [s.get("run", "") for s in steps]
+        assert any(u.startswith("astral-sh/setup-uv@") for u in uses)
+        assert any("pytest" in cmd for cmd in runs)
 
 
 class TestDashboardTestsWorkflow:

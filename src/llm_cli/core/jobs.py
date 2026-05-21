@@ -248,11 +248,9 @@ class _JobRegistry:
                     full_env.update(env)
                 proc = subprocess.Popen(
                     argv,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
                     env=full_env,
                     cwd=str(cwd) if cwd else None,
+                    **_subprocess_popen_kwargs(),
                 )
                 self._procs[job_id] = proc
                 with self._lock:
