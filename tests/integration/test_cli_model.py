@@ -137,7 +137,7 @@ def test_model_pull_existing_id_refreshes(tmp_path: Path) -> None:
     def fake_dl(repo, revision, include, exclude, target_dir):
         return 0
 
-    with patch("llm_cli.commands.model_cmd.hf_download", side_effect=fake_dl):
+    with patch("llm_cli.core.model_pull.hf_download", side_effect=fake_dl):
         result = runner.invoke(app, ["model", "pull", "qwen-q__q4"], catch_exceptions=False)
     assert result.exit_code == 0
     e = get_entry(models_dir, "qwen-q__q4")
@@ -158,9 +158,9 @@ def test_model_pull_ambiguous_url_errors(tmp_path: Path) -> None:
         ],
     )
     with patch(
-        "llm_cli.commands.model_cmd.fetch_repo_revision", return_value=multi_quant
+        "llm_cli.core.model_pull.fetch_repo_revision", return_value=multi_quant
     ), patch(
-        "llm_cli.commands.model_cmd.hf_download"
+        "llm_cli.core.model_pull.hf_download"
     ) as mock_dl:
         result = runner.invoke(app, ["model", "pull", url], catch_exceptions=False)
     assert result.exit_code == 1
@@ -267,11 +267,11 @@ def test_model_pull_url_happy_path(tmp_path: Path) -> None:
         "Qwen3.6-235B-A22B-UD-Q4_K_XL-00001-of-00002.gguf"
     )
     with patch(
-        "llm_cli.commands.model_cmd.fetch_repo_revision", return_value=_fake_repo_info()
+        "llm_cli.core.model_pull.fetch_repo_revision", return_value=_fake_repo_info()
     ), patch(
-        "llm_cli.commands.model_cmd.hf_download", side_effect=_fake_download
+        "llm_cli.core.model_pull.hf_download", side_effect=_fake_download
     ), patch(
-        "llm_cli.commands.model_cmd._verify_sha256", return_value=[]
+        "llm_cli.core.model_pull._verify_sha256", return_value=[]
     ):
         result = runner.invoke(app, ["model", "pull", url], catch_exceptions=False)
     assert result.exit_code == 0, result.stdout
