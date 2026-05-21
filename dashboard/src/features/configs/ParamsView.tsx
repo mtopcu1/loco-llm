@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
+import { unwrapApi } from '@/api/helpers'
+import { useConfigDocument } from '@/hooks/useConfigDocument'
+import { buildConfigPutBody } from '@/lib/configDocument'
 import { getApiError } from '@/lib/apiError'
 import { errorToToast } from '@/lib/errorToToast'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -12,43 +15,31 @@ export function ParamsView({ configId }: { configId: string }) {
   const qc = useQueryClient()
   const [saveErrors, setSaveErrors] = useState<string[]>([])
 
-  const config = useQuery({
-    queryKey: ['configs', configId],
-    queryFn: async () => {
-      const { data, error } = await api.GET('/configs/{config_id}', {
-        params: { path: { config_id: configId } },
-      })
-      if (error) throw new Error('Failed to load config')
-      return data as {
-        id: string
-        raw?: Record<string, unknown>
-        resolved?: Record<string, unknown>
-      }
-    },
-  })
+  const config = useConfigDocument(configId)
 
   const params = useQuery({
     queryKey: ['configs', configId, 'params'],
     queryFn: async () => {
-      const { data, error } = await api.GET('/configs/{config_id}/params', {
-        params: { path: { config_id: configId } },
-      })
-      if (error) throw new Error('Failed to load params')
+      const data = await unwrapApi(() =>
+        api.GET('/configs/{config_id}/params', {
+          params: { path: { config_id: configId } },
+        }),
+      )
       return data as ParamCell[]
     },
   })
 
-  const raw = (config.data?.raw ?? config.data?.resolved) as Record<string, unknown> | undefined
-  const runtimeId = raw?.runtime ? String(raw.runtime) : ''
-  const modelId = raw?.model ? String(raw.model) : undefined
+  const runtimeId = config.data?.runtimeId ?? ''
+  const modelId = config.data?.modelId
 
   const recommendations = useQuery({
     queryKey: ['recommendations', runtimeId, modelId ?? ''],
     queryFn: async () => {
-      const { data, error } = await api.GET('/recommendations', {
-        params: { query: { runtime_id: runtimeId, model_id: modelId ?? null } },
-      })
-      if (error) throw new Error('Failed to load recommendations')
+      const data = await unwrapApi(() =>
+        api.GET('/recommendations', {
+          params: { query: { runtime_id: runtimeId, model_id: modelId ?? null } },
+        }),
+      )
       return data as Recommendation[]
     },
     enabled: Boolean(runtimeId),
@@ -58,21 +49,13 @@ export function ParamsView({ configId }: { configId: string }) {
     mutationFn: async (serveParams: Record<string, unknown>) => {
       setSaveErrors([])
       if (!config.data) throw new Error('Config not loaded')
-      const cfgRaw = (config.data.raw ?? config.data.resolved) as Record<string, unknown>
-      const serve =
-        typeof cfgRaw.serve === 'object' && cfgRaw.serve
-          ? (cfgRaw.serve as Record<string, unknown>)
-          : {}
-      const body = {
-        ...cfgRaw,
-        id: configId,
-        serve: { ...serve, params: serveParams },
-      }
-      const { error } = await api.PUT('/configs/{config_id}', {
-        params: { path: { config_id: configId } },
-        body,
-      })
-      if (error) throw error
+      const body = buildConfigPutBody(configId, config.data.detail, serveParams)
+      await unwrapApi(() =>
+        api.PUT('/configs/{config_id}', {
+          params: { path: { config_id: configId } },
+          body,
+        }),
+      )
     },
     onSuccess: () => {
       toast.success('Params saved')

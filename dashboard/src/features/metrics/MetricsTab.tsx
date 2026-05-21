@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
+import { unwrapApi } from '@/api/helpers'
+import { useConfigDocument } from '@/hooks/useConfigDocument'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useMetricsStream } from '@/hooks/useMetricsStream'
@@ -28,29 +30,17 @@ export interface MetricsTabProps {
 }
 
 export function MetricsTab({ configId }: MetricsTabProps) {
-  const config = useQuery({
-    queryKey: ['configs', configId],
-    queryFn: async () => {
-      const { data, error } = await api.GET('/configs/{config_id}', {
-        params: { path: { config_id: configId } },
-      })
-      if (error) throw new Error('Failed to load config')
-      return data as Record<string, unknown>
-    },
-  })
-
-  const runtimeId = useMemo(() => {
-    const raw = (config.data?.raw ?? config.data?.resolved) as Record<string, unknown> | undefined
-    return raw?.runtime ? String(raw.runtime) : null
-  }, [config.data])
+  const config = useConfigDocument(configId)
+  const runtimeId = config.data?.runtimeId || null
 
   const runtime = useQuery({
     queryKey: ['runtimes', runtimeId],
     queryFn: async () => {
-      const { data, error } = await api.GET('/runtimes/{runtime_id}', {
-        params: { path: { runtime_id: runtimeId! } },
-      })
-      if (error) throw new Error('Failed to load runtime')
+      const data = await unwrapApi(() =>
+        api.GET('/runtimes/{runtime_id}', {
+          params: { path: { runtime_id: runtimeId! } },
+        }),
+      )
       return data as { manifest: Record<string, unknown>; id: string }
     },
     enabled: runtimeId != null,
@@ -59,8 +49,7 @@ export function MetricsTab({ configId }: MetricsTabProps) {
   const runtimes = useQuery({
     queryKey: ['runtimes'],
     queryFn: async () => {
-      const { data, error } = await api.GET('/runtimes')
-      if (error) throw new Error('Failed to load runtimes')
+      const data = await unwrapApi(() => api.GET('/runtimes'))
       return data as Array<{ id: string; has_metrics: boolean }>
     },
   })
