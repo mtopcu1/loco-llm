@@ -43,6 +43,9 @@ dist/
 # Models now live in $LLM_MODELS (data root); keep the repo dir out of git.
 models/
 
+# Local test scratch
+tests/tmp_dist/
+
 # Dashboard
 dashboard/node_modules/
 dashboard/dist/
