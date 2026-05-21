@@ -12,6 +12,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from llm_cli.core.hf_client import fetch_repo_revision
 from llm_cli.core.hf_url import HFUrlError, parse_hf_url
 from llm_cli.core.model_resolve import build_artifact
 from llm_cli.core.model_registry import (
