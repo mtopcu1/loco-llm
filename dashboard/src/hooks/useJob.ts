@@ -41,12 +41,12 @@ export function useJob(id: string | null) {
     let cancelled = false
     void (async () => {
       try {
-        const body = await unwrapApi<{ lines?: string[] }>(() =>
-          api.GET('/jobs/{job_id}/log', {
-            params: { path: { job_id: id } },
-          }),
-        )
-        if (!cancelled) setLogLines(body.lines ?? [])
+        const { data, error } = await api.GET('/jobs/{job_id}/log', {
+          params: { path: { job_id: id } },
+        })
+        if (error) throw error
+        const body = data as { lines?: string[] } | undefined
+        if (!cancelled) setLogLines(body?.lines ?? [])
       } catch {
         if (!cancelled) setLogLines([])
       }

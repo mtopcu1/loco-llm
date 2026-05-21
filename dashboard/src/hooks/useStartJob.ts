@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { apiPost } from '@/api/helpers'
+import { api } from '@/api/client'
 import { errorToToast } from '@/lib/errorToToast'
 import type { paths } from '@/api/generated'
 import { useAppStore } from '@/store'
@@ -21,11 +21,12 @@ export function useStartJob() {
 
   return useMutation({
     mutationFn: async ({ path, params, body }: StartJobInput) => {
-      const data = (await apiPost(path, {
-        params: params as { path?: Record<string, string>; query?: Record<string, string> },
-        body,
-      })) as { job_id?: string }
-      return data
+      const { data, error } = await api.POST(path, {
+        params: params as never,
+        body: body as never,
+      })
+      if (error) throw error
+      return data as { job_id?: string }
     },
     onSuccess: (data, variables) => {
       if (data?.job_id) {

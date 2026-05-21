@@ -16,9 +16,18 @@ function resolveUrl(input: string): string {
   return input
 }
 
+function requestUrl(input: RequestInfo | URL): string {
+  if (typeof input === 'string') return resolveUrl(input)
+  if (input instanceof Request) return resolveUrl(input.url)
+  return resolveUrl(input.toString())
+}
+
 /** `fetch` that applies the insecure-banner header and honors the test base URL. */
-export async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
-  const response = await fetch(resolveUrl(input), init)
+export const fetchWithInsecure: typeof fetch = async (input, init) => {
+  const response = await fetch(requestUrl(input), init)
   useAppStore.getState().setInsecure(response.headers.get('x-localllm-insecure') === 'true')
   return response
 }
+
+/** @deprecated use fetchWithInsecure */
+export const apiFetch = fetchWithInsecure
