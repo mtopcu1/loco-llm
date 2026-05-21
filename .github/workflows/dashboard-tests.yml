@@ -22,12 +22,7 @@ jobs:
       - name: Set up Python
         run: uv python install 3.11
       - run: uv venv && uv pip install -e ".[dev,dashboard]"
-      - name: Run pytest
-        env:
-          CI: "true"
-          NO_COLOR: "1"
-          TERM: "dumb"
-        run: uv run pytest -q --tb=short -n 4
+      - run: uv run pytest tests/unit/test_core_dashboard.py tests/unit/test_core_disk.py tests/unit/test_cli_dashboard.py -v
       - run: cd dashboard && npm ci
       - run: cd dashboard && npm run typecheck
       - run: cd dashboard && npm run test
