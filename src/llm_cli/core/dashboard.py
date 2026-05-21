@@ -17,6 +17,8 @@ from typing import Literal
 
 import yaml
 
+from llm_cli.core.lifecycle import state_dir, state_root
+from llm_cli.core.scaffold import install_root
 from llm_cli.core.settings import resolve_settings
 
 InstallVerdict = tuple[
@@ -35,14 +37,8 @@ class InstalledRecord:
 
 
 def dashboard_root() -> Path:
-    """Repo-relative path to the dashboard/ source directory."""
-    settings = resolve_settings()
-    if settings.repo_root is None:
-        raise RuntimeError(
-            "repo_root not configured. Run `llm setup` or set repo_root via "
-            "`llm settings edit repo_root`."
-        )
-    return settings.repo_root / "dashboard"
+    """Install-root path to the dashboard/ source directory."""
+    return install_root() / "dashboard"
 
 
 def dist_dir() -> Path:
@@ -113,9 +109,7 @@ def verify_installed(cli_version: str) -> InstallVerdict:
 
 def _state_dashboard_dir() -> Path:
     settings = resolve_settings()
-    if settings.repo_root is None:
-        raise RuntimeError("repo_root not configured")
-    d = settings.repo_root / "state" / "dashboard"
+    d = state_dir(state_root(settings)) / "dashboard"
     d.mkdir(parents=True, exist_ok=True)
     return d
 

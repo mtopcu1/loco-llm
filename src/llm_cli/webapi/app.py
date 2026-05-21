@@ -99,10 +99,11 @@ def create_app(
 
     @app.get("/docs/dashboard-security", include_in_schema=False)
     def dashboard_security_doc():
-        settings = resolve_settings()
-        if settings.repo_root is None:
-            return PlainTextResponse("repo_root not configured", status_code=503)
-        doc_path = settings.repo_root / "docs" / "DASHBOARD-SECURITY.md"
+        from llm_cli.core.scaffold import install_root
+
+        doc_path = install_root() / "docs" / "DASHBOARD-SECURITY.md"
+        if not doc_path.is_file():
+            return PlainTextResponse("dashboard security doc not found", status_code=503)
         return PlainTextResponse(doc_path.read_text(encoding="utf-8"))
 
     @app.on_event("startup")

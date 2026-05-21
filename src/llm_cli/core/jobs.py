@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
+from llm_cli.core.lifecycle import state_dir, state_root
 from llm_cli.core.settings import resolve_settings
 from llm_cli.webapi.streams import EventHub
 
@@ -60,10 +61,8 @@ class Job:
 
 
 def _jobs_dir() -> Path:
-    p = resolve_settings().repo_root
-    if p is None:
-        raise RuntimeError("repo_root not configured")
-    d = p / "state" / "jobs"
+    settings = resolve_settings()
+    d = state_dir(state_root(settings)) / "jobs"
     d.mkdir(parents=True, exist_ok=True)
     return d
 

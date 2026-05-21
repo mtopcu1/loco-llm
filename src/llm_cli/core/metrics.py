@@ -9,14 +9,13 @@ from pathlib import Path
 
 from prometheus_client.parser import text_string_to_metric_families
 
+from llm_cli.core.lifecycle import state_dir, state_root
 from llm_cli.core.settings import resolve_settings
 
 
 def _metrics_dir() -> Path:
-    repo = resolve_settings().repo_root
-    if repo is None:
-        raise RuntimeError("repo_root not configured")
-    d = repo / "state" / "metrics"
+    settings = resolve_settings()
+    d = state_dir(state_root(settings)) / "metrics"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
