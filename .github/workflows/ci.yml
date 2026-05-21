@@ -21,12 +21,4 @@ jobs:
           CI: "true"
           NO_COLOR: "1"
           TERM: "dumb"
-        run: |
-          uv run pytest -v --tb=long -ra -o addopts= --junitxml=pytest-results.xml --durations=15
-      - name: Upload pytest results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pytest-results
-          path: pytest-results.xml
-          if-no-files-found: ignore
+        run: uv run pytest -q --tb=short
