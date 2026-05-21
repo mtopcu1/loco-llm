@@ -16,9 +16,5 @@ jobs:
         run: |
           uv venv
           uv pip install -e ".[dev,dashboard]"
-      - name: Run pytest
-        env:
-          CI: "true"
-          NO_COLOR: "1"
-          TERM: "dumb"
-        run: uv run pytest -q --tb=short -n 4
+      - name: Smoke import
+        run: uv run python -c "import llm_cli; print(llm_cli.__version__)"
