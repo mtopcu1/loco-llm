@@ -69,7 +69,7 @@ def test_cancel_running_subprocess_job(test_client, webapi_repo, monkeypatch, tm
     job_id = jobs_module.registry().start_subprocess(
         kind="update",
         context={},
-        argv=["python", "-c", "import time; time.sleep(30)"],
+        argv=["python", "-c", "import time; time.sleep(5)"],
     )
     import time
 
