@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.7.0](https://github.com/mtopcu1/loco-llm/compare/v1.6.0...v1.7.0) (2026-05-21)
+
+
+### Features
+
+* **dashboard:** surface instance switch job failures ([4f5e07c](https://github.com/mtopcu1/loco-llm/commit/4f5e07c1f844a8385c36bb05c1631f1418abe181))
+
+
+### Bug Fixes
+
+* **ci:** restore fetch typing and doctor install import ([e9d064d](https://github.com/mtopcu1/loco-llm/commit/e9d064d184a5752ddef52aef3dd11811cd617dde))
+* **serve:** propagate switch errors and serve log tail into jobs ([08ea177](https://github.com/mtopcu1/loco-llm/commit/08ea177710f357fc08b9874bd8e671b86199016d))
+* **serve:** stop job log spam and diagnose silent exit 1 ([a76db29](https://github.com/mtopcu1/loco-llm/commit/a76db29aa796050e48319ccf74633164caf0dd61))
+* **tests:** patch core.model_pull in model pull integration tests ([bc7a2c8](https://github.com/mtopcu1/loco-llm/commit/bc7a2c884d0ce1e90848c3590891c1781952dcff))
+* **tests:** patch model_cmd.hf_download for existing-id pull refresh ([ab40075](https://github.com/mtopcu1/loco-llm/commit/ab40075e8dbd49340e3026beb2dbc36c9fbfcbd9))
+* **tests:** re-export model_cmd hooks and regen OpenAPI client ([e8b1050](https://github.com/mtopcu1/loco-llm/commit/e8b1050f2d97f43f9010bbcf6633774f638e7e26))
+
 ## [1.6.0](https://github.com/mtopcu1/loco-llm/compare/v1.5.0...v1.6.0) (2026-05-21)
 
 
