@@ -2,17 +2,17 @@
 
 _Date: 2026-05-20_
 _Status: Approved — implementing on feat/ux-improvements_
-_Scope: Nested install layout (Hermes-style), CLI rename `llm` → `loco`, data home `~/.loco`._
+_Scope: Nested install layout (Hermes-style), CLI rename `loco` → `loco`, data home `~/.loco`._
 
 ## 1. Purpose
 
-End users get a single mental model: **`loco`** is the command, **`~/.loco`** is where their data lives, **`~/.loco/install`** is the managed git checkout. No mixed `llm` / `loco-llm` / `~/.config/llm` paths.
+End users get a single mental model: **`loco`** is the command, **`~/.loco`** is where their data lives, **`~/.loco/install`** is the managed git checkout. No mixed `loco` / `loco-llm` / `~/.config/llm` paths.
 
 ## 2. Decisions
 
 | Topic | Decision |
 |-------|----------|
-| CLI command | **`loco`** (replaces `llm` on `$PATH`) |
+| CLI command | **`loco`** (replaces `loco` on `$PATH`) |
 | Data home | **`~/.loco`** (replaces `~/.loco-llm` and `~/.config/llm/config.yaml`) |
 | Install root | **`~/.loco/install`** (git clone + `.venv`) |
 | Settings file | **`~/.loco/config.yaml`** |
@@ -79,7 +79,7 @@ Unchanged semantics: git fetch/checkout on **install root** only; never touches 
 
 ## 9. Non-goals
 
-- No `llm` shim on `$PATH` after this change.
+- No `loco` shim on `$PATH` after this change.
 - No automatic migration from `~/.loco-llm` or `~/.config/llm`.
 - No rename of Python module `llm_cli` in this pass.
 - No sparse checkout / tarball distribution (future).

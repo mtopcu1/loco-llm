@@ -49,7 +49,7 @@ Releases are fully automated:
 3. When ready to release, **review the release PR** (it shows you exactly
    what version + changelog will land) and **merge it**.
 4. The merge creates a git tag and GitHub Release with the CHANGELOG.
-   Users run `llm update` to pick up the tag. There is no PyPI publish step.
+   Users run `loco update` to pick up the tag. There is no PyPI publish step.
 
 ## Dev install
 

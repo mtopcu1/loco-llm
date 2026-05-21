@@ -1,9 +1,9 @@
-"""Tests for `llm serve` env construction."""
+"""Tests for `loco serve` env construction."""
 from __future__ import annotations
 
 from pathlib import Path
 
-from llm_cli.commands.serve import _serve_env_from_params
+from llm_cli.core.serve import _serve_env_from_params
 from llm_cli.core.params import parse_schema
 from llm_cli.core.settings import Settings
 

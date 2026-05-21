@@ -17,6 +17,8 @@ export type ReadinessResult = {
   latency_ms: number
 }
 
+import { apiFetch } from '@/lib/apiFetch'
+
 export type ChatCompletionResult = {
   content: string
   ttftMs: number
@@ -34,7 +36,7 @@ function parseApiError(body: unknown): string {
 
 export async function fetchReadiness(timeoutSec = 120): Promise<ReadinessResult> {
   const url = `/api/instance/chat/readiness?timeout_sec=${timeoutSec}`
-  const res = await fetch(url)
+  const res = await apiFetch(url)
   if (!res.ok) {
     const body = await res.json().catch(() => null)
     throw new Error(parseApiError(body))
@@ -55,7 +57,7 @@ export async function streamChatCompletion(
   let content = ''
   let completionTokens = 0
 
-  const res = await fetch('/api/instance/chat', {
+  const res = await apiFetch('/api/instance/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

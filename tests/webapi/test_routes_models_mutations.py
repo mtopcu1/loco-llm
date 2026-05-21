@@ -49,7 +49,7 @@ def test_pull_model_returns_job_id(test_client, monkeypatch):
         lambda: type(
             "R",
             (),
-            {"start_subprocess": lambda self, **kw: fake_id},
+            {"start_async": lambda self, **kw: fake_id},
         )(),
     )
     r = test_client.post(

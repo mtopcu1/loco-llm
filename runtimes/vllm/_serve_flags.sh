@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared helpers for composing `vllm serve` argv.
+# Shared helpers for composing `vloco serve` argv.
 
 _is_truthy() {
   case "${1,,}" in

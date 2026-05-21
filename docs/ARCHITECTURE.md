@@ -42,8 +42,9 @@ Branding and layout: [`docs/superpowers/specs/2026-05-20-hermes-layout-and-brand
 
 | Layer | Role |
 |-------|------|
-| `src/llm_cli/commands/` | Typer commands (`setup`, `serve`, `update`, …) |
-| `src/llm_cli/core/` | Settings, paths, lifecycle, registry |
+| `src/llm_cli/commands/` | Typer commands; setup chain (`setup_chain.py`); runtime wizards (`runtime_setup.py`) |
+| `src/llm_cli/core/` | Settings, paths, lifecycle, registry, `serve_modes` + `serve`, events |
+| `src/llm_cli/webapi/` | FastAPI dashboard API (imports from `core`, not `commands`) |
 | `install/runtimes/` | Manifests + build/serve scripts (read-only recipes) |
 | Data home | Configs, models, installed runtimes, `state/` |
 

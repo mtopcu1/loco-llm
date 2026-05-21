@@ -1,4 +1,4 @@
-"""Integration tests for `llm stop`, `llm status`, `llm logs`."""
+"""Integration tests for `loco stop`, `loco status`, `loco logs`."""
 from __future__ import annotations
 
 import json
@@ -64,8 +64,9 @@ def test_stop_background_sigterms_pid_and_clears(tmp_path: Path) -> None:
 
     with (
         patch("llm_cli.commands.lifecycle_cmds.reconcile", lambda _repo: None),
-        patch("llm_cli.commands.lifecycle_cmds.os.kill", new=fake_kill),
-        patch("llm_cli.commands.lifecycle_cmds._wait_pid_gone", return_value=True),
+        patch("llm_cli.core.lifecycle.is_alive", return_value=True),
+        patch("llm_cli.core.process_control.os.kill", new=fake_kill),
+        patch("llm_cli.core.process_control.wait_pid_gone", return_value=True),
     ):
         result = runner.invoke(app, ["stop"], catch_exceptions=False)
     assert result.exit_code == 0
@@ -94,16 +95,17 @@ def test_stop_background_escalates_to_sigkill_if_pid_persists(tmp_path: Path) ->
 
     with (
         patch("llm_cli.commands.lifecycle_cmds.reconcile", lambda _repo: None),
-        patch("llm_cli.commands.lifecycle_cmds.os.kill", new=fake_kill),
+        patch("llm_cli.core.lifecycle.is_alive", return_value=True),
+        patch("llm_cli.core.process_control.os.kill", new=fake_kill),
         patch(
-            "llm_cli.commands.lifecycle_cmds._wait_pid_gone",
+            "llm_cli.core.process_control.wait_pid_gone",
             side_effect=[False, True],
         ),
     ):
         result = runner.invoke(app, ["stop"], catch_exceptions=False)
     assert result.exit_code == 0
     assert signal.SIGTERM in sigs
-    assert lifecycle_cmds._SIGKILL in sigs
+    assert int(getattr(signal, "SIGKILL", 9)) in sigs
 
 
 def test_stop_systemd_calls_systemctl_stop(tmp_path: Path) -> None:
@@ -116,16 +118,16 @@ def test_stop_systemd_calls_systemctl_stop(tmp_path: Path) -> None:
             config_id="cfg-a",
             port=1,
             started_at="t",
-            unit="llm.service",
+            unit="loco.service",
         ),
     )
     with (
-        patch("llm_cli.commands.lifecycle_cmds.stop_unit") as su,
+        patch("llm_cli.core.systemd_unit.stop_unit") as su,
         patch("llm_cli.core.lifecycle._systemd_is_active", return_value=True),
     ):
         result = runner.invoke(app, ["stop"], catch_exceptions=False)
     assert result.exit_code == 0
-    su.assert_called_once_with("llm.service")
+    su.assert_called_once_with("loco.service")
     assert read_running(repo) is None
 
 
@@ -198,7 +200,7 @@ def test_status_systemd_text(tmp_path: Path) -> None:
             config_id="cfg-a",
             port=18080,
             started_at="2026-05-17T16:00:00Z",
-            unit="llm.service",
+            unit="loco.service",
         ),
     )
     with (
@@ -208,7 +210,7 @@ def test_status_systemd_text(tmp_path: Path) -> None:
         result = runner.invoke(app, ["status"], catch_exceptions=False)
     assert result.exit_code == 0
     assert "running" in result.stdout.lower()
-    assert "llm.service" in result.stdout
+    assert "loco.service" in result.stdout
     assert "journalctl" in result.stdout.lower()
 
 
@@ -256,7 +258,7 @@ def test_logs_systemd_invokes_journalctl(tmp_path: Path) -> None:
             config_id="cfg-a",
             port=1,
             started_at="t",
-            unit="llm.service",
+            unit="loco.service",
         ),
     )
     with (
@@ -267,5 +269,5 @@ def test_logs_systemd_invokes_journalctl(tmp_path: Path) -> None:
     assert result.exit_code == 0
     cmd = call.call_args[0][0]
     assert cmd[:3] == ["journalctl", "--user", "-u"]
-    assert "llm.service" in cmd
+    assert "loco.service" in cmd
     assert "-n" in cmd and "20" in cmd

@@ -1,5 +1,10 @@
 export function jobTitle(kind: string | undefined, context?: Record<string, unknown>): string {
   if (!kind) return 'Job'
+  if (kind === 'instance_start_wait') {
+    const configId = context?.config_id
+    const action = context?.action === 'switch' ? 'Switch instance' : 'Start instance'
+    return typeof configId === 'string' && configId ? `${action}: ${configId}` : action
+  }
   if (kind === 'model_pull') {
     const url = context?.url
     if (typeof url === 'string' && url) {

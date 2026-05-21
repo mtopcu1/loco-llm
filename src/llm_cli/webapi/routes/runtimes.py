@@ -1,37 +1,17 @@
 from __future__ import annotations
 
-import sys
 from dataclasses import asdict
 from typing import Any
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
-from llm_cli.core import install_record, jobs as jobs_module, param_grid_models as pgm, registry
-from llm_cli.core.lifecycle import read_running, reconcile, state_root
+from llm_cli.core import install_record, jobs as jobs_module, lifecycle_status, param_grid_models as pgm, registry
 from llm_cli.core.settings import resolve_settings
+from llm_cli.webapi.job_runners import runtime_install_job, runtime_rebuild_job
 from llm_cli.webapi.errors import ApiError, ErrorCode
 
 router = APIRouter()
-
-
-def _llm_argv(*args: str) -> list[str]:
-    return [sys.executable, "-m", "llm_cli", *args]
-
-
-def _running_runtime_id() -> tuple[str | None, str | None]:
-    """Return (runtime_id, config_id) when a service is running, else (None, None)."""
-    settings = resolve_settings()
-    root = state_root(settings)
-    reconcile(root)
-    rec = read_running(root)
-    if rec is None:
-        return None, None
-    cfg = registry.get_config_merged(rec.config_id)
-    if cfg is None:
-        return None, rec.config_id
-    rt = cfg.data.get("runtime")
-    return (str(rt) if isinstance(rt, str) else None), rec.config_id
 
 
 class RuntimeSummary(BaseModel):
@@ -122,13 +102,6 @@ def default_params(runtime_id: str, model_id: str | None = None):
     return [asdict(cell) for cell in cells]
 
 
-def _install_argv(runtime_id: str) -> list[str]:
-    argv = _llm_argv("runtime", "install", runtime_id, "--yes")
-    if runtime_id == "vllm":
-        argv.extend(["-p", "vllm_version=0.21.0", "-p", "pip_extra=cuda"])
-    return argv
-
-
 @router.post("/runtimes/{runtime_id}/install", tags=["runtimes"])
 def install_runtime_route(runtime_id: str):
     if registry.get_runtime_merged(runtime_id) is None:
@@ -138,10 +111,14 @@ def install_runtime_route(runtime_id: str):
             details={"runtime_id": runtime_id},
             status_code=404,
         )
-    job_id = jobs_module.registry().start_subprocess(
+
+    async def factory(report):
+        await runtime_install_job(runtime_id, report)
+
+    job_id = jobs_module.registry().start_async(
         kind="runtime_install",
         context={"runtime_id": runtime_id},
-        argv=_install_argv(runtime_id),
+        coro_factory=factory,
     )
     return {"job_id": job_id}
 
@@ -155,13 +132,13 @@ def rebuild_runtime_route(runtime_id: str, reset: bool = Query(default=False)):
             details={"runtime_id": runtime_id},
             status_code=404,
         )
-    argv = _llm_argv("runtime", "rebuild", runtime_id, "--yes")
-    if reset:
-        argv.append("--reset")
-    job_id = jobs_module.registry().start_subprocess(
+    async def factory(report):
+        await runtime_rebuild_job(runtime_id, reset=reset, report=report)
+
+    job_id = jobs_module.registry().start_async(
         kind="runtime_rebuild",
         context={"runtime_id": runtime_id, "reset": reset},
-        argv=argv,
+        coro_factory=factory,
     )
     return {"job_id": job_id}
 
@@ -175,7 +152,7 @@ def uninstall_runtime_route(runtime_id: str, purge: bool = Query(default=False))
             details={"runtime_id": runtime_id},
             status_code=404,
         )
-    running_rt, config_id = _running_runtime_id()
+    running_rt, config_id = lifecycle_status.running_runtime_and_config()
     if running_rt == runtime_id:
         raise ApiError(
             ErrorCode.RUNTIME_IN_USE,

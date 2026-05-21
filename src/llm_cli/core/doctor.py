@@ -165,7 +165,7 @@ def _dashboard_scope_checks() -> list[ScopeCheckResult]:
             name="dashboard installed",
             status="info" if record is None else "ok",
             message=(
-                "Not installed (run `llm dashboard install`)"
+                "Not installed (run `loco dashboard install`)"
                 if record is None
                 else f"Installed for CLI {record.cli_version} at {record.installed_at}"
             ),
@@ -181,7 +181,7 @@ def _dashboard_scope_checks() -> list[ScopeCheckResult]:
                     "Match"
                     if record.cli_version == cur
                     else f"Built for CLI {record.cli_version}, current is {cur}. "
-                    "Run `llm dashboard install --reset`."
+                    "Run `loco dashboard install --reset`."
                 ),
             )
         )
@@ -207,7 +207,7 @@ def _dashboard_scope_checks() -> list[ScopeCheckResult]:
                 message=(
                     f"pid={pid} alive"
                     if alive
-                    else f"Stale pid file (pid={pid}); run `llm dashboard stop`."
+                    else f"Stale pid file (pid={pid}); run `loco dashboard stop`."
                 ),
             )
         )
@@ -375,7 +375,7 @@ def systemd_linger_advisory(
 ) -> str | None:
     """Return a warning message if user lingering is off; None if OK or not applicable.
 
-    User systemd units (e.g. ``llm serve --systemd``) keep running after logout only
+    User systemd units (e.g. ``loco serve --systemd``) keep running after logout only
     when lingering is enabled. Missing ``loginctl`` or unexpected output is ignored.
     """
     result = run_command(
@@ -400,9 +400,9 @@ def systemd_linger_advisory(
 _REQ_HEADER = (
     "# External Requirements\n\n"
     "<!-- AUTO-GENERATED from requirements.yaml — do not edit by hand. "
-    "Run `llm doctor render-requirements` to regenerate. -->\n\n"
+    "Run `loco doctor render-requirements` to regenerate. -->\n\n"
     "These prerequisites must exist on the machine for the LocalLLM CLI and the "
-    "runtimes' build/serve scripts to function. Run `llm doctor` to verify the "
+    "runtimes' build/serve scripts to function. Run `loco doctor` to verify the "
     "current state of each.\n\n"
 )
 

@@ -1,4 +1,4 @@
-"""Integration tests for `llm serve`, `llm switch`. Uses runner injection — no real bash."""
+"""Integration tests for `loco serve`, `loco switch`. Uses runner injection — no real bash."""
 from __future__ import annotations
 
 import os
@@ -86,9 +86,9 @@ def test_serve_background_writes_running_json_and_calls_spawn(tmp_path: Path) ->
     repo = _make_repo(tmp_path, port=18091)
     _configure(tmp_path, repo)
     with (
-        patch("llm_cli.commands.serve.spawn_background", return_value=5555) as sb,
-        patch("llm_cli.commands.serve.wait_for_ready", return_value=True),
-        patch("llm_cli.commands.serve.port_in_use", return_value=False),
+        patch("llm_cli.core.serve.spawn_background", return_value=5555) as sb,
+        patch("llm_cli.core.serve.wait_for_ready", return_value=True),
+        patch("llm_cli.core.serve.port_in_use", return_value=False),
     ):
         result = runner.invoke(app, ["serve", "cfg-a"], catch_exceptions=False)
     assert result.exit_code == 0, result.stdout
@@ -104,7 +104,7 @@ def test_serve_background_writes_running_json_and_calls_spawn(tmp_path: Path) ->
 def test_serve_fails_when_port_in_use(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path, port=18092)
     _configure(tmp_path, repo)
-    with patch("llm_cli.commands.serve.port_in_use", return_value=True):
+    with patch("llm_cli.core.serve.port_in_use", return_value=True):
         result = runner.invoke(app, ["serve", "cfg-a"], catch_exceptions=False)
     assert result.exit_code != 0
     assert "already in use" in result.stdout.lower()
@@ -124,7 +124,7 @@ def test_serve_refuses_when_runtime_uninstalled(tmp_path: Path) -> None:
     result = runner.invoke(app, ["serve", "cfg-a"], catch_exceptions=False)
     assert result.exit_code != 0
     assert "not installed" in result.stdout.lower()
-    assert "llm runtime install" in result.stdout
+    assert "loco runtime install" in result.stdout
 
 
 def test_serve_readiness_timeout_kills_child_and_clears_state(tmp_path: Path) -> None:
@@ -136,10 +136,10 @@ def test_serve_readiness_timeout_kills_child_and_clears_state(tmp_path: Path) ->
         killed["called"] = True
 
     with (
-        patch("llm_cli.commands.serve.spawn_background", return_value=8888),
-        patch("llm_cli.commands.serve.wait_for_ready", return_value=False),
-        patch("llm_cli.commands.serve.port_in_use", return_value=False),
-        patch("llm_cli.commands.serve.os.kill", new=fake_kill),
+        patch("llm_cli.core.serve.spawn_background", return_value=8888),
+        patch("llm_cli.core.serve.wait_for_ready", return_value=False),
+        patch("llm_cli.core.serve.port_in_use", return_value=False),
+        patch("llm_cli.core.serve.os.kill", new=fake_kill),
     ):
         result = runner.invoke(app, ["serve", "cfg-a"], catch_exceptions=False)
     assert result.exit_code != 0
@@ -160,8 +160,8 @@ def test_serve_foreground_writes_running_and_clears_on_exit(tmp_path: Path) -> N
         return 7777, 0
 
     with (
-        patch("llm_cli.commands.serve.spawn_foreground", new=fake_spawn_fg),
-        patch("llm_cli.commands.serve.port_in_use", return_value=False),
+        patch("llm_cli.core.serve.spawn_foreground", new=fake_spawn_fg),
+        patch("llm_cli.core.serve.port_in_use", return_value=False),
     ):
         result = runner.invoke(
             app, ["serve", "cfg-a", "--foreground"], catch_exceptions=False
@@ -175,12 +175,12 @@ def test_serve_systemd_rewrites_unit_and_writes_running(tmp_path: Path) -> None:
     _configure(tmp_path, repo)
     with (
         patch("llm_cli.core.lifecycle._systemd_is_active", return_value=True),
-        patch("llm_cli.commands.serve.write_if_different", return_value=True) as wid,
-        patch("llm_cli.commands.serve.daemon_reload") as dr,
-        patch("llm_cli.commands.serve.restart_unit") as ru,
-        patch("llm_cli.commands.serve.wait_for_ready", return_value=True),
-        patch("llm_cli.commands.serve.systemd_is_active", return_value=True),
-        patch("llm_cli.commands.serve.port_in_use", return_value=False),
+        patch("llm_cli.core.serve.write_if_different", return_value=True) as wid,
+        patch("llm_cli.core.serve.daemon_reload") as dr,
+        patch("llm_cli.core.serve.restart_unit") as ru,
+        patch("llm_cli.core.serve.wait_for_ready", return_value=True),
+        patch("llm_cli.core.serve.systemd_is_active", return_value=True),
+        patch("llm_cli.core.serve.port_in_use", return_value=False),
     ):
         result = runner.invoke(
             app, ["serve", "cfg-a", "--systemd"], catch_exceptions=False
@@ -188,11 +188,11 @@ def test_serve_systemd_rewrites_unit_and_writes_running(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.stdout
     wid.assert_called_once()
     dr.assert_called_once()
-    ru.assert_called_once_with("llm.service")
+    ru.assert_called_once_with("loco.service")
     rec = read_running(_state(tmp_path))
     assert rec is not None
     assert rec.mode == "systemd"
-    assert rec.unit == "llm.service"
+    assert rec.unit == "loco.service"
     assert rec.config_id == "cfg-a"
 
 
@@ -201,12 +201,12 @@ def test_serve_systemd_skips_daemon_reload_when_unit_unchanged(tmp_path: Path) -
     _configure(tmp_path, repo)
     with (
         patch("llm_cli.core.lifecycle._systemd_is_active", return_value=True),
-        patch("llm_cli.commands.serve.write_if_different", return_value=False),
-        patch("llm_cli.commands.serve.daemon_reload") as dr,
-        patch("llm_cli.commands.serve.restart_unit") as ru,
-        patch("llm_cli.commands.serve.wait_for_ready", return_value=True),
-        patch("llm_cli.commands.serve.systemd_is_active", return_value=True),
-        patch("llm_cli.commands.serve.port_in_use", return_value=False),
+        patch("llm_cli.core.serve.write_if_different", return_value=False),
+        patch("llm_cli.core.serve.daemon_reload") as dr,
+        patch("llm_cli.core.serve.restart_unit") as ru,
+        patch("llm_cli.core.serve.wait_for_ready", return_value=True),
+        patch("llm_cli.core.serve.systemd_is_active", return_value=True),
+        patch("llm_cli.core.serve.port_in_use", return_value=False),
     ):
         result = runner.invoke(
             app, ["serve", "cfg-a", "--systemd"], catch_exceptions=False
@@ -224,7 +224,7 @@ def test_foreground_from_supervisor_does_not_touch_running_json(tmp_path: Path) 
         config_id="cfg-a",
         port=18097,
         started_at="t",
-        unit="llm.service",
+        unit="loco.service",
     )
     write_running(_state(tmp_path), pre)
 
@@ -233,7 +233,7 @@ def test_foreground_from_supervisor_does_not_touch_running_json(tmp_path: Path) 
         return 1234, 0
 
     with (
-        patch("llm_cli.commands.serve.spawn_foreground", new=fake_spawn_fg),
+        patch("llm_cli.core.serve.spawn_foreground", new=fake_spawn_fg),
         patch("llm_cli.core.lifecycle._systemd_is_active", return_value=True),
     ):
         result = runner.invoke(
@@ -275,12 +275,12 @@ def test_switch_background_stops_old_starts_new(tmp_path: Path) -> None:
         killed["sig"] = sig
 
     with (
-        patch("llm_cli.commands.serve.reconcile", lambda _repo: None),
-        patch("llm_cli.commands.serve.os.kill", new=fake_kill),
-        patch("llm_cli.commands.serve.spawn_background", return_value=5151),
-        patch("llm_cli.commands.serve.wait_for_ready", return_value=True),
-        patch("llm_cli.commands.serve.port_in_use", return_value=False),
-        patch("llm_cli.commands.serve._wait_pid_gone", return_value=True),
+        patch("llm_cli.core.serve.reconcile", lambda _repo: None),
+        patch("llm_cli.core.serve.os.kill", new=fake_kill),
+        patch("llm_cli.core.serve.spawn_background", return_value=5151),
+        patch("llm_cli.core.serve.wait_for_ready", return_value=True),
+        patch("llm_cli.core.serve.port_in_use", return_value=False),
+        patch("llm_cli.core.process_control.wait_pid_gone", return_value=True),
     ):
         result = runner.invoke(app, ["switch", "cfg-b"], catch_exceptions=False)
     assert result.exit_code == 0, result.stdout
@@ -312,7 +312,7 @@ def test_switch_foreground_refuses_with_hint(tmp_path: Path) -> None:
             log_path="state/logs/cfg-a.log",
         ),
     )
-    with patch("llm_cli.commands.serve.reconcile", lambda _repo: None):
+    with patch("llm_cli.core.serve.reconcile", lambda _repo: None):
         result = runner.invoke(app, ["switch", "cfg-a"], catch_exceptions=False)
     assert result.exit_code != 0
     assert "foreground" in result.stdout.lower()
@@ -329,14 +329,14 @@ def test_serve_systemd_noop_when_same_config_already_active(tmp_path: Path) -> N
             config_id="cfg-a",
             port=18100,
             started_at="t",
-            unit="llm.service",
+            unit="loco.service",
         ),
     )
     with (
-        patch("llm_cli.commands.serve.systemd_is_active", return_value=True),
+        patch("llm_cli.core.serve.systemd_is_active", return_value=True),
         patch("llm_cli.core.lifecycle._systemd_is_active", return_value=True),
-        patch("llm_cli.commands.serve.write_if_different", return_value=False) as wid,
-        patch("llm_cli.commands.serve.restart_unit") as ru,
+        patch("llm_cli.core.serve.write_if_different", return_value=False) as wid,
+        patch("llm_cli.core.serve.restart_unit") as ru,
     ):
         result = runner.invoke(
             app, ["serve", "cfg-a", "--systemd"], catch_exceptions=False

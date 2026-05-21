@@ -19,7 +19,7 @@ the diff and admin-merge.
 ## 3. There is no PyPI
 
 Distribution is by git tag. Merging the release PR creates the tag and a
-GitHub Release with the CHANGELOG. `llm update` consumes the tag. No PyPI
+GitHub Release with the CHANGELOG. `loco update` consumes the tag. No PyPI
 trusted publisher to configure, no wheel to upload, no scaffold tarball.
 
 ## 4. Flow
@@ -31,5 +31,5 @@ flowchart LR
   rp --> relpr[Release PR opened/updated]
   relpr --> mergerel[Merge release PR, admin OK]
   mergerel --> tag[Tag vX.Y.Z + GitHub Release]
-  tag --> users[users: llm update]
+  tag --> users[users: loco update]
 ```

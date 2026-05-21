@@ -36,9 +36,9 @@ def mount_spa(app: FastAPI, dist_dir: Path) -> None:
                 content={
                     "error": {
                         "code": "DASHBOARD_NOT_BUILT",
-                        "message": "Dashboard frontend not built. Run `llm dashboard install`.",
+                        "message": "Dashboard frontend not built. Run `loco dashboard install`.",
                         "details": {"dist_dir": str(dist_dir)},
-                        "fix_hint": "Run `llm dashboard install`",
+                        "fix_hint": "Run `loco dashboard install`",
                     }
                 },
             )

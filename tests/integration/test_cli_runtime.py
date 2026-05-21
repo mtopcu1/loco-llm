@@ -130,8 +130,8 @@ def test_runtime_info_unknown_id(tmp_path: Path) -> None:
     assert result.exit_code == 1
 
 
-@patch("llm_cli.commands.runtime_cmd._run_build_script", return_value=0)
-@patch("llm_cli.commands.runtime_cmd._run_verify_script", return_value=0)
+@patch("llm_cli.core.runtime_install._run_build_script", return_value=0)
+@patch("llm_cli.core.runtime_install._run_verify_script", return_value=0)
 def test_runtime_install_yes_omits_unset_build_params(
     mock_verify, mock_build, tmp_path: Path
 ) -> None:
@@ -155,8 +155,8 @@ def test_runtime_install_yes_omits_unset_build_params(
     assert env == {}
 
 
-@patch("llm_cli.commands.runtime_cmd._run_build_script", return_value=0)
-@patch("llm_cli.commands.runtime_cmd._run_verify_script", return_value=0)
+@patch("llm_cli.core.runtime_install._run_build_script", return_value=0)
+@patch("llm_cli.core.runtime_install._run_verify_script", return_value=0)
 def test_runtime_install_param_override(
     mock_verify, mock_build, tmp_path: Path
 ) -> None:
@@ -188,7 +188,7 @@ def test_runtime_install_param_override(
     mock_build.assert_called_once()
 
 
-@patch("llm_cli.commands.runtime_cmd._run_build_script", return_value=1)
+@patch("llm_cli.core.runtime_install._run_build_script", return_value=1)
 def test_runtime_install_build_failure_no_record(mock_build, tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -254,8 +254,8 @@ def test_runtime_uninstall_not_installed(tmp_path: Path) -> None:
     )
 
 
-@patch("llm_cli.commands.runtime_cmd._run_build_script", return_value=0)
-@patch("llm_cli.commands.runtime_cmd._run_verify_script", return_value=0)
+@patch("llm_cli.core.runtime_install._run_build_script", return_value=0)
+@patch("llm_cli.core.runtime_install._run_verify_script", return_value=0)
 def test_runtime_rebuild_reuses_params(
     mock_verify, mock_build, tmp_path: Path
 ) -> None:
@@ -292,8 +292,8 @@ def test_runtime_rebuild_reuses_params(
     mock_verify.assert_called()
 
 
-@patch("llm_cli.commands.runtime_cmd._run_build_script", return_value=0)
-@patch("llm_cli.commands.runtime_cmd._run_verify_script", return_value=0)
+@patch("llm_cli.core.runtime_install._run_build_script", return_value=0)
+@patch("llm_cli.core.runtime_install._run_verify_script", return_value=0)
 def test_runtime_rebuild_reset_yes_clears_stored_build_params(
     mock_verify, mock_build, tmp_path: Path
 ) -> None:
@@ -323,8 +323,8 @@ def test_runtime_rebuild_reset_yes_clears_stored_build_params(
     mock_build.assert_called()
 
 
-@patch("llm_cli.commands.runtime_cmd._run_build_script", return_value=0)
-@patch("llm_cli.commands.runtime_cmd._run_verify_script", return_value=0)
+@patch("llm_cli.core.runtime_install._run_build_script", return_value=0)
+@patch("llm_cli.core.runtime_install._run_verify_script", return_value=0)
 @patch("llm_cli.core.wizards.edit_params")
 def test_runtime_install_interactive_saves_sparse_build_params(
     mock_edit_params, mock_verify, mock_build, tmp_path: Path

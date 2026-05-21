@@ -11,7 +11,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
-from llm_cli.core import jobs as jobs_module, lifecycle, registry
+from llm_cli.core import jobs as jobs_module, lifecycle, lifecycle_status, registry
 from llm_cli.core.settings import resolve_settings
 from llm_cli.webapi.errors import ApiError, ErrorCode
 
@@ -142,11 +142,53 @@ async def stream_instance_logs():
     return StreamingResponse(_events(), media_type="text/event-stream")
 
 
-def _read_running_mode() -> str | None:
-    root = _state_root()
-    lifecycle.reconcile(root)
-    rec = lifecycle.read_running(root)
-    return rec.mode if rec is not None else None
+def _serve_log_path(config_id: str) -> Path:
+    return lifecycle.logs_dir(_state_root()) / f"{config_id}.log"
+
+
+def _serve_log_tail_lines(config_id: str, *, max_lines: int = 60) -> list[str]:
+    """Last lines from the config serve log (where readiness / runtime errors land)."""
+    log_path = _serve_log_path(config_id)
+    if not log_path.is_file():
+        return [f"(no serve log file yet: {log_path})"]
+    text = log_path.read_text(encoding="utf-8", errors="replace")
+    lines = text.splitlines()
+    if not lines:
+        return ["(serve log file exists but is empty — failure may be before serve.sh wrote output)"]
+    return lines[-max_lines:]
+
+
+def _debug_hints(config_id: str) -> list[str]:
+    log_path = _serve_log_path(config_id)
+    return [
+        f"serve log on disk: {log_path}",
+        f"terminal: loco switch {config_id}",
+        f"tail log: loco logs  (while any instance is running) or: Get-Content -Wait '{log_path}'",
+        "check runtime installed: loco runtime list",
+        "check model on disk: loco model list",
+        "full diagnostics: loco doctor",
+    ]
+
+
+async def _report_instance_failure(config_id: str, report, exc: BaseException) -> None:
+    await report({"stage": "failed"})
+    msg = str(exc).strip()
+    if msg:
+        seen: set[str] = set()
+        for line in msg.splitlines():
+            line = line.strip()
+            if not line or line in seen:
+                continue
+            seen.add(line)
+            await report({"log": f"error: {line}"})
+    await report({"log": "--- serve log tail ---"})
+    tail = _serve_log_tail_lines(config_id)
+    for line in tail:
+        await report({"log": line})
+    if len(tail) <= 2 and tail and tail[0].startswith("("):
+        await report({"log": "--- how to debug ---"})
+        for hint in _debug_hints(config_id):
+            await report({"log": hint})
 
 
 async def _instance_start_coro(
@@ -154,14 +196,22 @@ async def _instance_start_coro(
     mode: str,
     report,
 ) -> None:
-    await report({"stage": "starting"})
-    await asyncio.to_thread(lifecycle.serve_instance, config_id, mode=mode)
+    await report({"stage": "starting", "log": f"config: {config_id} (mode={mode})"})
+    try:
+        await asyncio.to_thread(lifecycle.serve_instance, config_id, mode=mode)
+    except Exception as exc:
+        await _report_instance_failure(config_id, report, exc)
+        raise
     await report({"stage": "ready"})
 
 
 async def _instance_switch_coro(config_id: str, report) -> None:
-    await report({"stage": "switching"})
-    await asyncio.to_thread(lifecycle.switch_instance, config_id)
+    await report({"stage": "switching", "log": f"config: {config_id}"})
+    try:
+        await asyncio.to_thread(lifecycle.switch_instance, config_id)
+    except Exception as exc:
+        await _report_instance_failure(config_id, report, exc)
+        raise
     await report({"stage": "ready"})
 
 
@@ -202,7 +252,7 @@ def start_instance(body: StartInstanceBody):
 
 @router.post("/instance/stop", tags=["instance"])
 def stop_instance_route():
-    mode = _read_running_mode()
+    mode = lifecycle_status.running_mode()
     if mode == "foreground":
         raise ApiError(
             ErrorCode.INSTANCE_FOREGROUND_NOT_STOPPABLE,
@@ -215,7 +265,7 @@ def stop_instance_route():
 
 @router.post("/instance/switch", tags=["instance"])
 def switch_instance_route(body: SwitchInstanceBody):
-    mode = _read_running_mode()
+    mode = lifecycle_status.running_mode()
     if mode == "foreground":
         raise ApiError(
             ErrorCode.INSTANCE_FOREGROUND_NOT_SWITCHABLE,

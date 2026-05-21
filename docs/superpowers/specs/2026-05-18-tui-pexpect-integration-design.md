@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-18  
 **Status:** Approved  
-**Scope:** Phase 1 — `llm config setup` + `llm runtime setup` (Option B). Phase 2 starter: `runtime install` walk_tier (implemented).
+**Scope:** Phase 1 — `loco config setup` + `loco runtime setup` (Option B). Phase 2 starter: `runtime install` walk_tier (implemented).
 
 ## Problem
 
@@ -13,7 +13,7 @@ Unit tests cover param grid state machines with mocked `Application`. The gap is
 ## Goals
 
 1. Add **code-driven pexpect tests** that drive real subprocesses with a PTY.
-2. Cover **Phase 1 workflows:** `llm config setup` and `llm runtime setup`.
+2. Cover **Phase 1 workflows:** `loco config setup` and `loco runtime setup`.
 3. Use **stub-runtime** and **fake registry models** (no GPU, no large downloads).
 4. Map **every command/workflow** to expected behavior and existing vs new test coverage.
 5. Cover **edge cases** for param grid navigation, validation, abort, and save semantics.
@@ -60,7 +60,7 @@ tests/
 
 ### `spawn_llm(args, *, env, cwd)`
 
-- Command: `{sys.executable} -m llm_cli.main` with args (or installed `llm` if `LLM_TEST_USE_ENTRYPOINT=1`).
+- Command: `{sys.executable} -m llm_cli.main` with args (or installed `loco` if `LLM_TEST_USE_ENTRYPOINT=1`).
 - Env: `PYTHONPATH=src`, isolated `HOME`, `XDG_CONFIG_HOME`, `TERM=xterm-256color`, `COLUMNS=100`, `LINES=30`.
 - **Do not** set `LLM_FORCE_PLAIN` — TUI must run (`stdout.isatty()` true via PTY).
 - Timeouts per `expect` step (default 5s); fail with decoded buffer on timeout.
@@ -123,21 +123,21 @@ Legend: **Mock** = existing `CliRunner`+patch; **TUI** = new pexpect; **N/A** = 
 
 | Command | Interactive UI | Expected behavior | Existing tests | TUI phase |
 |---------|----------------|-------------------|----------------|-----------|
-| `llm setup --default` | No (flags only) | Writes settings, prints next steps, **no** chain | `test_cli_setup.py` | N/A |
-| `llm setup` (interactive) | typer.prompt + **chain** | Settings → optional runtime/model/config/serve chain | `test_cli_setup_chain.py` (chain mocked) | Phase 3 (partial) |
-| `llm list` | No | Tables of runtimes/models/configs | `test_cli_milestone2.py` | N/A |
-| `llm specs` | No | Regenerates specs.md block | `test_cli_specs.py` | N/A |
-| `llm advisor` | `select` if no flags | VRAM recommendations; optional config offer | `test_cli_advisor.py` | Phase 3 (select only) |
-| `llm serve` / `switch` / `stop` / `status` / `logs` | No | Lifecycle dispatch | `test_cli_serve.py`, `test_cli_lifecycle.py` | N/A |
-| `llm doctor` | No | Prereq checks | `test_cli_doctor.py` | N/A |
+| `loco setup --default` | No (flags only) | Writes settings, prints next steps, **no** chain | `test_cli_setup.py` | N/A |
+| `loco setup` (interactive) | typer.prompt + **chain** | Settings → optional runtime/model/config/serve chain | `test_cli_setup_chain.py` (chain mocked) | Phase 3 (partial) |
+| `loco list` | No | Tables of runtimes/models/configs | `test_cli_milestone2.py` | N/A |
+| `loco specs` | No | Regenerates specs.md block | `test_cli_specs.py` | N/A |
+| `loco advisor` | `select` if no flags | VRAM recommendations; optional config offer | `test_cli_advisor.py` | Phase 3 (select only) |
+| `loco serve` / `switch` / `stop` / `status` / `logs` | No | Lifecycle dispatch | `test_cli_serve.py`, `test_cli_lifecycle.py` | N/A |
+| `loco doctor` | No | Prereq checks | `test_cli_doctor.py` | N/A |
 
-### `llm settings`
+### `loco settings`
 
 | Subcommand | UI | Expected behavior | Existing tests | TUI |
 |------------|-----|-------------------|----------------|-----|
 | `show`, `set`, `path` | No | Read/write `~/.config/llm/config.yaml` | `test_cli_settings.py` | N/A |
 
-### `llm runtime`
+### `loco runtime`
 
 | Subcommand | UI | Expected behavior | Existing tests | TUI |
 |------------|-----|-------------------|----------------|-----|
@@ -147,7 +147,7 @@ Legend: **Mock** = existing `CliRunner`+patch; **TUI** = new pexpect; **N/A** = 
 | `rebuild` | Same as install with `--reset` | Re-prompt or `--yes` defaults | `test_cli_runtime.py` | Phase 2 |
 | `install`/`rebuild` custom kind | No | Error → use `runtime setup` | `test_cli_runtime_setup.py` | N/A |
 
-### `llm model`
+### `loco model`
 
 | Subcommand | UI | Expected behavior | Existing tests | TUI |
 |------------|-----|-------------------|----------------|-----|
@@ -155,7 +155,7 @@ Legend: **Mock** = existing `CliRunner`+patch; **TUI** = new pexpect; **N/A** = 
 | `pull` | Duplicate menu in **setup chain only** | HF download, registry upsert | `test_cli_model.py` (HTTP mocked) | N/A (network) |
 | Chain duplicate menu | `select` 4-way | keep / force / rename / skip | None dedicated | Phase 3 |
 
-### `llm config`
+### `loco config`
 
 | Subcommand | UI | Expected behavior | Existing tests | TUI |
 |------------|-----|-------------------|----------------|-----|
@@ -176,14 +176,14 @@ Legend: **Mock** = existing `CliRunner`+patch; **TUI** = new pexpect; **N/A** = 
 
 ## Phase 1 — TUI scenarios
 
-### A. `llm config setup`
+### A. `loco config setup`
 
 **Fixtures:** seeded repo + fake `qwen-7b` + full workspace runtimes.
 
 #### A1 — Happy path (llamacpp + model, flags pre-filled)
 
 ```
-llm config setup --runtime llamacpp --model qwen-7b
+loco config setup --runtime llamacpp --model qwen-7b
 ```
 
 | Step | Keys / action | Expect | Post-condition |
@@ -196,7 +196,7 @@ llm config setup --runtime llamacpp --model qwen-7b
 #### A2 — Full interactive pickers
 
 ```
-llm config setup
+loco config setup
 ```
 
 | Step | Keys | Expect |
@@ -245,7 +245,7 @@ llm config setup
 #### A8 — stub-runtime (no model)
 
 ```
-llm config setup --runtime stub-runtime
+loco config setup --runtime stub-runtime
 ```
 
 | Step | Expect | Post |
@@ -264,14 +264,14 @@ llm config setup --runtime stub-runtime
 
 ---
 
-### B. `llm runtime setup`
+### B. `loco runtime setup`
 
 **Fixtures:** seeded repo with workspace `runtimes/` (includes `stub-runtime`, `llamacpp`).
 
 #### B1 — Preset → stub-runtime install
 
 ```
-llm runtime setup
+loco runtime setup
 ```
 
 | Step | Keys | Expect | Post |
@@ -316,8 +316,8 @@ Pre-create `runtimes/llamacpp`. Run custom setup with id `llamacpp` → expect `
 |----------|--------------|
 | `runtime install <id>` with **walk_tier** | Needs tiered build fixture runtime in temp repo; stub-runtime has empty `build` |
 | `runtime install` abort mid-grid | Same harness as config grid |
-| `llm setup` chain first `confirm` + runtime setup | Longer script; compose Phase 1 workflows |
-| `llm advisor` interactive `select` | Simple questionary; lower risk than param grid |
+| `loco setup` chain first `confirm` + runtime setup | Longer script; compose Phase 1 workflows |
+| `loco advisor` interactive `select` | Simple questionary; lower risk than param grid |
 
 Phase 2 reuses `workflows/` helpers and `walk_tier` param grid scenarios (advanced toggle, abort).
 

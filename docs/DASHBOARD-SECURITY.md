@@ -18,7 +18,7 @@ and how to safely expose the dashboard if you actually need to.
 
 **Not defended against:**
 - Other processes on the same machine. Any local process can already
-  shell out to `llm` directly; a localhost-only dashboard adds no new
+  shell out to `loco` directly; a localhost-only dashboard adds no new
   attack surface against that threat model.
 - Attackers with file system access. The dashboard reads and writes the
   same files (`configs/*.yaml`, `state/*`, `~/.config/llm/config.yaml`)
@@ -72,7 +72,7 @@ If you actually need remote access, prefer:
 
   ```bash
   # On `host`:
-  llm dashboard serve --insecure --i-understand \
+  loco dashboard serve --insecure --i-understand \
     --host 100.x.y.z \
     --allowed-host 100.x.y.z:7878
   ```
@@ -98,8 +98,8 @@ the source of truth for which hosts are legitimate.
 
 ```bash
 # 1. Verify the dashboard isn't bound non-localhost right now.
-llm dashboard status
-llm doctor dashboard
+loco dashboard status
+loco doctor dashboard
 
 # 2. Verify no systemd unit or shell rc file bakes in --insecure.
 grep -r 'dashboard.*insecure' ~/.bashrc ~/.zshrc ~/.config/systemd 2>/dev/null

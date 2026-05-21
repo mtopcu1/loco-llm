@@ -267,6 +267,9 @@ export const handlers = [
       context: { runtime_id: 'vllm' },
     }),
   ),
+  http.get('http://localhost/api/jobs/:id/log', () =>
+    HttpResponse.json({ lines: ['line one', 'line two'] }),
+  ),
   http.post('http://localhost/api/jobs/:id/cancel', () =>
     HttpResponse.json({ cancelled: true }),
   ),

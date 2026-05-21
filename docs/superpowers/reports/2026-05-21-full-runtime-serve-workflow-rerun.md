@@ -35,7 +35,7 @@
 
 ## Not re-validated end-to-end in UI
 
-- Full runtime uninstall → dashboard reinstall (vllm build ~5 min)
+- Full runtime uninstall → dashboard reinstall (vloco build ~5 min)
 - Fresh model pulls + in-progress table rows (F6) — needs browser during an active pull
 - vllm cold start (~98s) — skipped
 - F10 (no Ollama) — unchanged product fact
@@ -47,8 +47,8 @@
 | F1 | repo_root None breaks serve | **fixed** — leave |
 | F2 | Deep links 404 | **fixed** — leave |
 | F3 | Cancelled pull orphans | **fixed** — leave (re-test cancel during a live large pull) |
-| F4 | vllm dashboard install Py3.14 | **fixed** (defaults) — leave |
-| F5 | No build-param UI | partial (vllm defaults only) — **discuss** if full param UI wanted |
+| F4 | vloco dashboard install Py3.14 | **fixed** (defaults) — leave |
+| F5 | No build-param UI | partial (vloco defaults only) — **discuss** if full param UI wanted |
 | F6 | Models table empty during pulls | **fixed** in source — verify in browser on next pull |
 | F7 | Stale instance dropdown | **fixed** in source — verify in browser |
 | F8 | Generic dual-start error | **fixed** — leave |

@@ -1,4 +1,4 @@
-"""End-to-end tests for `llm runtime setup`."""
+"""End-to-end tests for `loco runtime setup`."""
 from __future__ import annotations
 
 import shutil
@@ -40,9 +40,9 @@ def test_runtime_setup_preset_lists_official_runtimes(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(wizards, "select", lambda prompt, choices, **k: next(picks))
 
-    from llm_cli.commands import runtime_cmd
+    from llm_cli.commands import runtime_setup
 
-    monkeypatch.setattr(runtime_cmd, "_run_install_for_id", lambda *a, **k: None)
+    monkeypatch.setattr(runtime_setup, "run_install_for_id", lambda *a, **k: None)
 
     result = runner.invoke(app, ["runtime", "setup"])
     assert result.exit_code == 0, result.output
@@ -58,7 +58,7 @@ def test_runtime_setup_custom_writes_all_files(monkeypatch, tmp_path):
         [
             "vllm-custom",
             "vLLM (user-installed)",
-            'vllm serve "$LLM_MODEL_PATH" --host "$LLM_SERVE_HOST" --port "$LLM_SERVE_PORT" $LLM_EXTRA_ARGS',
+            'vloco serve "$LLM_MODEL_PATH" --host "$LLM_SERVE_HOST" --port "$LLM_SERVE_PORT" $LLM_EXTRA_ARGS',
             "",
         ]
     )

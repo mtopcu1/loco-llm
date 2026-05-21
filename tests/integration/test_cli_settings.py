@@ -1,4 +1,4 @@
-"""Integration tests for `llm settings ...`."""
+"""Integration tests for `loco settings ...`."""
 from __future__ import annotations
 
 from pathlib import Path

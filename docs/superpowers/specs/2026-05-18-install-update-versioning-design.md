@@ -5,7 +5,7 @@ _Status: Draft — pending user review_
 
 ## 1. Purpose
 
-Give **public users** a way to install and update LocalLLM **without git**: curl-style install, semver releases, and `llm update`. Official runtime manifests ship in a **read-only bundle**; user-owned data (configs, models, builds, state) lives under `~/llm`.
+Give **public users** a way to install and update LocalLLM **without git**: curl-style install, semver releases, and `loco update`. Official runtime manifests ship in a **read-only bundle**; user-owned data (configs, models, builds, state) lives under `~/llm`.
 
 Contributors keep the existing **dev install** (git clone + editable `pip install -e`).
 
@@ -15,12 +15,12 @@ Contributors keep the existing **dev install** (git clone + editable `pip instal
 |----------|--------|
 | Primary audience | **Public users** who never touch git |
 | Install model | **Read-only bundle** — official runtimes only in the install; custom runtimes/configs in user data dirs |
-| Distribution | **Approach 1** — release tarball + install script + `llm update` (not PyPI-only, not hidden git clone) |
+| Distribution | **Approach 1** — release tarball + install script + `loco update` (not PyPI-only, not hidden git clone) |
 
 ## 3. Goals
 
 - One-liner install: `curl -fsSL https://…/install.sh | bash`
-- Idempotent upgrade: `llm update` (or `llm update --check`)
+- Idempotent upgrade: `loco update` (or `loco update --check`)
 - Semver releases tagged on `main`; dev builds derive version from git
 - Atomic upgrades via versioned release dirs + `current` symlink
 - Clear split: **bundle** (read-only, vendor-owned) vs **data_root** (user-owned)
@@ -31,7 +31,7 @@ Contributors keep the existing **dev install** (git clone + editable `pip instal
 - Standalone binary (PyInstaller/Nuitka)
 - PyPI as primary distribution channel
 - Auto-update on every CLI invocation (optional notify-only later)
-- Custom runtime authoring in bundle mode (`llm runtime setup` custom branch disabled; message points to dev install)
+- Custom runtime authoring in bundle mode (`loco runtime setup` custom branch disabled; message points to dev install)
 - Per-PR version bumps or branch-name semver for public releases
 - Windows-native install (WSL2/Linux only, same as today)
 - Downgrade UX beyond keeping the previous release directory on disk
@@ -120,7 +120,7 @@ Introduce `bundle_root()` / extend `Settings` with `install_kind`, `install_root
 
 - Remove duplicate `__version__` string; read installed version via `importlib.metadata.version("localllm-cli")`
 - `pyproject.toml`: `dynamic = ["version"]` + hatch-vcs config
-- `llm --version` and `llm update --check` use package metadata
+- `loco --version` and `loco update --check` use package metadata
 
 ### 6.4 Branch / preview builds (contributors only, not v1 public)
 
@@ -173,7 +173,7 @@ URL: `https://raw.githubusercontent.com/mtopcu1/local-llm-scaffold/main/releases
 }
 ```
 
-Install script and `llm update` fetch this file first, then download the tarball from `tarball_url`.
+Install script and `loco update` fetch this file first, then download the tarball from `tarball_url`.
 
 ## 9. Install script (`scripts/install.sh`)
 
@@ -195,7 +195,7 @@ Behavior:
 8. Write/update `~/.config/llm/config.yaml` (preserve existing `data_root` overrides)
 9. Create `~/llm/configs/` if missing; copy template configs if dir empty
 10. Symlink `~/.local/bin/llm`
-11. Run `llm setup --default` if first install (skip interactive chain unless `$LOCALLLM_SETUP=1`)
+11. Run `loco setup --default` if first install (skip interactive chain unless `$LOCALLLM_SETUP=1`)
 
 Existing repo-root `install.sh` becomes **`scripts/install-dev.sh`** (editable install from clone) or keeps name with a banner when run from git checkout.
 
@@ -208,10 +208,10 @@ Environment variables:
 | `LOCALLLM_INSTALL_DIR` | Override `~/.local/share/localllm` |
 | `LOCALLLM_SKIP_SETUP` | Skip post-install setup (same as today) |
 
-## 10. `llm update` command
+## 10. `loco update` command
 
 ```
-llm update [--check] [--version VERSION] [--channel stable]
+loco update [--check] [--version VERSION] [--channel stable]
 ```
 
 | Flag | Behavior |
@@ -222,16 +222,16 @@ llm update [--check] [--version VERSION] [--channel stable]
 
 Flow:
 
-1. Refuse in **source/dev** mode with hint: `git pull && pip install -e .` (or add `llm update --dev` later)
+1. Refuse in **source/dev** mode with hint: `git pull && pip install -e .` (or add `loco update --dev` later)
 2. Load `install.version` from settings
 3. Fetch `stable.json`; compare semver
 4. If up to date → print message, exit 0
 5. Download tarball → verify sha256 → extract to `releases/{version}/`
 6. `pip install --force-reinstall` wheel into configured venv
 7. Repoint `current` symlink; update `install.version` in settings
-8. Print summary + suggest `llm doctor`
+8. Print summary + suggest `loco doctor`
 
-**Rollback (manual v1):** previous release dir remains under `releases/`; user can repoint `current` symlink or re-run `llm update --version PREVIOUS`.
+**Rollback (manual v1):** previous release dir remains under `releases/`; user can repoint `current` symlink or re-run `loco update --version PREVIOUS`.
 
 ## 11. Code changes (summary)
 
@@ -256,7 +256,7 @@ Flow:
 | Checksum mismatch | Delete partial extract; exit 1; do not repoint `current` |
 | Python too old | Fail before download with required version |
 | Disk full mid-extract | Fail; partial dir removed; `current` unchanged |
-| `llm update` in source mode | Exit 1 with dev instructions |
+| `loco update` in source mode | Exit 1 with dev instructions |
 | Missing `install` section in settings | Treat as legacy source install if `repo_root` set; else prompt re-run install script |
 
 ## 13. Testing
@@ -268,7 +268,7 @@ Flow:
 | Integration | Config write/read under temp `configs_dir` |
 | Integration | Registry loads from bundle layout fixture |
 | CI | On tag: build tarball, smoke `install.sh` against fixture in ephemeral container |
-| Manual | WSL curl install → `llm update --check` → upgrade across two tagged releases |
+| Manual | WSL curl install → `loco update --check` → upgrade across two tagged releases |
 
 ## 14. Migration & compatibility
 
@@ -278,7 +278,7 @@ Flow:
 
 ## 15. Documentation updates
 
-- `README.md`: public install one-liner + `llm update`
+- `README.md`: public install one-liner + `loco update`
 - `docs/wizards.md` or new `docs/install.md`: dev vs bundle, directory layout, rollback
 - Contributor note: releases require tagging + CI
 
@@ -295,7 +295,7 @@ Flow:
 
 **Phase 3 — Update command**
 
-- `llm update` / `--check`; wire to manifest + pip reinstall
+- `loco update` / `--check`; wire to manifest + pip reinstall
 
 **Phase 4 — Polish**
 
@@ -308,7 +308,7 @@ Flow:
 | Tool | Model | LocalLLM v1 equivalent |
 |------|-------|------------------------|
 | Ollama | Single binary + curl install script | Tarball bundle + venv wheel |
-| OpenCode | Multi-channel binary + `opencode upgrade` | `stable.json` + `llm update` |
+| OpenCode | Multi-channel binary + `opencode upgrade` | `stable.json` + `loco update` |
 | pipx tools | PyPI wheel | We also ship non-Python bundle assets (runtimes) |
 
 LocalLLM differs because **runtime manifests are part of the product**, not just the Python package — hence tarball bundle rather than PyPI-only.

@@ -1,4 +1,4 @@
-"""`llm config` — show, validate, new, setup."""
+"""`loco config` — show, validate, new, setup."""
 from __future__ import annotations
 
 import json
@@ -46,13 +46,12 @@ def _atomic_write_yaml(path: Path, doc: dict[str, Any]) -> None:
 
 
 def _parse_param(token: str) -> tuple[str, str]:
-    if "=" not in token:
-        raise typer.BadParameter(f"--param must be key=value (got {token!r})")
-    key, value = token.split("=", 1)
-    key = key.strip()
-    if not key:
-        raise typer.BadParameter("--param key cannot be empty")
-    return key, value.strip()
+    from llm_cli.core.params import ParamTokenError, parse_cli_param_token
+
+    try:
+        return parse_cli_param_token(token)
+    except ParamTokenError as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
 
 def do_config_new(
@@ -162,7 +161,7 @@ def do_config_setup(
         if not entries:
             console.print(
                 "[red]error:[/red] no compatible models in registry; "
-                "`llm model pull <hf-url>` first, then `llm config setup`."
+                "`loco model pull <hf-url>` first, then `loco config setup`."
             )
             return None
         if mid is None:

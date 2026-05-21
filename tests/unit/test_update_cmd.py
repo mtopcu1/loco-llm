@@ -1,4 +1,4 @@
-"""Tests for git-based llm update."""
+"""Tests for git-based loco update."""
 from __future__ import annotations
 
 import subprocess
@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from llm_cli.commands.update_cmd import GitCommandError
+from llm_cli.core.update_ops import GitCommandError
 from llm_cli.main import app
 
 runner = CliRunner()
@@ -64,16 +64,16 @@ def fake_clone(tmp_path, monkeypatch):
     _init_repo(root, tags=["v0.4.0", "v0.4.1"])
     monkeypatch.setenv("LOCO_INSTALL", str(root))
     monkeypatch.setattr(
-        "llm_cli.commands.update_cmd._sync_deps", lambda _root: None
+        "llm_cli.core.update_ops._sync_deps", lambda _root: None
     )
     monkeypatch.setattr(
-        "llm_cli.commands.update_cmd._fetch_remote", lambda _root, refspec=None: None
+        "llm_cli.core.update_ops._fetch_remote", lambda _root, refspec=None: None
     )
     monkeypatch.setattr(
-        "llm_cli.commands.update_cmd._ff_pull", lambda _root, _branch: None
+        "llm_cli.core.update_ops._ff_pull", lambda _root, _branch: None
     )
     monkeypatch.setattr(
-        "llm_cli.commands.update_cmd._service_running", lambda: False
+        "llm_cli.core.update_ops._service_running", lambda: False
     )
     return root
 
@@ -191,11 +191,11 @@ def test_sync_deps_targets_managed_venv_python(tmp_path, monkeypatch):
         return subprocess.CompletedProcess(cmd, 0)
 
     monkeypatch.setattr(
-        "llm_cli.commands.update_cmd.shutil.which", lambda name: "/usr/bin/uv"
+        "llm_cli.core.update_ops.shutil.which", lambda name: "/usr/bin/uv"
     )
-    monkeypatch.setattr("llm_cli.commands.update_cmd.subprocess.run", fake_run)
+    monkeypatch.setattr("llm_cli.core.update_ops.subprocess.run", fake_run)
 
-    from llm_cli.commands.update_cmd import _sync_deps
+    from llm_cli.core.update_ops import _sync_deps
 
     _sync_deps(root)
 
@@ -227,7 +227,7 @@ def test_update_rebuilds_dashboard_if_installed(monkeypatch):
         "llm_cli.core.dashboard.load_installed_record",
         lambda: type("R", (), {"cli_version": "0.9.0"})(),
     )
-    monkeypatch.setattr("llm_cli.commands.update_cmd.current_cli_version", lambda: "1.1.0")
+    monkeypatch.setattr("llm_cli.core.update_ops.current_cli_version", lambda: "1.1.0")
 
     def fake_install(**kwargs):
         called["install"] = True
@@ -238,9 +238,9 @@ def test_update_rebuilds_dashboard_if_installed(monkeypatch):
         )()
 
     monkeypatch.setattr("llm_cli.core.dashboard.run_install", fake_install)
-    monkeypatch.setattr("llm_cli.commands.update_cmd.shutil.which", lambda cmd: f"/usr/bin/{cmd}")
+    monkeypatch.setattr("llm_cli.core.update_ops.shutil.which", lambda cmd: f"/usr/bin/{cmd}")
 
-    from llm_cli.commands.update_cmd import _post_update_hooks
+    from llm_cli.core.update_ops import _post_update_hooks
 
     _post_update_hooks()
     assert called["install"] is True
@@ -260,7 +260,7 @@ def test_update_fetch_missing_branch_prints_hint(monkeypatch, tmp_path):
             "fatal: couldn't find remote ref feat/missing",
         )
 
-    monkeypatch.setattr("llm_cli.commands.update_cmd._fetch_remote", fail_fetch)
+    monkeypatch.setattr("llm_cli.core.update_ops._fetch_remote", fail_fetch)
 
     result = runner.invoke(app, ["update", "--branch", "feat/missing"])
     assert result.exit_code == 1
@@ -275,9 +275,9 @@ def test_update_skips_dashboard_rebuild_if_node_missing(monkeypatch):
         "llm_cli.core.dashboard.load_installed_record",
         lambda: type("R", (), {"cli_version": "0.9.0"})(),
     )
-    monkeypatch.setattr("llm_cli.commands.update_cmd.current_cli_version", lambda: "1.1.0")
-    monkeypatch.setattr("llm_cli.commands.update_cmd.shutil.which", lambda _cmd: None)
+    monkeypatch.setattr("llm_cli.core.update_ops.current_cli_version", lambda: "1.1.0")
+    monkeypatch.setattr("llm_cli.core.update_ops.shutil.which", lambda _cmd: None)
 
-    from llm_cli.commands.update_cmd import _post_update_hooks
+    from llm_cli.core.update_ops import _post_update_hooks
 
     _post_update_hooks()

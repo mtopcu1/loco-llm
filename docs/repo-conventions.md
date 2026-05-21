@@ -15,18 +15,18 @@ End users edit launch configs only under **data home** `configs/`. Repo `configs
 
 | File | Role |
 |---|---|
-| `requirements.yaml` | External prerequisites for `llm doctor` |
-| `requirements.md` | Regenerated via `llm doctor render-requirements` |
-| `specs.md` | Host/GPU/WSL snapshot via `llm specs` |
+| `requirements.yaml` | External prerequisites for `loco doctor` |
+| `requirements.md` | Regenerated via `loco doctor render-requirements` |
+| `specs.md` | Host/GPU/WSL snapshot via `loco specs` |
 
 ## Settings vs configs
 
 Two namespaces, intentionally separate:
 
-- **`llm settings ...`** edits `{data_home}/config.yaml` (where data lives on this machine).
-- **`llm config show/validate`** operates on `{data_home}/configs/*.yaml` (launch units).
+- **`loco settings ...`** edits `{data_home}/config.yaml` (where data lives on this machine).
+- **`loco config show/validate`** operates on `{data_home}/configs/*.yaml` (launch units).
 
-For manual bash, `eval "$(llm settings env)"` injects `LLM_DATA_ROOT`, `LLM_REPO_ROOT`, `LLM_RUNTIMES`, `LLM_MODELS`, `LLM_CACHE`.
+For manual bash, `eval "$(loco settings env)"` injects `LLM_DATA_ROOT`, `LLM_REPO_ROOT`, `LLM_RUNTIMES`, `LLM_MODELS`, `LLM_CACHE`.
 
 ## Directory layout
 
@@ -55,8 +55,8 @@ Heavy artifacts are **not** in git.
 
 ## CLI discovery
 
-- **`llm list`** — install recipes + user runtimes; configs from **data home only**; models from registry; benchmarks merged.
-- **`llm config validate`** — configs in data home `configs/`.
+- **`loco list`** — install recipes + user runtimes; configs from **data home only**; models from registry; benchmarks merged.
+- **`loco config validate`** — configs in data home `configs/`.
 
 ## Git: what to commit
 

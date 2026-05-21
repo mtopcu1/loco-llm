@@ -7,25 +7,25 @@ _Status: Approved by user, ready for implementation planning_
 
 ## 1. Purpose
 
-Make runtimes a first-class, schema-driven object in the CLI. Today, adding a runtime is "drop five files in a folder and hope the configs match." This spec turns each runtime into a typed manifest with a build-time and serve-time parameter schema, and adds a `llm runtime` command group that installs, verifies, lists, and uninstalls them. Configs become typed parameter sets validated against the chosen runtime's schema. The CLI is the only thing that translates params to env vars at script-spawn time, so a future web UI can render the same schema as a form with no extra work.
+Make runtimes a first-class, schema-driven object in the CLI. Today, adding a runtime is "drop five files in a folder and hope the configs match." This spec turns each runtime into a typed manifest with a build-time and serve-time parameter schema, and adds a `loco runtime` command group that installs, verifies, lists, and uninstalls them. Configs become typed parameter sets validated against the chosen runtime's schema. The CLI is the only thing that translates params to env vars at script-spawn time, so a future web UI can render the same schema as a form with no extra work.
 
 ## 2. Problems solved
 
 - **Authoring runtimes is hand-wavy.** Three untyped bash scripts plus a free-form `env:` dict in every config means typos and stale param names silently propagate.
-- **There is no "ready to serve" gate.** `llm serve` happily spawns against a runtime whose `build.sh` was never run, then surfaces the failure mid-spawn.
-- **`requirements.yaml` is global.** Adding a CUDA-only dep warns CPU-only users; uninstalled-runtime deps still appear in `llm doctor` output.
-- **Setup wants to "help" too much.** Any attempt to bundle 10–30 minute builds into `llm setup` turns first-run into an hour-long block; failures inside setup are especially painful.
+- **There is no "ready to serve" gate.** `loco serve` happily spawns against a runtime whose `build.sh` was never run, then surfaces the failure mid-spawn.
+- **`requirements.yaml` is global.** Adding a CUDA-only dep warns CPU-only users; uninstalled-runtime deps still appear in `loco doctor` output.
+- **Setup wants to "help" too much.** Any attempt to bundle 10–30 minute builds into `loco setup` turns first-run into an hour-long block; failures inside setup are especially painful.
 - **Configs aren't replicable.** A config can name any env var it wants; whether the runtime understands that var is anyone's guess until serve crashes.
 
 ## 3. Goals
 
 - One typed `manifest.yaml` per runtime declares its build schema, serve schema, and external dependencies (with conditional `when:` clauses).
-- One CLI verb to install a runtime: `llm runtime install <id>`, interactive by default, scriptable via `--param`/`--yes`.
+- One CLI verb to install a runtime: `loco runtime install <id>`, interactive by default, scriptable via `--param`/`--yes`.
 - One detection mechanism for "installed": the `.installed` record file the CLI writes after `build.sh` succeeds and `verify.sh` (if present) passes.
-- `llm serve <cfg>` hard-errors when the runtime is not installed, with a fix-it hint.
+- `loco serve <cfg>` hard-errors when the runtime is not installed, with a fix-it hint.
 - Configs use typed `serve.params`, validated against the runtime's serve schema. Unknown keys and missing required keys are hard errors.
-- `llm doctor` scopes external-dep checks to **currently installed** runtimes by default, with `--all` for completeness.
-- `llm setup` never blocks on a build. It writes settings and prints a fixed onboarding hint.
+- `loco doctor` scopes external-dep checks to **currently installed** runtimes by default, with `--all` for completeness.
+- `loco setup` never blocks on a build. It writes settings and prints a fixed onboarding hint.
 - All four contract scripts (`build.sh`, `verify.sh`, `serve.sh`, `healthcheck.sh`) are uniform across "official" and "custom" runtimes. Provenance is a manifest field, not a folder split.
 
 ## 4. Non-goals
@@ -34,10 +34,10 @@ Make runtimes a first-class, schema-driven object in the CLI. Today, adding a ru
 - **Multi-flavor coexistence.** One install per runtime id at a time. Switching flavor = rebuild.
 - **Remote runtime registry.** Runtimes are folders shipped in this repo (or user-added to it). No download mechanism, no catalog server.
 - **Per-config build params.** Build flavor and other build-time choices live with the install, not the config.
-- **Automatic schema migration.** If a manifest's `build:` schema changes after a runtime is installed, the install keeps its old `build_params`; `llm runtime info` shows the drift and the user runs `llm runtime rebuild <id> --reset` to re-prompt. No magic.
-- **Hot reconfigure.** Edit a config → `llm switch <same-cfg>` restarts. No live param reload.
-- **Parallel installs.** Sequential only; `for rt in a b; do llm runtime install $rt; done` is the answer.
-- **Bulk install during `llm setup`.** Removed entirely; setup only handles settings + an onboarding hint.
+- **Automatic schema migration.** If a manifest's `build:` schema changes after a runtime is installed, the install keeps its old `build_params`; `loco runtime info` shows the drift and the user runs `loco runtime rebuild <id> --reset` to re-prompt. No magic.
+- **Hot reconfigure.** Edit a config → `loco switch <same-cfg>` restarts. No live param reload.
+- **Parallel installs.** Sequential only; `for rt in a b; do loco runtime install $rt; done` is the answer.
+- **Bulk install during `loco setup`.** Removed entirely; setup only handles settings + an onboarding hint.
 
 ## 5. Architecture
 
@@ -108,7 +108,7 @@ Every param accepts: `default`, `required` (default `false`), `prompt` (defaults
 
 A `requires:` entry may carry `when: { build.<param>: <value> }`. The CLI evaluates the clause against the resolved build params and skips the requirement if the clause does not match. v1 supports only `build.<param>: <scalar>` equality. (Future: serve-time `when:` clauses; logical ops.)
 
-For `llm runtime install` and `llm doctor --runtime <id>`, the resolved build params come from CLI flags + interactive prompts (or, on a re-check of an installed runtime, from `.installed.build_params`). For `llm doctor --all` against an *uninstalled* runtime, the build schema's `default:` values are used as the resolved params; entries whose `when:` references a param with no default are listed as conditional (annotated, not failed).
+For `loco runtime install` and `loco doctor --runtime <id>`, the resolved build params come from CLI flags + interactive prompts (or, on a re-check of an installed runtime, from `.installed.build_params`). For `loco doctor --all` against an *uninstalled* runtime, the build schema's `default:` values are used as the resolved params; entries whose `when:` references a param with no default are listed as conditional (annotated, not failed).
 
 #### 5.1.3 Path-template expansion
 
@@ -122,18 +122,18 @@ For `type: path` params, the CLI expands the following tokens before injecting t
 | `${models_dir}` | `settings.models_dir` |
 | `${cache_dir}` | `settings.cache_dir` |
 
-Unknown `${...}` tokens are an error (caught at `llm config validate`).
+Unknown `${...}` tokens are an error (caught at `loco config validate`).
 
 #### 5.1.4 Provenance
 
-`official: true` is set on runtimes we ship. Absent or `false` is treated as user-added. The field affects only how `llm runtime list` groups output; install / serve / validate behavior is uniform.
+`official: true` is set on runtimes we ship. Absent or `false` is treated as user-added. The field affects only how `loco runtime list` groups output; install / serve / validate behavior is uniform.
 
 ### 5.2 Script contract
 
 | Script | Required | Role |
 |---|---|---|
 | `build.sh` | yes | Reads `LLM_BUILD_<PARAM>` env vars (CLI sets them from the `build:` schema). Idempotent. |
-| `verify.sh` | optional | "Binary works" probe with no model needed (e.g. `llama-server --version`). Exit 0 = OK. CLI runs it right after `build.sh` and on `llm doctor --runtime <id>`. |
+| `verify.sh` | optional | "Binary works" probe with no model needed (e.g. `llama-server --version`). Exit 0 = OK. CLI runs it right after `build.sh` and on `loco doctor --runtime <id>`. |
 | `serve.sh` | yes | Reads env vars per the `serve:` schema. Foreground. Handles SIGTERM cleanly. |
 | `healthcheck.sh` | yes | Existing contract — exit 0 once the running server is ready. |
 
@@ -159,9 +159,9 @@ Path: `${runtimes_dir}/<id>/.installed`. JSON object; one record per runtime. Ex
 | `runtime_id` | Matches the manifest `id`. Sanity check on read. |
 | `installed_at` | ISO-8601 UTC. |
 | `build_params` | The full resolved param map used for this install (defaults included). |
-| `build_sh_sha256` | sha256 of the `build.sh` contents at install time. Informational only (drift shown by `llm runtime info`, no behavior change at serve time). |
+| `build_sh_sha256` | sha256 of the `build.sh` contents at install time. Informational only (drift shown by `loco runtime info`, no behavior change at serve time). |
 | `verify_passed` | `true` if `verify.sh` ran and exited 0; `null` if `verify.sh` was absent. (A nonzero exit aborts the install entirely — `.installed` is not written, so the field is never `false`.) |
-| `schema_hash` | sha256 of the canonicalized `build:` schema at install time. Drives the "schema changed since install" warning in `llm runtime info`. |
+| `schema_hash` | sha256 of the canonicalized `build:` schema at install time. Drives the "schema changed since install" warning in `loco runtime info`. |
 
 Detection: a runtime is "installed" iff `.installed` exists and parses. No subprocess on the hot path.
 
@@ -188,7 +188,7 @@ readiness:
   timeout_seconds: 900
 ```
 
-Validation rules (`llm config validate`):
+Validation rules (`loco config validate`):
 
 | Condition | Result |
 |---|---|
@@ -204,78 +204,78 @@ Defaults from the schema are filled in **at env-build time**, not when reading t
 
 ### 5.5 CLI surface
 
-Today's top-level `llm build` and `llm pull` are removed. Two new groups:
+Today's top-level `loco build` and `loco pull` are removed. Two new groups:
 
 ```text
-llm runtime list                 # id, official?, installed?, flavor, last built; --json
-llm runtime info <id>            # manifest schema, install record, requirements status, drift
-llm runtime install <id>         # interactive: prompts each `build:` param; --param k=v, --yes
-llm runtime uninstall <id>       # removes .installed marker; --purge also rm -rf the install dir
-llm runtime rebuild <id>         # reuses stored build_params unless --reset
+loco runtime list                 # id, official?, installed?, flavor, last built; --json
+loco runtime info <id>            # manifest schema, install record, requirements status, drift
+loco runtime install <id>         # interactive: prompts each `build:` param; --param k=v, --yes
+loco runtime uninstall <id>       # removes .installed marker; --purge also rm -rf the install dir
+loco runtime rebuild <id>         # reuses stored build_params unless --reset
 
-llm model list                   # id, has weights?, source kind
-llm model info <id>              # manifest + install state
-llm model pull <id>              # runs pull.sh (unchanged for v1)
+loco model list                   # id, has weights?, source kind
+loco model info <id>              # manifest + install state
+loco model pull <id>              # runs pull.sh (unchanged for v1)
 ```
 
-#### 5.5.1 `llm runtime install <id>` flow
+#### 5.5.1 `loco runtime install <id>` flow
 
 1. Load manifest → typed schema.
 2. Resolve build params:
    - From `--param k=v` flags (repeatable; one occurrence per param key, last wins on duplicates).
    - Interactive prompts (Rich) for any unset params, with default pre-filled.
    - `--yes` accepts all defaults non-interactively; errors if any required-no-default is missing.
-3. Pre-flight dependencies: `llm doctor --runtime <id>` with the resolved build params (so `when:` clauses evaluate correctly). Refuse with install hints if anything is missing.
+3. Pre-flight dependencies: `loco doctor --runtime <id>` with the resolved build params (so `when:` clauses evaluate correctly). Refuse with install hints if anything is missing.
 4. Build the env vars for `build.sh`: each build param resolves to its declared `env:` name (or the derived `LLM_BUILD_<PARAM_UPPER>` if no `env:` was declared). Invoke `runtimes/<id>/build.sh` via the existing WSL bash runner.
 5. If `verify.sh` exists, run it with the same env. Exit non-zero from either step aborts; no `.installed` written.
 6. Write `.installed` (5.3). Append `{action:"runtime-install", id, build_params}` to `state/history.jsonl`.
 7. Print a one-line success: `installed llamacpp (flavor=cuda)`.
 
-#### 5.5.2 `llm runtime uninstall <id>`
+#### 5.5.2 `loco runtime uninstall <id>`
 
 - Removes the `.installed` marker. Build artifacts under `${runtimes_dir}/<id>/` are left intact (a re-install reuses them; a half-broken build can be salvaged).
 - `--purge` additionally `rm -rf ${runtimes_dir}/<id>/`. Confirmation prompt unless `--yes`.
 - Appends `{action:"runtime-uninstall", id, purge}` to history.
 
-#### 5.5.3 `llm runtime rebuild <id>`
+#### 5.5.3 `loco runtime rebuild <id>`
 
 - Reuses `build_params` from the existing `.installed` record.
 - `--reset` discards them and re-prompts (or accepts `--param` overrides).
 - Internally: uninstall (no purge) → install. History: one `runtime-rebuild` event.
 
-#### 5.5.4 `llm runtime info <id>`
+#### 5.5.4 `loco runtime info <id>`
 
 Renders: manifest schema (build + serve), `.installed` (if any), per-requirement status (✓/✗ with installed version), and the two drift indicators:
 
 - `build.sh` sha vs `.installed.build_sh_sha256` (informational).
 - `schema_hash` of current manifest vs `.installed.schema_hash` (warning if changed: "schema changed since install; rebuild to refresh").
 
-### 5.6 `llm serve` gate
+### 5.6 `loco serve` gate
 
-Before any spawn, `llm serve` checks `.installed` for the config's runtime. If absent:
+Before any spawn, `loco serve` checks `.installed` for the config's runtime. If absent:
 
 ```text
 error: runtime 'llamacpp' is not installed
-hint:  llm runtime install llamacpp
+hint:  loco runtime install llamacpp
 ```
 
 Exit 1. No history event written, no port probe attempted.
 
 ### 5.7 Setup flow
 
-`llm setup` does not touch runtimes. After settings are saved (today's behavior unchanged), it prints a fixed panel:
+`loco setup` does not touch runtimes. After settings are saved (today's behavior unchanged), it prints a fixed panel:
 
 ```text
 Setup complete. Settings written to ~/.config/llm/config.yaml.
 
 Recommended next steps:
-  1. llm doctor                  # verify cross-cutting prereqs
-  2. llm runtime list            # see available runtimes
-  3. llm runtime install <id>    # install one (e.g. `llm runtime install llamacpp`)
-  4. llm model list              # browse model definitions
-  5. llm model pull <id>         # download weights
-  6. llm config validate         # check launch configs
-  7. llm serve <config-id>       # start a server
+  1. loco doctor                  # verify cross-cutting prereqs
+  2. loco runtime list            # see available runtimes
+  3. loco runtime install <id>    # install one (e.g. `loco runtime install llamacpp`)
+  4. loco model list              # browse model definitions
+  5. loco model pull <id>         # download weights
+  6. loco config validate         # check launch configs
+  7. loco serve <config-id>       # start a server
 ```
 
 ### 5.8 Requirements integration
@@ -284,10 +284,10 @@ Recommended next steps:
 
 | Command | Scope |
 |---|---|
-| `llm doctor` | Universal + every currently-installed runtime's deps. |
-| `llm doctor --runtime <id>` | Universal + one runtime's deps (used by install pre-flight). |
-| `llm doctor --all` | Universal + every runtime in the repo (installed or not). |
-| `llm doctor render-requirements` | Regenerates `requirements.md`: universal section + one section per runtime. |
+| `loco doctor` | Universal + every currently-installed runtime's deps. |
+| `loco doctor --runtime <id>` | Universal + one runtime's deps (used by install pre-flight). |
+| `loco doctor --all` | Universal + every runtime in the repo (installed or not). |
+| `loco doctor render-requirements` | Regenerates `requirements.md`: universal section + one section per runtime. |
 
 ## 6. Module / file layout
 
@@ -302,7 +302,7 @@ Recommended next steps:
 | `src/llm_cli/commands/artifacts.py` | **Deleted.** Functions move into the two sub-apps. |
 | `src/llm_cli/commands/serve.py` | Add `.installed` gate; build env from validated `serve.params`. |
 | `src/llm_cli/commands/setup.py` | Append the "Recommended next steps" panel. |
-| `src/llm_cli/commands/list_cmd.py` | Update `llm list runtimes` and `llm list models` to use the new schema/status fields. |
+| `src/llm_cli/commands/list_cmd.py` | Update `loco list runtimes` and `loco list models` to use the new schema/status fields. |
 | `src/llm_cli/main.py` | Remove top-level `build` and `pull`; mount `runtime` and `model` sub-apps. |
 | `runtimes/llamacpp/manifest.yaml` | Replace with the schema-bearing version (5.1). |
 | `runtimes/llamacpp/build.sh` | Read `LLM_BUILD_FLAVOR` / `LLM_BUILD_JOBS`; flavor selects CMake flags. |
@@ -315,7 +315,7 @@ Recommended next steps:
 | `docs/add-a-runtime.md` | Rewritten around the manifest schema and the four-script contract. |
 | `docs/add-a-model.md` | Note that model schema is a follow-up; pull.sh contract unchanged. |
 | `docs/runtime-lifecycle.md` | **New.** Install / rebuild / uninstall semantics; `.installed` record; drift behavior. |
-| `README.md` | Update CLI table; replace `llm build` / `llm pull` with the new sub-apps; update Getting Started. |
+| `README.md` | Update CLI table; replace `loco build` / `loco pull` with the new sub-apps; update Getting Started. |
 
 ## 7. Testing
 
@@ -328,17 +328,17 @@ Recommended next steps:
 
 ### 7.2 Integration (against `stub-runtime`)
 
-- `llm runtime install stub-runtime --yes` → `.installed` created; `llm runtime list` shows it; `llm runtime info stub-runtime` renders cleanly.
-- `llm config validate` is silent for an installed runtime's config; warns for an uninstalled one.
-- `llm serve <stub-cfg>` refuses with the hint when not installed; succeeds after install.
-- `llm runtime uninstall stub-runtime` removes the marker; serve refuses again.
-- `llm runtime rebuild stub-runtime` re-installs with the same params; `--reset` re-prompts.
-- `llm runtime install` with `--param flavor=cpu` for llamacpp avoids the `nvcc` requirement check (mocked doctor); `--param flavor=cuda` triggers it.
+- `loco runtime install stub-runtime --yes` → `.installed` created; `loco runtime list` shows it; `loco runtime info stub-runtime` renders cleanly.
+- `loco config validate` is silent for an installed runtime's config; warns for an uninstalled one.
+- `loco serve <stub-cfg>` refuses with the hint when not installed; succeeds after install.
+- `loco runtime uninstall stub-runtime` removes the marker; serve refuses again.
+- `loco runtime rebuild stub-runtime` re-installs with the same params; `--reset` re-prompts.
+- `loco runtime install` with `--param flavor=cpu` for llamacpp avoids the `nvcc` requirement check (mocked doctor); `--param flavor=cuda` triggers it.
 
 ### 7.3 CLI surface tests
 
-- `llm build` and `llm pull` are not registered (typer raises usage error).
-- `llm runtime` and `llm model` sub-apps register the expected verbs.
+- `loco build` and `loco pull` are not registered (typer raises usage error).
+- `loco runtime` and `loco model` sub-apps register the expected verbs.
 
 ### 7.4 Mock vs real
 
@@ -350,7 +350,7 @@ Recommended next steps:
 - New: `docs/runtime-lifecycle.md` — install / rebuild / uninstall, the four-script contract, the `.installed` record, drift indicators.
 - Rewrite: `docs/add-a-runtime.md` — manifest schema walk-through, dep declaration, when-clauses, verify.sh examples for common stacks.
 - Update: `docs/add-a-model.md` — note model schema is a follow-up; pull.sh contract unchanged.
-- Update: `README.md` — replace `llm build` / `llm pull` rows with `llm runtime ...` / `llm model ...` tables; refresh Getting Started to walk through `llm runtime install llamacpp` → `llm model pull <id>` → `llm serve`.
+- Update: `README.md` — replace `loco build` / `loco pull` rows with `loco runtime ...` / `loco model ...` tables; refresh Getting Started to walk through `loco runtime install llamacpp` → `loco model pull <id>` → `loco serve`.
 - Update: `docs/superpowers/specs/2026-05-15-localllm-scaffolding-design.md` — add a note at the top pointing at this spec and the lifecycle spec.
 - Update: `docs/lifecycle.md` — note the new `.installed` gate ahead of any serve.
 

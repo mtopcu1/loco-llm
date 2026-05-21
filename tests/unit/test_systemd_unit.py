@@ -37,14 +37,14 @@ def test_desired_unit_text_is_deterministic() -> None:
 
 def test_unit_path_uses_xdg_config_home(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    assert unit_path() == tmp_path / "systemd" / "user" / "llm.service"
+    assert unit_path() == tmp_path / "systemd" / "user" / "loco.service"
 
 
 def test_unit_path_falls_back_to_home(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
-    assert unit_path() == tmp_path / ".config" / "systemd" / "user" / "llm.service"
+    assert unit_path() == tmp_path / ".config" / "systemd" / "user" / "loco.service"
 
 
 def test_write_if_different_creates_file(tmp_path: Path, monkeypatch) -> None:
@@ -79,40 +79,40 @@ def test_daemon_reload_calls_systemctl_user() -> None:
 
 def test_restart_unit_calls_systemctl_restart() -> None:
     runner = MagicMock(return_value=MagicMock(returncode=0, stdout="", stderr=""))
-    restart_unit("llm.service", runner=runner)
+    restart_unit("loco.service", runner=runner)
     cmd = runner.call_args[0][0]
-    assert cmd == ["systemctl", "--user", "restart", "llm.service"]
+    assert cmd == ["systemctl", "--user", "restart", "loco.service"]
 
 
 def test_stop_unit_calls_systemctl_stop() -> None:
     runner = MagicMock(return_value=MagicMock(returncode=0, stdout="", stderr=""))
-    stop_unit("llm.service", runner=runner)
+    stop_unit("loco.service", runner=runner)
     cmd = runner.call_args[0][0]
-    assert cmd == ["systemctl", "--user", "stop", "llm.service"]
+    assert cmd == ["systemctl", "--user", "stop", "loco.service"]
 
 
 def test_is_active_true_when_stdout_active() -> None:
     runner = MagicMock(
         return_value=MagicMock(returncode=0, stdout="active\n", stderr="")
     )
-    assert is_active("llm.service", runner=runner) is True
+    assert is_active("loco.service", runner=runner) is True
 
 
 def test_is_active_false_when_stdout_inactive() -> None:
     runner = MagicMock(
         return_value=MagicMock(returncode=3, stdout="inactive\n", stderr="")
     )
-    assert is_active("llm.service", runner=runner) is False
+    assert is_active("loco.service", runner=runner) is False
 
 
 def test_is_active_false_when_systemctl_missing() -> None:
     def runner(cmd, **kw):
         raise FileNotFoundError("systemctl")
 
-    assert is_active("llm.service", runner=runner) is False
+    assert is_active("loco.service", runner=runner) is False
 
 
 def test_restart_unit_raises_on_nonzero() -> None:
     runner = MagicMock(return_value=MagicMock(returncode=2, stdout="", stderr="boom"))
     with pytest.raises(RuntimeError):
-        restart_unit("llm.service", runner=runner)
+        restart_unit("loco.service", runner=runner)

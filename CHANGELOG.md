@@ -90,7 +90,7 @@
 
 ### Features
 
-* **dashboard:** `llm dashboard serve` (background + foreground, readiness wait, browser auto-open) ([5532710](https://github.com/mtopcu1/loco-llm/commit/5532710e4b00ae8d3a2ef4366c4f1f44f0c4d27d))
+* **dashboard:** `loco dashboard serve` (background + foreground, readiness wait, browser auto-open) ([5532710](https://github.com/mtopcu1/loco-llm/commit/5532710e4b00ae8d3a2ef4366c4f1f44f0c4d27d))
 * **dashboard:** app shell (Layout/Header/Sidebar), status pill, error card, useSSE hook ([4d1a20c](https://github.com/mtopcu1/loco-llm/commit/4d1a20cfa2ea63deb9ac03f13aaf618cc86b743d))
 * **dashboard:** centralized error→toast mapping by ErrorCode ([2aa73e9](https://github.com/mtopcu1/loco-llm/commit/2aa73e9a53737a1e48ab4849d7e191add1e78007))
 * **dashboard:** Configs list + detail (Overview/Params/Validate/Raw YAML, read-only) ([664e143](https://github.com/mtopcu1/loco-llm/commit/664e14308bc96d1c773631d5297248cc9a4cbb38))
@@ -101,8 +101,8 @@
 * **dashboard:** enable model pull/add/uninstall with form validation ([12c3201](https://github.com/mtopcu1/loco-llm/commit/12c3201d92a865755003caa303b28109132c3772))
 * **dashboard:** enable runtime install/rebuild/uninstall mutations with error toasts ([07c3bad](https://github.com/mtopcu1/loco-llm/commit/07c3badd45b8c2e02b02d8043bba6fd3fa295abc))
 * **dashboard:** History page with filters and live SSE updates ([031bd07](https://github.com/mtopcu1/loco-llm/commit/031bd07c4ddb53ccb726f7cddbfa69e56c7b4fc3))
-* **dashboard:** implement `llm dashboard install` (python deps + npm build + .installed) ([8d4ca41](https://github.com/mtopcu1/loco-llm/commit/8d4ca4192ff11f3aaf9d2ada4b7b1cd9002878bb))
-* **dashboard:** implement `llm dashboard stop` and `uninstall [--purge]` ([2b6f2d9](https://github.com/mtopcu1/loco-llm/commit/2b6f2d97234ca9f69594f392bdbba74deaf8f5a9))
+* **dashboard:** implement `loco dashboard install` (python deps + npm build + .installed) ([8d4ca41](https://github.com/mtopcu1/loco-llm/commit/8d4ca4192ff11f3aaf9d2ada4b7b1cd9002878bb))
+* **dashboard:** implement `loco dashboard stop` and `uninstall [--purge]` ([2b6f2d9](https://github.com/mtopcu1/loco-llm/commit/2b6f2d97234ca9f69594f392bdbba74deaf8f5a9))
 * **dashboard:** Instance page with live log streaming (read-only) ([134781e](https://github.com/mtopcu1/loco-llm/commit/134781e64170099a251da68dab81f5d8633d125c))
 * **dashboard:** instance start/stop/switch controls ([53b8b1c](https://github.com/mtopcu1/loco-llm/commit/53b8b1c0d798646af12b2eb2224f40e14cdb270f))
 * **dashboard:** Jobs tray in sidebar + JobDetailSheet with streaming log ([673c474](https://github.com/mtopcu1/loco-llm/commit/673c474b7447384712883fa04af5516be6a3d30c))
@@ -116,13 +116,13 @@
 * **dashboard:** typed API client generated from OpenAPI schema ([6522037](https://github.com/mtopcu1/loco-llm/commit/6522037d2f90fc747748005caba00644490f43e9))
 * **dashboard:** useJobs/useJob/useStartJob hooks with SSE-into-Query integration ([81e4938](https://github.com/mtopcu1/loco-llm/commit/81e49382eab5a4ff38039b094da7781dca9d463a))
 * **dashboard:** web dashboard MVP (Plan 1/5) ([7877253](https://github.com/mtopcu1/loco-llm/commit/787725314db17042ee6bc563b6b531541db37846))
-* **dashboard:** wire llm dashboard subcommand group with status stub ([e36111a](https://github.com/mtopcu1/loco-llm/commit/e36111a0ec3995466482fa3071a457c51e1bafb7))
+* **dashboard:** wire loco dashboard subcommand group with status stub ([e36111a](https://github.com/mtopcu1/loco-llm/commit/e36111a0ec3995466482fa3071a457c51e1bafb7))
 * **dashboard:** wire TanStack Router/Query, Zustand store, sonner toaster ([31ed8ee](https://github.com/mtopcu1/loco-llm/commit/31ed8ee4b60942a29108650580159d725870c899))
 * **disk:** per-model disk usage and data-root capacity scan ([1292315](https://github.com/mtopcu1/loco-llm/commit/129231509b9809d522d2629d6933ee6c26dd1d6e))
 * **doctor:** add `dashboard` scope (node/npm, install record, dist integrity, server pid) ([2af345a](https://github.com/mtopcu1/loco-llm/commit/2af345acd2d54a41f7b5353678f396bea64ef116))
 * **jobs:** in-memory job registry with per-job log file and SSE fan-out ([8e387f0](https://github.com/mtopcu1/loco-llm/commit/8e387f0ca133679b90814a902950e69614fdc668))
-* **setup:** offer optional dashboard install at end of `llm setup` chain ([d6ff269](https://github.com/mtopcu1/loco-llm/commit/d6ff269de25f953a0481c0235e9bb4c3e9b8d9e9))
-* **update:** rebuild dashboard after `llm update` when version drifts (best-effort) ([2822faf](https://github.com/mtopcu1/loco-llm/commit/2822faf27f4aa1e51c256f599e7d4f7bc42a870a))
+* **setup:** offer optional dashboard install at end of `loco setup` chain ([d6ff269](https://github.com/mtopcu1/loco-llm/commit/d6ff269de25f953a0481c0235e9bb4c3e9b8d9e9))
+* **update:** rebuild dashboard after `loco update` when version drifts (best-effort) ([2822faf](https://github.com/mtopcu1/loco-llm/commit/2822faf27f4aa1e51c256f599e7d4f7bc42a870a))
 * **webapi:** /api/jobs list/get/stream/cancel routes ([6ace4cf](https://github.com/mtopcu1/loco-llm/commit/6ace4cf449938d447f673fc0ebb23196f707c74b))
 * **webapi:** extend ErrorCode enum for mutation paths ([6019356](https://github.com/mtopcu1/loco-llm/commit/6019356d568d61a776c83b5d9ce6c244eb229ba0))
 * **webapi:** FastAPI factory + health + version routes + middleware wiring ([6c8d13a](https://github.com/mtopcu1/loco-llm/commit/6c8d13a0205518841cb9dcc22778055562abcd37))
@@ -205,13 +205,13 @@
 
 ### ⚠ BREAKING CHANGES
 
-* llm update no longer reads from PyPI or installs a scaffold tarball.
+* loco update no longer reads from PyPI or installs a scaffold tarball.
 
 ### Features
 
 * **cli:** warn when running off a release tag ([4d5ee57](https://github.com/mtopcu1/loco-llm/commit/4d5ee57a8492439b608dd573908f43cb64e0671a))
 * **install:** curl-installable git-clone installer with uv editable install ([3d8bd1c](https://github.com/mtopcu1/loco-llm/commit/3d8bd1cc0b0889af7503ced3bed8c52122d952a3))
-* rewrite llm update as git-tag-based with re-anchor semantics ([bd361a5](https://github.com/mtopcu1/loco-llm/commit/bd361a54ff2572695c70eb8849417ea452f72bbb))
+* rewrite loco update as git-tag-based with re-anchor semantics ([bd361a5](https://github.com/mtopcu1/loco-llm/commit/bd361a54ff2572695c70eb8849417ea452f72bbb))
 
 
 ### Documentation
@@ -240,7 +240,7 @@
 
 ### Features
 
-* **0.2:** param grid wizard, llamacpp/vllm runtime params ([70a0c1f](https://github.com/mtopcu1/local-llm-scaffold/commit/70a0c1fb307e4e94c62f98f15f62760a595c50cb))
+* **0.2:** param grid wizard, llamacpp/vloco runtime params ([70a0c1f](https://github.com/mtopcu1/local-llm-scaffold/commit/70a0c1fb307e4e94c62f98f15f62760a595c50cb))
 * **0.2:** wizards, advisor, and setup chain ([71f974d](https://github.com/mtopcu1/local-llm-scaffold/commit/71f974d10e4121b00bfda1c85f34f59902417260))
 * add Python package skeleton and CLI smoke test ([a7b4b4c](https://github.com/mtopcu1/local-llm-scaffold/commit/a7b4b4ca76fe0c613963c98d090070ad275be35d))
 * **assets:** layered scaffold and user asset discovery ([9a2a20c](https://github.com/mtopcu1/local-llm-scaffold/commit/9a2a20c465eedf3e6092763ae3d93c96f73af647))
@@ -252,7 +252,7 @@
 * **config-resolve:** strict errors when ${model_path} cant resolve ([fb991a9](https://github.com/mtopcu1/local-llm-scaffold/commit/fb991a97b25ac7a887447489b7f11c725f8ff061))
 * **core:** add lightweight version parser and comparator ([070a100](https://github.com/mtopcu1/local-llm-scaffold/commit/070a1009701d13726e2d09822e7f4cdb8f1351c6))
 * **core:** add Paths loader for paths.yaml ([c7b8ead](https://github.com/mtopcu1/local-llm-scaffold/commit/c7b8ead9998d980bdcd7ab1d0dfa5d8e71bd78ed))
-* distributed install, llm update, and layered assets (v0.3.0) ([e5a45d5](https://github.com/mtopcu1/local-llm-scaffold/commit/e5a45d5d577bbdc728db07f06f836b0ae00cb54d))
+* distributed install, loco update, and layered assets (v0.3.0) ([e5a45d5](https://github.com/mtopcu1/local-llm-scaffold/commit/e5a45d5d577bbdc728db07f06f836b0ae00cb54d))
 * **doctor:** add runtime requirement helpers ([1b57f75](https://github.com/mtopcu1/local-llm-scaffold/commit/1b57f75a29a9b1e321fa653cd053111915d7a485))
 * **doctor:** add scoped CLI checks ([1b27078](https://github.com/mtopcu1/local-llm-scaffold/commit/1b270784f0a693adef6a6530d311723a4f82eff9))
 * **doctor:** render grouped requirements ([c866617](https://github.com/mtopcu1/local-llm-scaffold/commit/c866617cf158bd9e132692f4017aec943c8708f4))
@@ -263,7 +263,7 @@
 * **install-record:** file_sha256 and stable schema_hash helpers ([5e6d7d0](https://github.com/mtopcu1/local-llm-scaffold/commit/5e6d7d09538c8832d7874e149ad8a38bc5f836a9))
 * **install-record:** InstallRecord dataclass + JSON read/write ([ed75515](https://github.com/mtopcu1/local-llm-scaffold/commit/ed755155ff00c960ecd6cea85c7e7058dc4ef21d))
 * **install:** add public install, dev install, and v0.2 migration scripts ([f2a1ae7](https://github.com/mtopcu1/local-llm-scaffold/commit/f2a1ae7e5cd69a9ae7b3ab3b1c23c0ef5d6c3b0c))
-* **install:** auto-invoke llm setup on first install ([9e1bec3](https://github.com/mtopcu1/local-llm-scaffold/commit/9e1bec3440d9955dd83f047fd684a8ac30a66a7c))
+* **install:** auto-invoke loco setup on first install ([9e1bec3](https://github.com/mtopcu1/local-llm-scaffold/commit/9e1bec3440d9955dd83f047fd684a8ac30a66a7c))
 * **lifecycle:** add module skeleton with state paths and record ([b4533a9](https://github.com/mtopcu1/local-llm-scaffold/commit/b4533a9c135499de3d593841e15e931fa1f74ffb))
 * **lifecycle:** append_history writes one JSON object per line ([dbaf8e9](https://github.com/mtopcu1/local-llm-scaffold/commit/dbaf8e9a294ce2246bde0ca450e5fef1e0cb89ee))
 * **lifecycle:** is_alive(pid) probe with POSIX kill(0) semantics ([a2b0b4d](https://github.com/mtopcu1/local-llm-scaffold/commit/a2b0b4d996eab0b0b1ffc37cac64fee37885b6c3))
@@ -296,25 +296,25 @@
 * **serve-spawn:** spawn_foreground blocks with on_started callback ([68563db](https://github.com/mtopcu1/local-llm-scaffold/commit/68563db4e400c14c07aadbca5073f5616039d216))
 * **serve-spawn:** wait_for_ready poll loop with injectable probe ([d47bd7c](https://github.com/mtopcu1/local-llm-scaffold/commit/d47bd7c41ed42a72d197efdcdd63b58290b23cdd))
 * **serve:** build env from validated serve.params ([6db4383](https://github.com/mtopcu1/local-llm-scaffold/commit/6db43836f135548fb1a4ff8735dd37d0da68a335))
-* **settings:** add `llm settings env` (eval-friendly export lines) ([5039695](https://github.com/mtopcu1/local-llm-scaffold/commit/50396959459cf05cc0d3fc99ade995d433fa4995))
-* **settings:** add `llm settings show` ([9f51a8a](https://github.com/mtopcu1/local-llm-scaffold/commit/9f51a8abc9b73b6d31169cc0f128caa6bf077d0f))
+* **settings:** add `loco settings env` (eval-friendly export lines) ([5039695](https://github.com/mtopcu1/local-llm-scaffold/commit/50396959459cf05cc0d3fc99ade995d433fa4995))
+* **settings:** add `loco settings show` ([9f51a8a](https://github.com/mtopcu1/local-llm-scaffold/commit/9f51a8abc9b73b6d31169cc0f128caa6bf077d0f))
 * **settings:** add ensure_data_dirs() helper ([3f5418c](https://github.com/mtopcu1/local-llm-scaffold/commit/3f5418cb116d9d0519f2be51175b401d21adfbbf))
-* **settings:** add interactive `llm settings edit <key>` ([62eaef2](https://github.com/mtopcu1/local-llm-scaffold/commit/62eaef26134e707c3889520a00307e7926c7d0aa))
+* **settings:** add interactive `loco settings edit <key>` ([62eaef2](https://github.com/mtopcu1/local-llm-scaffold/commit/62eaef26134e707c3889520a00307e7926c7d0aa))
 * **settings:** add load_settings() with key validation ([e24647c](https://github.com/mtopcu1/local-llm-scaffold/commit/e24647c7f198582040ef62b3c1c189eba6ce094d))
 * **settings:** add resolve() to fill defaults and derived dirs ([0f28639](https://github.com/mtopcu1/local-llm-scaffold/commit/0f286395b01b31cc617c2857e13e4bfde6093445))
 * **settings:** add save_settings() with key validation ([ec22f70](https://github.com/mtopcu1/local-llm-scaffold/commit/ec22f70c83562f4498e875a3138220886779f2f5))
 * **settings:** add XDG-aware settings_path() ([3b0070d](https://github.com/mtopcu1/local-llm-scaffold/commit/3b0070d2527f624eccf065926a4fb580791f7845))
 * **settings:** introduce Settings dataclass and KEY_REGISTRY ([b1b9c57](https://github.com/mtopcu1/local-llm-scaffold/commit/b1b9c5710e2d11aea69c477ba3a39b6c3dc5596b))
-* **setup:** add `llm setup --default` (non-interactive) ([8c71bb3](https://github.com/mtopcu1/local-llm-scaffold/commit/8c71bb3539c86c0c459f2790f940432b378d1d14))
+* **setup:** add `loco setup --default` (non-interactive) ([8c71bb3](https://github.com/mtopcu1/local-llm-scaffold/commit/8c71bb3539c86c0c459f2790f940432b378d1d14))
 * **setup:** granular per-directory override prompts ([eecb6fa](https://github.com/mtopcu1/local-llm-scaffold/commit/eecb6fa99c991f22f79f0e2c44d72d89c596bc00))
 * **setup:** interactive data_root prompt + default layout ([aa116ae](https://github.com/mtopcu1/local-llm-scaffold/commit/aa116ae8d1ebabde6fd6b612b19464b9bf50a148))
 * **setup:** recommended next steps panel ([7d94b70](https://github.com/mtopcu1/local-llm-scaffold/commit/7d94b703a587d12c037ec8844b7f2d73bfc1a67f))
-* **systemd:** render llm.service template per config ([5028b75](https://github.com/mtopcu1/local-llm-scaffold/commit/5028b75869db93c860b2057eaa0a63f32ddb8639))
+* **systemd:** render loco.service template per config ([5028b75](https://github.com/mtopcu1/local-llm-scaffold/commit/5028b75869db93c860b2057eaa0a63f32ddb8639))
 * **systemd:** unit_path resolves via XDG with HOME fallback ([93ab143](https://github.com/mtopcu1/local-llm-scaffold/commit/93ab14348b378516438ad42bb1642fc361996f66))
 * **systemd:** wrappers for daemon-reload, restart, stop, is-active ([79cea4a](https://github.com/mtopcu1/local-llm-scaffold/commit/79cea4a01eee1b33690604a766fcd9ea0ad18d77))
 * **systemd:** write_if_different skips disk write when unchanged ([a1796c9](https://github.com/mtopcu1/local-llm-scaffold/commit/a1796c9fdbe83244cc367cb384af75a830649317))
 * **tests:** add PTY TUI integration coverage for setup flows ([aa566b2](https://github.com/mtopcu1/local-llm-scaffold/commit/aa566b2c57ad7fdf6cdeff5c545cb62bff40fc93))
-* **update:** add llm update with scaffold tarball swap ([bc35245](https://github.com/mtopcu1/local-llm-scaffold/commit/bc35245cf52deb7f1a757ef7b099842e0a4a006d))
+* **update:** add loco update with scaffold tarball swap ([bc35245](https://github.com/mtopcu1/local-llm-scaffold/commit/bc35245cf52deb7f1a757ef7b099842e0a4a006d))
 * **validate,model-cmd:** registry-backed model rules + drop legacy model dir code ([f124e3a](https://github.com/mtopcu1/local-llm-scaffold/commit/f124e3af8853f761eb60ea5bf6b578f678b71a0c))
 
 

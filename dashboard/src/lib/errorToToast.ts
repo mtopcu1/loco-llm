@@ -1,5 +1,6 @@
 import { toast } from 'sonner'
 import { getApiError } from '@/lib/apiError'
+import { apiFetch } from '@/lib/apiFetch'
 
 const HINT_RE = /^(GET|POST|PUT|DELETE)\s+(\/api\/.+)$/
 
@@ -13,7 +14,7 @@ function parseFixHint(hint: string | null | undefined) {
 async function executeFixHint(parsed: { method: string; path: string }) {
   if (parsed.method !== 'POST') return
   try {
-    const r = await fetch(parsed.path, { method: 'POST' })
+    const r = await apiFetch(parsed.path, { method: 'POST' })
     if (r.ok) toast.success('Fix applied')
     else toast.error('Fix failed', { description: await r.text() })
   } catch (e) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${LLM_RUNTIMES:?LLM_RUNTIMES must be set (eval \"\$(llm settings env)\")}"
+: "${LLM_RUNTIMES:?LLM_RUNTIMES must be set (eval \"\$(loco settings env)\")}"
 
 ROOT="${LLM_RUNTIMES}/llamacpp"
 SRC="${ROOT}/llama.cpp"

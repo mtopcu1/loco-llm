@@ -1,4 +1,4 @@
-"""End-to-end tests for `llm config setup` wizard."""
+"""End-to-end tests for `loco config setup` wizard."""
 from __future__ import annotations
 
 import shutil
@@ -235,6 +235,6 @@ def test_config_setup_no_compatible_models(monkeypatch, tmp_path):
 
         result = runner.invoke(app, ["config", "setup"])
         assert result.exit_code != 0
-        assert "llm model pull" in result.output
+        assert "loco model pull" in result.output
     finally:
         wizards.force_plain(False)

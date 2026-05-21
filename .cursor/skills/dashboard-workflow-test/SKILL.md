@@ -1,7 +1,7 @@
 ---
 name: dashboard-workflow-test
 description: >-
-  Tests loco-llm dashboard workflows in the browser, documents UX issues, bugs,
+  Tests loco-loco dashboard workflows in the browser, documents UX issues, bugs,
   and opinions in a structured report. Use when the user asks to test a workflow,
   debug the website, audit dashboard UX, or run an end-to-end dashboard scenario
   (e.g. pull a model, install a runtime).

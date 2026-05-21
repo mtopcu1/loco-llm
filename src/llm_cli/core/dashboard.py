@@ -190,7 +190,7 @@ def run_install(
     if not skip_python:
         uv = shutil.which("uv")
         if uv is None:
-            raise RuntimeError("`uv` not found. Install uv and retry `llm dashboard install`.")
+            raise RuntimeError("`uv` not found. Install uv and retry `loco dashboard install`.")
         venv_python = _managed_venv_python(root)
         if venv_python is None:
             raise RuntimeError(

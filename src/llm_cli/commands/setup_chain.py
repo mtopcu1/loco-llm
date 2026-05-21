@@ -1,4 +1,4 @@
-"""Orchestration for `loco setup` onboarding chain."""
+"""Interactive onboarding chain for `loco setup` (runtime → model → config → serve)."""
 from __future__ import annotations
 
 from typing import Any
@@ -24,7 +24,7 @@ def _prompt_text(prompt: str, *, default: str = "") -> str:
 
 
 def _do_runtime_setup() -> str | None:
-    from llm_cli.commands.runtime_cmd import interactive_runtime_setup
+    from llm_cli.commands.runtime_setup import interactive_runtime_setup
 
     return interactive_runtime_setup()
 
@@ -53,7 +53,7 @@ def _duplicate_model_menu(existing_id: str) -> str:
 
 def _pull_with_new_model_id(url: str) -> str | None:
     """Prompt until unique id or user-visible failure; returns None on aborted pull."""
-    from llm_cli.commands.model_cmd import (
+    from llm_cli.core.model_pull import (
         DuplicateModelRegistrationError,
         PullModelError,
     )
@@ -98,7 +98,7 @@ def _pull_with_new_model_id(url: str) -> str | None:
 
 def _interactive_model_pull_for_setup(url: str) -> str | None:
     """Pull HF URL or resolve duplicate registration interactively."""
-    from llm_cli.commands.model_cmd import DuplicateModelRegistrationError
+    from llm_cli.core.model_pull import DuplicateModelRegistrationError
 
     try:
         return _do_model_pull(url)
@@ -115,9 +115,9 @@ def _interactive_model_pull_for_setup(url: str) -> str | None:
 
 
 def _do_model_pull(url: str, **kwargs: Any) -> str:
-    from llm_cli.commands.model_cmd import do_model_pull
+    from llm_cli.core.model_pull import pull_hf_url_model_id
 
-    return do_model_pull(url, **kwargs)
+    return pull_hf_url_model_id(url, **kwargs)
 
 
 def _do_config_setup(
@@ -134,12 +134,14 @@ def _do_config_setup(
 
 
 def _do_serve(config_id: str) -> int:
-    from llm_cli.commands.serve import serve_dispatch
+    from llm_cli.core.serve import serve_dispatch
+    from llm_cli.core.serve_errors import ServeError
 
     try:
         serve_dispatch(config_id)
-    except typer.Exit as exc:
-        return int(exc.exit_code or 1)
+    except ServeError as exc:
+        console.print(f"[red]error:[/red] {exc.message}")
+        return exc.exit_code
     return 0
 
 
@@ -151,7 +153,7 @@ def _do_dashboard_install() -> None:
 
 def run_setup_chain() -> int:
     """Interactive post-settings chain (runtime → model URL → config → serve)."""
-    from llm_cli.commands.model_cmd import PullModelError
+    from llm_cli.core.model_pull import PullModelError
     from llm_cli.core.lifecycle import append_history, state_root
     from llm_cli.core.settings import load_settings, resolve
 

@@ -1,6 +1,6 @@
 # Releases
 
-Releases are **git tags** plus GitHub Releases with CHANGELOG text. Users pick up new versions with `llm update` (see [UPDATE.md](UPDATE.md)).
+Releases are **git tags** plus GitHub Releases with CHANGELOG text. Users pick up new versions with `loco update` (see [UPDATE.md](UPDATE.md)).
 
 ## Maintainer flow
 
@@ -8,7 +8,7 @@ Releases are **git tags** plus GitHub Releases with CHANGELOG text. Users pick u
 2. `release-please.yml` opens or updates a **release PR** (version bump in `pyproject.toml`, `src/llm_cli/__init__.py`, and `CHANGELOG.md`).
 3. Review the release PR and **merge** (admin bypass is OK — bot PRs often lack CI checks).
 4. Merging creates tag `vX.Y.Z` and a GitHub Release.
-5. Users run `llm update` to fetch and checkout the new tag.
+5. Users run `loco update` to fetch and checkout the new tag.
 
 One-time GitHub setup: [RELEASE_SETUP.md](RELEASE_SETUP.md).
 

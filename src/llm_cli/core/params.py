@@ -84,7 +84,7 @@ def parse_schema(raw: dict[str, Any]) -> list[ParamSpec]:
         if "default" in entry:
             raise ValueError(
                 f"param {key!r}: `default` was removed from params.yaml; "
-                "use llm advisor for suggestions"
+                "use loco advisor for suggestions"
             )
         ptype = _coerce_type(entry.get("type"))
         values: tuple[str, ...] = ()
@@ -296,3 +296,18 @@ def validate_params(
     if errors:
         return {}, errors
     return coerced, []
+
+
+class ParamTokenError(ValueError):
+    """Invalid ``--param key=value`` token."""
+
+
+def parse_cli_param_token(token: str) -> tuple[str, str]:
+    """Parse a single ``key=value`` CLI flag token."""
+    if "=" not in token:
+        raise ParamTokenError(f"--param must be key=value (got {token!r})")
+    key, value = token.split("=", 1)
+    key = key.strip()
+    if not key:
+        raise ParamTokenError("--param key cannot be empty")
+    return key, value.strip()

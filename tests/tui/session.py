@@ -1,4 +1,4 @@
-"""Pexpect wrapper for driving `llm` in a PTY."""
+"""Pexpect wrapper for driving `loco` in a PTY."""
 from __future__ import annotations
 
 import os
@@ -20,7 +20,7 @@ def strip_ansi(text: str) -> str:
 
 
 class TuiSession:
-    """Thin helper around a spawned `llm` CLI process."""
+    """Thin helper around a spawned `loco` CLI process."""
 
     def __init__(self, child: pexpect.spawn, fixture: RepoFixture) -> None:
         self.child = child

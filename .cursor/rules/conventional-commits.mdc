@@ -35,7 +35,7 @@ Every commit on `main` must follow [Conventional Commits](https://www.convention
 ## Examples
 
 ```text
-feat(update): add --scaffold-only flag to llm update
+feat(update): add --scaffold-only flag to loco update
 fix(tests): compare manifest version to pyproject.toml
 chore: rename PyPI distribution to loco-llm-cli
 docs: document branch protection for CI checks

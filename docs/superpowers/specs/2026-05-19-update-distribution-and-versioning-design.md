@@ -13,9 +13,9 @@ Make LocalLLM installable, updatable, and versioned the way a small public CLI s
 Today's install/update story is a manual git workflow:
 
 - Fresh install: clone the repo, `./install.sh`, edit settings.
-- Update: `cd ~/local-llm-scaffold && git pull && ...` — no `llm update`.
+- Update: `cd ~/local-llm-scaffold && git pull && ...` — no `loco update`.
 - Versioning: `pyproject.toml` and `src/llm_cli/__init__.py` are edited by hand; there are no git tags.
-- The repo doubles as the **asset library** — `runtimes/`, `configs/`, `benchmarks/` are read at runtime from `repo_root`. User-authored custom runtimes (via `llm runtime setup --kind custom`) and configs land in the same tree, so `git pull` risks conflicting with user customizations.
+- The repo doubles as the **asset library** — `runtimes/`, `configs/`, `benchmarks/` are read at runtime from `repo_root`. User-authored custom runtimes (via `loco runtime setup --kind custom`) and configs land in the same tree, so `git pull` risks conflicting with user customizations.
 - No published artifacts; no PyPI presence; no GitHub release surface.
 
 This is acceptable for a personal tool but not for the "public CLI like hermes/opencode" audience the maintainer has chosen to target.
@@ -23,7 +23,7 @@ This is acceptable for a personal tool but not for the "public CLI like hermes/o
 ## 3. Goals
 
 1. **Single-command install** for new users (`curl|bash` or `pipx install`).
-2. **Single-command update** (`llm update`) that atomically refreshes both the CLI and the asset tree.
+2. **Single-command update** (`loco update`) that atomically refreshes both the CLI and the asset tree.
 3. **Asset tree separated from user customizations.** `git pull`-equivalent on the asset tree must never clobber user-authored content.
 4. **Automatic versioning** driven by Conventional Commits, with a human-gated release PR.
 5. **Tagged releases only**; no per-branch pre-release artifacts (per user choice).
@@ -35,7 +35,7 @@ This is acceptable for a personal tool but not for the "public CLI like hermes/o
 - No compile-to-binary step (no PyInstaller / PyOxidizer / Bun-compile). Pure-Python `typer` CLI ships as a wheel via pipx. Escape hatch left open for `shiv` later if demand appears.
 - No Homebrew tap, no Docker image, no npm postinstall hack, no Windows-native install path. WSL2 / Linux stays the supported environment.
 - No PyPI pre-release index usage; no `--channel edge`; no per-branch published wheels.
-- No `--branch <name>` flag on `llm update`. Branch testing is a dev-clone concern.
+- No `--branch <name>` flag on `loco update`. Branch testing is a dev-clone concern.
 - No automatic rollback of the wheel (one-liner via `pipx install ==<prev>` is documented instead). Scaffold rollback on failure is automatic.
 - No "compatibility mode" preserving the v0.2.0 layout. The migration script flips the user to the new layout in one shot.
 - No third asset layer (system-wide `/etc/...`) until someone asks for one.
@@ -84,7 +84,7 @@ A maintainer/contributor's machine additionally has:
 ~/.config/llm/config.yaml                   (with repo_root set to the checkout)
 ```
 
-The stable `llm` and the dev `llm-dev` coexist on the same machine without conflict.
+The stable `loco` and the dev `llm-dev` coexist on the same machine without conflict.
 
 ## 7. Section 1 — Distribution & install UX
 
@@ -99,17 +99,17 @@ curl -fsSL https://raw.githubusercontent.com/mtopcu1/local-llm-scaffold/main/scr
 1. Verifies prerequisites: `python3 >= 3.11`, `curl`, `tar`. **No `git`.**
 2. Bootstraps `pipx` if missing: `python3 -m pip install --user pipx && python3 -m pipx ensurepath`.
 3. Runs `pipx install 'localllm-cli==X.Y.Z'`, where `X.Y.Z` is the release the script ships in (pinned at release time so the script and the tag are in lockstep).
-4. Runs `llm update --scaffold-only --yes` to download and extract the matching scaffold tarball into `$LLM_SCAFFOLD_DIR`.
-5. Drops the user into `llm setup` for first-time machine config.
+4. Runs `loco update --scaffold-only --yes` to download and extract the matching scaffold tarball into `$LLM_SCAFFOLD_DIR`.
+5. Drops the user into `loco setup` for first-time machine config.
 
 ### 7.2 Alternative install for pipx-savvy users
 
 ```bash
 pipx install localllm-cli
-llm setup       # bootstraps scaffold + settings on first run
+loco setup       # bootstraps scaffold + settings on first run
 ```
 
-`llm setup`'s first-run logic gains a small responsibility: if `$LLM_SCAFFOLD_DIR` does not exist yet, run `llm update --scaffold-only --yes` as part of setup.
+`loco setup`'s first-run logic gains a small responsibility: if `$LLM_SCAFFOLD_DIR` does not exist yet, run `loco update --scaffold-only --yes` as part of setup.
 
 ### 7.3 Distribution channel
 
@@ -133,18 +133,18 @@ This is documented in `CONTRIBUTING.md` (new) as the only supported way to "run 
 
 | Layer | Path | Owned by | Writable by CLI? | Backing storage |
 |---|---|---|---|---|
-| `scaffold` | `$LLM_SCAFFOLD_DIR` (default `~/.local/share/localllm/scaffold/`) | `llm update` | **No.** Treated read-only. | Plain directory, populated by extracting a GitHub release tarball. **Not** a git clone. |
-| `user` | `$LLM_DATA_ROOT/user/` (default `~/llm/user/`) | the user / `llm runtime setup` / `llm config new` | Yes. | Plain directory. |
+| `scaffold` | `$LLM_SCAFFOLD_DIR` (default `~/.local/share/localllm/scaffold/`) | `loco update` | **No.** Treated read-only. | Plain directory, populated by extracting a GitHub release tarball. **Not** a git clone. |
+| `user` | `$LLM_DATA_ROOT/user/` (default `~/llm/user/`) | the user / `loco runtime setup` / `loco config new` | Yes. | Plain directory. |
 
 Each layer mirrors the same shape — `runtimes/{id}/`, `configs/{id}.yaml`, `benchmarks/{id}/`. Discovery walks both. **The user layer wins on id collision.**
 
 ### 8.2 Behavior changes
 
-- `llm list` shows a `source` column (`scaffold` / `user`). `llm runtime info <id>` and `llm config show <id>` print the source as part of their headers.
-- `llm runtime setup --kind custom` writes to `$LLM_DATA_ROOT/user/runtimes/<id>/` instead of `repo_root/runtimes/<id>/`. Wizard UX otherwise unchanged.
-- `llm config new` / `llm config setup` write to `$LLM_DATA_ROOT/user/configs/<id>.yaml`. Configs referencing scaffold runtimes is the normal case and Just Works.
-- `llm runtime install <scaffold-id>` continues to read scripts from `$LLM_SCAFFOLD_DIR/runtimes/<id>/` and write the `.installed` marker into `$LLM_RUNTIMES/<id>/`. Unchanged from today.
-- A user layer entry that shadows a scaffold id is flagged in `llm list` (e.g. ` (overrides scaffold)`). This is intentional friction — the user meant to override.
+- `loco list` shows a `source` column (`scaffold` / `user`). `loco runtime info <id>` and `loco config show <id>` print the source as part of their headers.
+- `loco runtime setup --kind custom` writes to `$LLM_DATA_ROOT/user/runtimes/<id>/` instead of `repo_root/runtimes/<id>/`. Wizard UX otherwise unchanged.
+- `loco config new` / `loco config setup` write to `$LLM_DATA_ROOT/user/configs/<id>.yaml`. Configs referencing scaffold runtimes is the normal case and Just Works.
+- `loco runtime install <scaffold-id>` continues to read scripts from `$LLM_SCAFFOLD_DIR/runtimes/<id>/` and write the `.installed` marker into `$LLM_RUNTIMES/<id>/`. Unchanged from today.
+- A user layer entry that shadows a scaffold id is flagged in `loco list` (e.g. ` (overrides scaffold)`). This is intentional friction — the user meant to override.
 
 ### 8.3 `repo_root` becomes dev-only
 
@@ -156,12 +156,12 @@ A new accessor in `src/llm_cli/core/repo.py` (working name: `scaffold_root()`) r
 
 In the v0.2.0 layout, `repo_root` is both the read source and the customization target. `git pull` can conflict with user customizations. The new layout makes the scaffold dir CLI-managed and treated as throwaway: it's a plain extracted tarball, atomically replaced on every update via directory-rename swap (see §9.2). Safe to wipe and re-extract because nothing the user wrote lives there.
 
-## 9. Section 3 — The `llm update` command
+## 9. Section 3 — The `loco update` command
 
 ### 9.1 Default invocation
 
 ```
-$ llm update
+$ loco update
 Checking for updates...
   CLI:      0.3.0  →  0.4.1   (PyPI)
   Scaffold: v0.3.0 →  v0.4.1   (github.com/mtopcu1/local-llm-scaffold)
@@ -178,7 +178,7 @@ Continue? [Y/n]
 
 1. **Detect.** Query PyPI's JSON API (`https://pypi.org/pypi/localllm-cli/json`, field `info.version`) for the latest wheel. Query GitHub's Releases API (`https://api.github.com/repos/mtopcu1/local-llm-scaffold/releases/latest`) for the latest scaffold tag. Compare both to currently-installed values (CLI version from `llm_cli.__version__`, scaffold version from `$LLM_SCAFFOLD_DIR/.scaffold-version`). Exit early with `Already up to date.` if both match.
 2. **Show changelog.** Use the same GitHub Release payload from step 1 (its `body` field) and print a short summary + URL. Confirm interactively unless `--yes`.
-3. **Service-running guard.** If `llm status` reports a service in any mode (`foreground` / `background` / `systemd`), refuse with: `"Stop the running service first (llm stop), or pass --restart to have update stop+start it."`
+3. **Service-running guard.** If `loco status` reports a service in any mode (`foreground` / `background` / `systemd`), refuse with: `"Stop the running service first (loco stop), or pass --restart to have update stop+start it."`
 4. **Stage the wheel.** Run `pipx upgrade localllm-cli --pip-args='--upgrade-strategy=eager'`. If pipx is not present (e.g. editable dev install), fall back to `pip install --upgrade localllm-cli` in the same env, **unless** `repo_root` is set — in dev mode, refuse with "this is an editable install; `git pull` in your checkout instead."
 5. **Stage the scaffold (atomic tarball swap).**
    1. Resolve the tarball asset URL from the Release payload (asset name pattern: `scaffold-<tag>.tar.gz`).
@@ -188,7 +188,7 @@ Continue? [Y/n]
    5. Write `$LLM_SCAFFOLD_DIR.new/.scaffold-version` with the new tag.
    6. Atomic swap: `mv $LLM_SCAFFOLD_DIR $LLM_SCAFFOLD_DIR.old && mv $LLM_SCAFFOLD_DIR.new $LLM_SCAFFOLD_DIR`. Both renames are on the same filesystem so each is atomic; the window between them is the only non-atomic moment and is sub-millisecond.
    7. On success of subsequent verify (step 6), `rm -rf $LLM_SCAFFOLD_DIR.old`. On failure, rollback is `mv $LLM_SCAFFOLD_DIR $LLM_SCAFFOLD_DIR.failed && mv $LLM_SCAFFOLD_DIR.old $LLM_SCAFFOLD_DIR`.
-6. **Verify.** Re-exec `llm --version` (must match the new wheel version) and `llm doctor --quick` against the new scaffold. On failure, automatically roll back the scaffold per step 5.7, leave the new wheel installed but warn the user, and print the one-liner to roll back the wheel (`pipx install 'localllm-cli==<prev>' --force`).
+6. **Verify.** Re-exec `loco --version` (must match the new wheel version) and `loco doctor --quick` against the new scaffold. On failure, automatically roll back the scaffold per step 5.7, leave the new wheel installed but warn the user, and print the one-liner to roll back the wheel (`pipx install 'localllm-cli==<prev>' --force`).
 7. **Finalize.** Delete `$LLM_SCAFFOLD_DIR.old/`. Print `Updated to 0.4.1.` plus a single-line "breaking change" hint if the release notes flag any.
 
 ### 9.3 Flags
@@ -199,7 +199,7 @@ Continue? [Y/n]
 | `--check` | Don't update — print available versions and exit non-zero if behind. |
 | `--scaffold-only` | Skip the pipx step. Used by `install.sh` and as an escape hatch. |
 | `--cli-only` | Skip the scaffold step. For dev-mode (`repo_root` set). |
-| `--restart` | If a service is running, `llm stop` it, update, then re-`serve` the same config in the same mode. Off by default. |
+| `--restart` | If a service is running, `loco stop` it, update, then re-`serve` the same config in the same mode. Off by default. |
 
 Not shipped at v0.3.0 (deferred until concrete demand): `--pin <version>`, `--rollback`, `--channel <name>`, `--branch <name>`.
 
@@ -208,15 +208,15 @@ Not shipped at v0.3.0 (deferred until concrete demand): `--pin <version>`, `--ro
 Every CLI invocation reads `$LLM_SCAFFOLD_DIR/.scaffold-version` (a single-line text file — cheap, no parsing) and compares it to `llm_cli.__version__`.
 
 - **Patch-level mismatch** (e.g. CLI 0.4.1, scaffold v0.4.0): single-line yellow warning printed at most once per CLI invocation (not persisted), command proceeds.
-- **Minor-or-major mismatch** (e.g. CLI 0.5.0, scaffold v0.4.1): destructive commands (`serve`, `runtime install`, `model pull`) **refuse** with "scaffold version drift — run `llm update --scaffold-only`". Non-destructive commands (`list`, `status`, `logs`, `--version`) warn but proceed.
-- **Missing file** (very old install or manually deleted): warn and suggest `llm update --scaffold-only`. Same destructive-vs-non-destructive split as above.
+- **Minor-or-major mismatch** (e.g. CLI 0.5.0, scaffold v0.4.1): destructive commands (`serve`, `runtime install`, `model pull`) **refuse** with "scaffold version drift — run `loco update --scaffold-only`". Non-destructive commands (`list`, `status`, `logs`, `--version`) warn but proceed.
+- **Missing file** (very old install or manually deleted): warn and suggest `loco update --scaffold-only`. Same destructive-vs-non-destructive split as above.
 
 ### 9.5 What `update` is NOT
 
 - Not a `pipx` wrapper (no `--include-deps` etc. leak through).
 - Not a `git` wrapper (no `--branch`, `--commit`, etc.).
 - Never touches `$LLM_DATA_ROOT/user/`. Hard rule.
-- Never auto-updates installed runtimes or pulled model weights. Those stay explicit via `llm runtime rebuild` / `llm model pull --force`.
+- Never auto-updates installed runtimes or pulled model weights. Those stay explicit via `loco runtime rebuild` / `loco model pull --force`.
 
 ## 10. Section 4 — Versioning automation
 
@@ -284,7 +284,7 @@ The tarball-attach step (4–5) is the single concrete consequence of choosing t
 
 ### 10.6 Tag is the single source of truth
 
-Because the scaffold lives in the same repo, the release tag (`v0.4.1`) **is** the scaffold checkout target for `llm update`. One number, two consumers. Zero drift risk between code and assets at release time.
+Because the scaffold lives in the same repo, the release tag (`v0.4.1`) **is** the scaffold checkout target for `loco update`. One number, two consumers. Zero drift risk between code and assets at release time.
 
 ### 10.7 Maintainer cadence
 
@@ -307,7 +307,7 @@ llm-dev setup
 Three deliberate choices in there:
 
 1. **`pipx install --editable`** — code changes in `src/` are picked up live.
-2. **`--suffix=-dev`** — installs the binary as `llm-dev`, not `llm`. **Stable `llm` and dev `llm-dev` coexist on the same machine.** This is the single most important UX detail; without it, "try this PR" wrecks the user's working install.
+2. **`--suffix=-dev`** — installs the binary as `llm-dev`, not `loco`. **Stable `loco` and dev `llm-dev` coexist on the same machine.** This is the single most important UX detail; without it, "try this PR" wrecks the user's working install.
 3. **`repo_root` set to the checkout** — flips on the dev-mode override from §8. The scaffold layer becomes the live checkout instead of `$LLM_SCAFFOLD_DIR`. Manifest/script changes are picked up live too.
 
 ### 11.2 Contributor "try this PR" flow
@@ -328,7 +328,7 @@ That is the complete story for testing unreleased code.
 
 Two workflows on PRs/branches, both run on `ubuntu-latest`:
 
-1. **`.github/workflows/ci.yml`** — runs on every PR and every `push: main`. Steps: `pip install -e '.[dev]'` → `pytest` → `llm doctor render-requirements && git diff --exit-code` (catches forgotten regenerations) → `llm specs --check` where feasible.
+1. **`.github/workflows/ci.yml`** — runs on every PR and every `push: main`. Steps: `pip install -e '.[dev]'` → `pytest` → `loco doctor render-requirements && git diff --exit-code` (catches forgotten regenerations) → `loco specs --check` where feasible.
 2. **`.github/workflows/build-check.yml`** — runs on PRs that touch `pyproject.toml` or `src/`. Steps: `python -m build` → `twine check dist/*`. Verifies the wheel would build cleanly.
 
 PTY/WSL-only tests stay marked and skipped on Linux CI as they are today (pyproject's `pexpect>=4.9; sys_platform != 'win32'` and the `tui` pytest marker handle this).
@@ -337,10 +337,10 @@ PTY/WSL-only tests stay marked and skipped on Linux CI as they are today (pyproj
 
 - No PyPI Test index usage.
 - No per-PR ephemeral install URLs.
-- No `--channel edge` knob inside `llm update`.
-- No `--branch <name>` flag on `llm update`.
+- No `--channel edge` knob inside `loco update`.
+- No `--branch <name>` flag on `loco update`.
 
-If demand for "try the unreleased fix" gets loud later, the cheapest add-on is per-branch wheels as GitHub Release assets. The wheel-installation step in `llm update` (§9 step 4) is factored so it can later accept a URL source. We don't build that scaffolding now.
+If demand for "try the unreleased fix" gets loud later, the cheapest add-on is per-branch wheels as GitHub Release assets. The wheel-installation step in `loco update` (§9 step 4) is factored so it can later accept a URL source. We don't build that scaffolding now.
 
 ## 12. Section 6 — Migration from v0.2.0
 
@@ -351,8 +351,8 @@ If demand for "try the unreleased fix" gets loud later, the cheapest add-on is p
 - Symlink `~/.local/bin/llm → $LLM_DATA_ROOT/.cli-venv/bin/llm`.
 - `~/.config/llm/config.yaml` with `data_root` + `repo_root` required.
 - User-authored items potentially mixed into the cloned tree:
-  - `repo_root/runtimes/<custom-id>/` from `llm runtime setup --kind custom`
-  - `repo_root/configs/<user-id>.yaml` from `llm config new` / `config setup`
+  - `repo_root/runtimes/<custom-id>/` from `loco runtime setup --kind custom`
+  - `repo_root/configs/<user-id>.yaml` from `loco config new` / `config setup`
   - Possibly edits to shipped scripts (rare but possible)
 
 ### 12.2 The migration command
@@ -411,8 +411,8 @@ Executes in this order, with rollback on any failure:
 2. **Diff and copy user content.** Compare `repo_root/runtimes/` and `repo_root/configs/` against the v0.3.0 tag's contents. Items present in `repo_root` but not in the tag are user content → copy to `$LLM_DATA_ROOT/user/{runtimes,configs}/`. Items in both with different content trigger the interactive `[k]/[d]/[a]` prompt (or are decided up front by `--on-conflict={keep,discard,abort}` for non-interactive runs).
 3. **Bootstrap pipx if missing.** Same logic as the fresh installer.
 4. **Install the wheel.** Remove the v0.2.0 `~/.local/bin/llm` symlink first (otherwise pipx refuses over a name collision), then `pipx install 'localllm-cli==0.3.0'`. If pipx install fails here, abort *before* touching anything else — config, venv, symlink can all be restored.
-5. **Initialize the scaffold dir.** Run the newly-installed `llm update --scaffold-only --yes`.
-6. **Smoke test.** `llm --version` (expect `llm 0.3.0`), `llm list`, `llm doctor --quick`. On any failure: restore the symlink to the old venv, restore `config.yaml.bak`, leave the pipx install in place (harmless), print recovery instructions.
+5. **Initialize the scaffold dir.** Run the newly-installed `loco update --scaffold-only --yes`.
+6. **Smoke test.** `loco --version` (expect `loco 0.3.0`), `loco list`, `loco doctor --quick`. On any failure: restore the symlink to the old venv, restore `config.yaml.bak`, leave the pipx install in place (harmless), print recovery instructions.
 7. **Remove `repo_root` from settings.** Write updated `config.yaml`. Backup is preserved.
 8. **Print closing instructions** — do not auto-delete the old clone or the old venv. Tell the user the clone is no longer needed and the venv (`$LLM_DATA_ROOT/.cli-venv`) can be removed at their discretion.
 
@@ -440,7 +440,7 @@ The migration script ships in v0.3.0 only. **Removed in v0.4.0.** Anyone still o
 Concrete cut order from current state to v0.3.0 released:
 
 1. **In v0.2.x land:** implement release-please + `ci.yml` + `publish.yml` (including the scaffold-tarball attach step from §10.5) first — no behavior change, just plumbing. Cut a `v0.2.1` patch release as a smoke test of the publish pipeline. After it runs, the GitHub Release for `v0.2.1` should have `localllm_cli-0.2.1-py3-none-any.whl`, sdist, `scaffold-v0.2.1.tar.gz`, and `scaffold-v0.2.1.tar.gz.sha256` all attached. PyPI gains `localllm-cli==0.2.1` even though no user is told to use it yet.
-2. **In a feature branch:** implement the layered asset model (§2), `llm update` command (§3), `migrate-from-v0.2.sh` (§6), and the docs sweep. This is the chunky PR.
+2. **In a feature branch:** implement the layered asset model (§2), `loco update` command (§3), `migrate-from-v0.2.sh` (§6), and the docs sweep. This is the chunky PR.
 3. **Cut `v0.3.0`** as the first user-facing distributed release. README updates to the pipx-first story. Old root `install.sh` becomes `scripts/install-dev.sh`.
 
 Step 1 is a deliberately small first slice so the publish pipeline gets exercised before we lean on it for a real release.
@@ -452,4 +452,4 @@ None blocking. A few items worth confirming during plan-writing:
 - **PyPI package name** is currently `localllm-cli` (from `pyproject.toml`). Confirm it's available on PyPI before scheduling step 1 of §13; reserve the name if so.
 - **GitHub Releases trusted publisher.** PyPI trusted-publisher setup is a one-time UI action on PyPI's web console; the implementation plan should call that out as a manual prerequisite.
 - **`$LLM_SCAFFOLD_DIR` env var name and default path** (`~/.local/share/localllm/scaffold/`) — should this match XDG_DATA_HOME if set? Current choice is "honor `$XDG_DATA_HOME` like the settings file already honors `$XDG_CONFIG_HOME`." Spell out in implementation plan.
-- **`llm doctor --quick`** referenced in §9.2 and §12.4 doesn't exist yet; either add it as part of the §9 implementation slice or use the existing `llm doctor` and accept slower update verification.
+- **`loco doctor --quick`** referenced in §9.2 and §12.4 doesn't exist yet; either add it as part of the §9 implementation slice or use the existing `loco doctor` and accept slower update verification.

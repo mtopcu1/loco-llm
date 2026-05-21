@@ -8,7 +8,7 @@ runner = CliRunner()
 def test_help_shows_program_name():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "llm" in result.stdout.lower()
+    assert "loco" in result.stdout.lower()
 
 
 def test_top_level_build_pull_removed():
@@ -26,7 +26,7 @@ def test_top_level_build_pull_removed():
 def test_version_flag_prints_package_version():
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
-    assert "llm " in result.stdout.lower()
+    assert "loco " in result.stdout.lower()
     from llm_cli import __version__
 
     assert __version__ in result.stdout

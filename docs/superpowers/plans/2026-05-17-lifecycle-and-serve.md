@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add `llm serve` (foreground / background / systemd), `llm stop`, `llm switch`, `llm status`, `llm logs`. Track a single running service in `state/running.json`. Manage one systemd unit (`~/.config/systemd/user/llm.service`) rewritten per config. Upgrade `stub-runtime` from "exit 1" to a real toy server so tests can drive the whole lifecycle end-to-end.
+**Goal:** Add `loco serve` (foreground / background / systemd), `loco stop`, `loco switch`, `loco status`, `loco logs`. Track a single running service in `state/running.json`. Manage one systemd unit (`~/.config/systemd/user/loco.service`) rewritten per config. Upgrade `stub-runtime` from "exit 1" to a real toy server so tests can drive the whole lifecycle end-to-end.
 
 **Architecture:** Three new core modules — `lifecycle.py` (state + reconcile), `serve_spawn.py` (bash builders + readiness probe), `systemd_unit.py` (template + systemctl wrappers). Two new command modules — `commands/serve.py` (`serve`, `switch`) and `commands/lifecycle_cmds.py` (`stop`, `status`, `logs`). All long-lived subprocess work happens through bash inside WSL (existing `core/wsl.run_repo_bash` mechanism), but the lifecycle commands need finer-grained control than `run_repo_bash` offers, so spawn helpers go into `serve_spawn.py` and accept an injectable runner for test seams.
 
@@ -18,7 +18,7 @@
   - `LLM_SERVE_PORT` — from `cfg.serve.port`
   - Every key in `cfg.serve.env` (with `${data_root}` expanded), passed verbatim
   - Plus the existing `LLM_DATA_ROOT`, `LLM_REPO_ROOT`, `LLM_RUNTIMES`, `LLM_MODELS`, `LLM_CACHE`
-- `serve.sh` **must** end with `exec <real-server …>` so the script's PID becomes the server's PID. We rely on this for clean `kill -TERM <pid>` from `llm stop`.
+- `serve.sh` **must** end with `exec <real-server …>` so the script's PID becomes the server's PID. We rely on this for clean `kill -TERM <pid>` from `loco stop`.
 - `healthcheck.sh` is invoked with the same env, exits `0` when the service is ready.
 
 **Running tests:** all commands assume the LocalLLM venv on PATH. From WSL:
@@ -127,11 +127,11 @@ def test_lifecycle_record_systemd_roundtrip() -> None:
         config_id="cfg-a",
         port=8000,
         started_at="2026-05-17T16:00:00Z",
-        unit="llm.service",
+        unit="loco.service",
     )
     assert rec.pid is None
     assert rec.log_path is None
-    assert rec.unit == "llm.service"
+    assert rec.unit == "loco.service"
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -160,7 +160,7 @@ class LifecycleRecord:
     started_at: str  # ISO-8601 UTC, e.g. "2026-05-17T16:00:00Z"
     pid: int | None = None
     log_path: str | None = None  # repo-relative POSIX path; None for systemd
-    unit: str | None = None  # "llm.service" for systemd; None otherwise
+    unit: str | None = None  # "loco.service" for systemd; None otherwise
 
 
 def state_dir(repo: Path) -> Path:
@@ -249,7 +249,7 @@ def test_clear_running_is_idempotent(tmp_path: Path) -> None:
         config_id="cfg-a",
         port=1,
         started_at="t",
-        unit="llm.service",
+        unit="loco.service",
     )
     write_running(tmp_path, rec)
     clear_running(tmp_path)
@@ -539,7 +539,7 @@ def test_reconcile_drops_systemd_when_inactive(tmp_path: Path) -> None:
         config_id="cfg-a",
         port=1,
         started_at="t",
-        unit="llm.service",
+        unit="loco.service",
     )
     write_running(tmp_path, rec)
     with patch("llm_cli.core.lifecycle._systemd_is_active", return_value=False):
@@ -553,7 +553,7 @@ def test_reconcile_keeps_systemd_when_active(tmp_path: Path) -> None:
         config_id="cfg-a",
         port=1,
         started_at="t",
-        unit="llm.service",
+        unit="loco.service",
     )
     write_running(tmp_path, rec)
     with patch("llm_cli.core.lifecycle._systemd_is_active", return_value=True):
@@ -775,7 +775,7 @@ def build_serve_inner(repo_posix: str, script_posix_relpath: str) -> str:
     """Inner bash for serve.sh — cd into repo and exec the script.
 
     The final `exec` is essential: it makes the script's PID become the
-    server's PID, so `kill -TERM <pid>` from `llm stop` reaches the server
+    server's PID, so `kill -TERM <pid>` from `loco stop` reaches the server
     directly with no intermediate bash wrapper.
     """
     rel = script_posix_relpath.lstrip("/")
@@ -1167,7 +1167,7 @@ Expected: ImportError on `desired_unit_text`.
 
 ```python
 # src/llm_cli/core/systemd_unit.py
-"""Render and manage the single `llm.service` user unit."""
+"""Render and manage the single `loco.service` user unit."""
 from __future__ import annotations
 
 import os
@@ -1175,14 +1175,14 @@ from pathlib import Path
 from typing import Callable
 
 _UNIT_TEMPLATE = """\
-# AUTO-GENERATED by `llm serve`. Edit will be overwritten on next `llm serve --systemd`.
+# AUTO-GENERATED by `loco serve`. Edit will be overwritten on next `loco serve --systemd`.
 [Unit]
 Description=LocalLLM service (config: {config_id})
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/llm serve {config_id} --foreground-from-supervisor
+ExecStart=%h/.local/bin/loco serve {config_id} --foreground-from-supervisor
 Restart=on-failure
 RestartSec=3
 
@@ -1204,7 +1204,7 @@ Expected: 2 passed.
 
 ```bash
 git add src/llm_cli/core/systemd_unit.py tests/unit/test_systemd_unit.py
-git commit -m "feat(systemd): render llm.service template per config"
+git commit -m "feat(systemd): render loco.service template per config"
 ```
 
 ---
@@ -1225,14 +1225,14 @@ from llm_cli.core.systemd_unit import unit_path
 
 def test_unit_path_uses_xdg_config_home(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    assert unit_path() == tmp_path / "systemd" / "user" / "llm.service"
+    assert unit_path() == tmp_path / "systemd" / "user" / "loco.service"
 
 
 def test_unit_path_falls_back_to_home(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
-    assert unit_path() == tmp_path / ".config" / "systemd" / "user" / "llm.service"
+    assert unit_path() == tmp_path / ".config" / "systemd" / "user" / "loco.service"
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -1246,10 +1246,10 @@ Append to `src/llm_cli/core/systemd_unit.py`:
 
 ```python
 def unit_path() -> Path:
-    """Resolve ~/.config/systemd/user/llm.service honoring $XDG_CONFIG_HOME."""
+    """Resolve ~/.config/systemd/user/loco.service honoring $XDG_CONFIG_HOME."""
     xdg = os.environ.get("XDG_CONFIG_HOME")
     base = Path(xdg) if xdg else Path.home() / ".config"
-    return base / "systemd" / "user" / "llm.service"
+    return base / "systemd" / "user" / "loco.service"
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -1365,39 +1365,39 @@ def test_daemon_reload_calls_systemctl_user() -> None:
 
 def test_restart_unit_calls_systemctl_restart() -> None:
     runner = MagicMock(return_value=MagicMock(returncode=0, stdout="", stderr=""))
-    restart_unit("llm.service", runner=runner)
+    restart_unit("loco.service", runner=runner)
     cmd = runner.call_args[0][0]
-    assert cmd == ["systemctl", "--user", "restart", "llm.service"]
+    assert cmd == ["systemctl", "--user", "restart", "loco.service"]
 
 
 def test_stop_unit_calls_systemctl_stop() -> None:
     runner = MagicMock(return_value=MagicMock(returncode=0, stdout="", stderr=""))
-    stop_unit("llm.service", runner=runner)
+    stop_unit("loco.service", runner=runner)
     cmd = runner.call_args[0][0]
-    assert cmd == ["systemctl", "--user", "stop", "llm.service"]
+    assert cmd == ["systemctl", "--user", "stop", "loco.service"]
 
 
 def test_is_active_true_when_stdout_active() -> None:
     runner = MagicMock(return_value=MagicMock(returncode=0, stdout="active\n", stderr=""))
-    assert is_active("llm.service", runner=runner) is True
+    assert is_active("loco.service", runner=runner) is True
 
 
 def test_is_active_false_when_stdout_inactive() -> None:
     runner = MagicMock(return_value=MagicMock(returncode=3, stdout="inactive\n", stderr=""))
-    assert is_active("llm.service", runner=runner) is False
+    assert is_active("loco.service", runner=runner) is False
 
 
 def test_is_active_false_when_systemctl_missing() -> None:
     def runner(cmd, **kw):
         raise FileNotFoundError("systemctl")
-    assert is_active("llm.service", runner=runner) is False
+    assert is_active("loco.service", runner=runner) is False
 
 
 def test_restart_unit_raises_on_nonzero() -> None:
     runner = MagicMock(return_value=MagicMock(returncode=2, stdout="", stderr="boom"))
     import pytest
     with pytest.raises(RuntimeError):
-        restart_unit("llm.service", runner=runner)
+        restart_unit("loco.service", runner=runner)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -1459,7 +1459,7 @@ git commit -m "feat(systemd): wrappers for daemon-reload, restart, stop, is-acti
 
 ## Phase 4 — `serve` and `switch` commands
 
-### Task 15: `llm serve <config>` — background mode (the default)
+### Task 15: `loco serve <config>` — background mode (the default)
 
 **Files:**
 - Create: `src/llm_cli/commands/serve.py`
@@ -1469,7 +1469,7 @@ git commit -m "feat(systemd): wrappers for daemon-reload, restart, stop, is-acti
 
 ```python
 # tests/integration/test_cli_serve.py
-"""Integration tests for `llm serve`, `llm switch`. Uses runner injection — no real bash."""
+"""Integration tests for `loco serve`, `loco switch`. Uses runner injection — no real bash."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -1569,7 +1569,7 @@ Expected: ImportError on `llm_cli.commands.serve` (command not wired yet — but
 
 ```python
 # src/llm_cli/commands/serve.py
-"""`llm serve` and `llm switch` — start a service in fg/bg/systemd."""
+"""`loco serve` and `loco switch` — start a service in fg/bg/systemd."""
 from __future__ import annotations
 
 import os
@@ -1725,7 +1725,7 @@ def _do_background(
 def serve(
     config_id: str = typer.Argument(..., help="Config id to start."),
     foreground: bool = typer.Option(False, "--foreground", help="Run attached to this terminal."),
-    systemd: bool = typer.Option(False, "--systemd", help="Bind llm.service to this config."),
+    systemd: bool = typer.Option(False, "--systemd", help="Bind loco.service to this config."),
     foreground_from_supervisor: bool = typer.Option(
         False, "--foreground-from-supervisor", hidden=True
     ),
@@ -1746,13 +1746,13 @@ def serve(
     if existing and existing.config_id == config_id and not foreground_from_supervisor:
         console.print(
             f"[red]error:[/red] {config_id} already running in {existing.mode}; "
-            f"use `llm switch` to change config or `llm stop` first"
+            f"use `loco switch` to change config or `loco stop` first"
         )
         raise typer.Exit(code=1)
     if existing and not foreground_from_supervisor:
         console.print(
             f"[red]error:[/red] {existing.config_id} already running in {existing.mode}; "
-            "stop it first or use `llm switch`"
+            "stop it first or use `loco switch`"
         )
         raise typer.Exit(code=1)
 
@@ -1796,7 +1796,7 @@ Expected: 4 passed (those covered by Task 15).
 
 ```bash
 git add src/llm_cli/commands/serve.py src/llm_cli/main.py tests/integration/test_cli_serve.py
-git commit -m "feat(serve): llm serve <cfg> background mode + port/readiness checks"
+git commit -m "feat(serve): loco serve <cfg> background mode + port/readiness checks"
 ```
 
 ---
@@ -1943,11 +1943,11 @@ def test_serve_systemd_rewrites_unit_and_writes_running(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.stdout
     wid.assert_called_once()
     dr.assert_called_once()
-    ru.assert_called_once_with("llm.service")
+    ru.assert_called_once_with("loco.service")
     from llm_cli.core.lifecycle import read_running
     rec = read_running(repo)
     assert rec.mode == "systemd"
-    assert rec.unit == "llm.service"
+    assert rec.unit == "loco.service"
     assert rec.config_id == "cfg-a"
 
 
@@ -2005,26 +2005,26 @@ def _do_systemd(
     changed = write_if_different(text)
     append_history(
         repo,
-        {"action": "systemd-write", "unit": "llm.service", "config_id": cfg.id, "changed": changed},
+        {"action": "systemd-write", "unit": "loco.service", "config_id": cfg.id, "changed": changed},
     )
     if changed:
         daemon_reload()
-    restart_unit("llm.service")
+    restart_unit("loco.service")
 
     timeout = _readiness_timeout(cfg.data)
     probe = _make_healthcheck_probe(settings, str(cfg.data["runtime"]), env)
 
     def combined_probe() -> bool:
-        return systemd_is_active("llm.service") and probe()
+        return systemd_is_active("loco.service") and probe()
 
     if not wait_for_ready(combined_probe, timeout_s=float(timeout), poll_s=1.0):
         try:
-            stop_unit("llm.service")
+            stop_unit("loco.service")
         except RuntimeError:
             pass
         console.print(
             f"[red]error:[/red] {cfg.id} did not become ready in {timeout}s; "
-            f"see `journalctl --user -u llm.service -n 50`"
+            f"see `journalctl --user -u loco.service -n 50`"
         )
         raise typer.Exit(code=1)
     rec = LifecycleRecord(
@@ -2032,7 +2032,7 @@ def _do_systemd(
         config_id=cfg.id,
         port=port,
         started_at=_utc_now_iso(),
-        unit="llm.service",
+        unit="loco.service",
     )
     write_running(repo, rec)
     append_history(repo, {"action": "start", "mode": "systemd", "config_id": cfg.id})
@@ -2111,7 +2111,7 @@ def test_foreground_from_supervisor_does_not_touch_running_json(tmp_path: Path) 
     from llm_cli.core.lifecycle import LifecycleRecord, write_running, read_running
     pre = LifecycleRecord(
         mode="systemd", config_id="cfg-a", port=18097,
-        started_at="t", unit="llm.service",
+        started_at="t", unit="loco.service",
     )
     write_running(repo, pre)
 
@@ -2151,7 +2151,7 @@ git commit -m "test(serve): supervisor mode preserves running.json and is hidden
 
 ---
 
-### Task 19: `llm switch <config>` — stop + start same mode
+### Task 19: `loco switch <config>` — stop + start same mode
 
 **Files:**
 - Modify: `src/llm_cli/commands/serve.py`
@@ -2260,13 +2260,13 @@ def switch(config_id: str = typer.Argument(..., help="New config id.")) -> None:
     if rec is None:
         console.print(
             f"[red]error:[/red] nothing running; "
-            f"use `llm serve {config_id}` instead"
+            f"use `loco serve {config_id}` instead"
         )
         raise typer.Exit(code=1)
     if rec.mode == "foreground":
         console.print(
             "[red]error:[/red] foreground sessions can't be switched; "
-            "Ctrl-C in the original terminal and rerun `llm serve <new>`"
+            "Ctrl-C in the original terminal and rerun `loco serve <new>`"
         )
         raise typer.Exit(code=1)
 
@@ -2328,12 +2328,12 @@ Expected: 10 passed.
 
 ```bash
 git add src/llm_cli/commands/serve.py src/llm_cli/main.py tests/integration/test_cli_serve.py
-git commit -m "feat(serve): llm switch <cfg> stops current and starts new in same mode"
+git commit -m "feat(serve): loco switch <cfg> stops current and starts new in same mode"
 ```
 
 ---
 
-### Task 20: `llm serve --systemd` idempotency on same unit text
+### Task 20: `loco serve --systemd` idempotency on same unit text
 
 When the desired unit text is byte-identical to disk **and** `systemd_is_active` is True **and** the existing record points at the same config, treat it as a no-op success. Already part of the conflict guard for the "same config running" case in Task 15; verify by adding a focused test.
 
@@ -2354,7 +2354,7 @@ def test_serve_systemd_noop_when_same_config_already_active(tmp_path: Path) -> N
         repo,
         LifecycleRecord(
             mode="systemd", config_id="cfg-a", port=18100,
-            started_at="t", unit="llm.service",
+            started_at="t", unit="loco.service",
         ),
     )
     # Also patch the lifecycle-module copy so reconcile() doesn't reap the record.
@@ -2387,7 +2387,7 @@ In `serve()` in `src/llm_cli/commands/serve.py`, **before** the conflict guard, 
         and existing is not None
         and existing.mode == "systemd"
         and existing.config_id == config_id
-        and systemd_is_active("llm.service")
+        and systemd_is_active("loco.service")
     ):
         console.print(f"[green]already serving[/green] {config_id} via systemd")
         return
@@ -2411,7 +2411,7 @@ git commit -m "feat(serve): --systemd is a no-op when same config already active
 
 ## Phase 5 — `stop`, `status`, `logs`
 
-### Task 21: `llm stop` (idempotent; fg/bg via SIGTERM; systemd via systemctl)
+### Task 21: `loco stop` (idempotent; fg/bg via SIGTERM; systemd via systemctl)
 
 **Files:**
 - Create: `src/llm_cli/commands/lifecycle_cmds.py`
@@ -2421,7 +2421,7 @@ git commit -m "feat(serve): --systemd is a no-op when same config already active
 
 ```python
 # tests/integration/test_cli_lifecycle.py
-"""Integration tests for `llm stop`, `llm status`, `llm logs`."""
+"""Integration tests for `loco stop`, `loco status`, `loco logs`."""
 from __future__ import annotations
 
 import os
@@ -2513,7 +2513,7 @@ def test_stop_systemd_calls_systemctl_stop(tmp_path: Path) -> None:
         repo,
         LifecycleRecord(
             mode="systemd", config_id="cfg-a", port=1,
-            started_at="t", unit="llm.service",
+            started_at="t", unit="loco.service",
         ),
     )
     # Patch lifecycle._systemd_is_active so reconcile() keeps the record.
@@ -2521,7 +2521,7 @@ def test_stop_systemd_calls_systemctl_stop(tmp_path: Path) -> None:
          patch("llm_cli.core.lifecycle._systemd_is_active", return_value=True):
         result = runner.invoke(app, ["stop"], catch_exceptions=False)
     assert result.exit_code == 0
-    su.assert_called_once_with("llm.service")
+    su.assert_called_once_with("loco.service")
     assert read_running(repo) is None
 ```
 
@@ -2534,7 +2534,7 @@ Expected: No `stop` command registered → Typer error.
 
 ```python
 # src/llm_cli/commands/lifecycle_cmds.py
-"""`llm stop`, `llm status`, `llm logs`."""
+"""`loco stop`, `loco status`, `loco logs`."""
 from __future__ import annotations
 
 import os
@@ -2596,7 +2596,7 @@ def stop() -> None:
         return
     if rec.mode == "systemd":
         try:
-            stop_unit("llm.service")
+            stop_unit("loco.service")
         except RuntimeError as exc:
             console.print(f"[yellow]warning:[/yellow] systemctl stop failed: {exc}")
         clear_running(repo)
@@ -2623,12 +2623,12 @@ Expected: 4 passed.
 
 ```bash
 git add src/llm_cli/commands/lifecycle_cmds.py src/llm_cli/main.py tests/integration/test_cli_lifecycle.py
-git commit -m "feat(lifecycle): llm stop with SIGTERM->SIGKILL escalation + systemd path"
+git commit -m "feat(lifecycle): loco stop with SIGTERM->SIGKILL escalation + systemd path"
 ```
 
 ---
 
-### Task 22: `llm status` (text + `--json`)
+### Task 22: `loco status` (text + `--json`)
 
 **Files:**
 - Modify: `src/llm_cli/commands/lifecycle_cmds.py`
@@ -2698,7 +2698,7 @@ def test_status_systemd_text(tmp_path: Path) -> None:
         repo,
         LifecycleRecord(
             mode="systemd", config_id="cfg-a", port=18080,
-            started_at="2026-05-17T16:00:00Z", unit="llm.service",
+            started_at="2026-05-17T16:00:00Z", unit="loco.service",
         ),
     )
     # reconcile() inside status() must not reap the record.
@@ -2707,7 +2707,7 @@ def test_status_systemd_text(tmp_path: Path) -> None:
         result = runner.invoke(app, ["status"], catch_exceptions=False)
     assert result.exit_code == 0
     assert "running" in result.stdout.lower()
-    assert "llm.service" in result.stdout
+    assert "loco.service" in result.stdout
     assert "journalctl" in result.stdout.lower()
 ```
 
@@ -2812,12 +2812,12 @@ Expected: 8 passed.
 
 ```bash
 git add src/llm_cli/commands/lifecycle_cmds.py src/llm_cli/main.py tests/integration/test_cli_lifecycle.py
-git commit -m "feat(lifecycle): llm status (text + --json) with uptime and liveness"
+git commit -m "feat(lifecycle): loco status (text + --json) with uptime and liveness"
 ```
 
 ---
 
-### Task 23: `llm logs [-f] [-n N]`
+### Task 23: `loco logs [-f] [-n N]`
 
 **Files:**
 - Modify: `src/llm_cli/commands/lifecycle_cmds.py`
@@ -2865,7 +2865,7 @@ def test_logs_systemd_invokes_journalctl(tmp_path: Path) -> None:
         repo,
         LifecycleRecord(
             mode="systemd", config_id="cfg-a", port=1,
-            started_at="t", unit="llm.service",
+            started_at="t", unit="loco.service",
         ),
     )
     with patch("llm_cli.commands.lifecycle_cmds.subprocess.call", return_value=0) as call:
@@ -2873,7 +2873,7 @@ def test_logs_systemd_invokes_journalctl(tmp_path: Path) -> None:
     assert result.exit_code == 0
     cmd = call.call_args[0][0]
     assert cmd[:3] == ["journalctl", "--user", "-u"]
-    assert "llm.service" in cmd
+    assert "loco.service" in cmd
     assert "-n" in cmd and "20" in cmd
 ```
 
@@ -2902,7 +2902,7 @@ def logs(
         console.print("nothing running")
         raise typer.Exit(code=1)
     if rec.mode == "systemd":
-        cmd = ["journalctl", "--user", "-u", rec.unit or "llm.service", "-n", str(lines)]
+        cmd = ["journalctl", "--user", "-u", rec.unit or "loco.service", "-n", str(lines)]
         if follow:
             cmd.append("-f")
         raise typer.Exit(code=subprocess.call(cmd))
@@ -2936,7 +2936,7 @@ Expected: 11 passed.
 
 ```bash
 git add src/llm_cli/commands/lifecycle_cmds.py src/llm_cli/main.py tests/integration/test_cli_lifecycle.py
-git commit -m "feat(lifecycle): llm logs reads file (fg/bg) or journalctl (systemd)"
+git commit -m "feat(lifecycle): loco logs reads file (fg/bg) or journalctl (systemd)"
 ```
 
 ---
@@ -3202,7 +3202,7 @@ If anything is missing, add it; otherwise skip. No commit if no change.
 ```markdown
 # Service lifecycle
 
-`llm` runs **at most one** server at a time. You pick which **config** to serve, and which **mode** to serve it in.
+`loco` runs **at most one** server at a time. You pick which **config** to serve, and which **mode** to serve it in.
 
 ## Modes
 
@@ -3215,26 +3215,26 @@ If anything is missing, add it; otherwise skip. No commit if no change.
 ## Verbs
 
 ```bash
-llm serve <config>                  # background (default)
-llm serve <config> --foreground     # attached
-llm serve <config> --systemd        # via ~/.config/systemd/user/llm.service
+loco serve <config>                  # background (default)
+loco serve <config> --foreground     # attached
+loco serve <config> --systemd        # via ~/.config/systemd/user/loco.service
 
-llm stop                            # stops whatever is running (idempotent)
-llm switch <config>                 # stop current, start <config> in the same mode
-llm status [--json]                 # what's running, or "not running"
-llm logs [-f] [-n N]                # file tail (fg/bg) or journalctl (systemd)
+loco stop                            # stops whatever is running (idempotent)
+loco switch <config>                 # stop current, start <config> in the same mode
+loco status [--json]                 # what's running, or "not running"
+loco logs [-f] [-n N]                # file tail (fg/bg) or journalctl (systemd)
 ```
 
 ## How "what's running" is tracked
 
 - `state/running.json` — single record; gitignored.
-- For `--systemd`, `systemctl --user is-active llm.service` is the source of truth; `running.json` is a cache that `llm status` cross-checks.
-- A stale PID is auto-reaped on the next `llm status`, `llm stop`, or `llm switch`.
+- For `--systemd`, `systemctl --user is-active loco.service` is the source of truth; `running.json` is a cache that `loco status` cross-checks.
+- A stale PID is auto-reaped on the next `loco status`, `loco stop`, or `loco switch`.
 
-## `llm switch <new>` semantics
+## `loco switch <new>` semantics
 
 - **background**: SIGTERM the current PID, wait ≤10s, escalate to SIGKILL, then start `<new>` in background.
-- **systemd**: rewrite `llm.service`, `daemon-reload` if changed, `restart`, wait for readiness.
+- **systemd**: rewrite `loco.service`, `daemon-reload` if changed, `restart`, wait for readiness.
 - **foreground**: refuses with a hint to Ctrl-C the original terminal.
 
 ## Troubleshooting
@@ -3242,10 +3242,10 @@ llm logs [-f] [-n N]                # file tail (fg/bg) or journalctl (systemd)
 | Symptom | Cause | Fix |
 |---|---|---|
 | `port <N> is already in use` | Another process bound the port. | `ss -tlnp \| grep <N>` to find owner. |
-| `did not become ready in 600s` | `serve.sh` started but `healthcheck.sh` never exited 0 in time. | `llm logs -n 200`; raise `readiness.timeout_seconds` in the config. |
+| `did not become ready in 600s` | `serve.sh` started but `healthcheck.sh` never exited 0 in time. | `loco logs -n 200`; raise `readiness.timeout_seconds` in the config. |
 | Systemd service dies after logout | Linger not enabled. | `sudo loginctl enable-linger $USER`. |
-| `nothing running` but you think it is | PID was reaped (process died). | `llm status` shows truth; run `llm serve <cfg>` again. |
-| `--systemd` says "already serving" | Same config + same unit text already active. | Edit the config or use `llm switch <other>`. |
+| `nothing running` but you think it is | PID was reaped (process died). | `loco status` shows truth; run `loco serve <cfg>` again. |
+| `--systemd` says "already serving" | Same config + same unit text already active. | Edit the config or use `loco switch <other>`. |
 
 ## Choosing a mode (decision tree)
 
@@ -3279,14 +3279,14 @@ Run: `grep -n -A 30 "## CLI" README.md` to locate the table.
 
 - [ ] **Step 2: Add five rows to the CLI table**
 
-In `README.md`, find the table that lists `llm setup`, `llm list`, etc., and add (alphabetical or grouped — match existing order):
+In `README.md`, find the table that lists `loco setup`, `loco list`, etc., and add (alphabetical or grouped — match existing order):
 
 ```markdown
-| `llm serve <cfg> [--foreground\|--systemd]` | Start a config. Background by default. |
-| `llm stop` | Stop the currently-running service. |
-| `llm switch <cfg>` | Replace the running config with `<cfg>` in the same mode. |
-| `llm status [--json]` | Show what's running. Exit 0 either way. |
-| `llm logs [-f] [-n N]` | Tail file logs (fg/bg) or journalctl (systemd). |
+| `loco serve <cfg> [--foreground\|--systemd]` | Start a config. Background by default. |
+| `loco stop` | Stop the currently-running service. |
+| `loco switch <cfg>` | Replace the running config with `<cfg>` in the same mode. |
+| `loco status [--json]` | Show what's running. Exit 0 either way. |
+| `loco logs [-f] [-n N]` | Tail file logs (fg/bg) or journalctl (systemd). |
 ```
 
 - [ ] **Step 3: Add a one-liner to Getting Started**
@@ -3297,13 +3297,13 @@ After the existing setup steps, add:
 4. Smoke-test the stub runtime:
 
    ```bash
-   llm serve stub-runtime__stub-model__default
-   llm status
-   llm stop
+   loco serve stub-runtime__stub-model__default
+   loco status
+   loco stop
    ```
 ```
 
-Renumber subsequent steps if needed. (If the section already has different content, slot the smoke step in after `llm list`.)
+Renumber subsequent steps if needed. (If the section already has different content, slot the smoke step in after `loco list`.)
 
 - [ ] **Step 4: Commit**
 
@@ -3328,7 +3328,7 @@ Run: `grep -n "state" docs/repo-conventions.md` — likely no hit yet.
 Add to the directory table:
 
 ```markdown
-| `state/`       | Runtime state (running.json, history.jsonl, logs/). **Gitignored.** Created on first use. Not a configuration source — `llm settings` is. |
+| `state/`       | Runtime state (running.json, history.jsonl, logs/). **Gitignored.** Created on first use. Not a configuration source — `loco settings` is. |
 ```
 
 - [ ] **Step 3: Commit**
@@ -3352,7 +3352,7 @@ Append to `docs/add-a-runtime.md`:
 ```markdown
 ## Lifecycle contract
 
-`llm serve` invokes your scripts via bash inside WSL. Honor these rules:
+`loco serve` invokes your scripts via bash inside WSL. Honor these rules:
 
 ### `serve.sh`
 
@@ -3360,13 +3360,13 @@ Append to `docs/add-a-runtime.md`:
   - `LLM_CONFIG_ID`, `LLM_SERVE_HOST`, `LLM_SERVE_PORT`
   - Every key in `cfg.serve.env` (with `${data_root}` already expanded)
   - The baseline: `LLM_DATA_ROOT`, `LLM_REPO_ROOT`, `LLM_RUNTIMES`, `LLM_MODELS`, `LLM_CACHE`
-- **End with `exec <server …>`**. This makes the script's PID become the server's PID, so `llm stop` can reach the server with `kill -TERM <pid>` directly.
+- **End with `exec <server …>`**. This makes the script's PID become the server's PID, so `loco stop` can reach the server with `kill -TERM <pid>` directly.
 - Trap nothing in the script itself; let the server handle SIGTERM cleanly (graceful shutdown within ~10s).
 
 ### `healthcheck.sh`
 
 - Exit `0` when the service is ready to accept traffic, non-zero otherwise.
-- Called repeatedly by `llm serve` until it succeeds or `readiness.timeout_seconds` elapses.
+- Called repeatedly by `loco serve` until it succeeds or `readiness.timeout_seconds` elapses.
 - Receives the same env as `serve.sh`. Don't `curl` external hosts — probe `127.0.0.1:$LLM_SERVE_PORT` (or whatever your runtime exposes).
 - Keep it fast (<2s) and side-effect-free.
 
@@ -3395,7 +3395,7 @@ git commit -m "docs(add-a-runtime): document serve.sh and healthcheck.sh contrac
 Find the existing redirection note (added during the settings redesign). Append one bullet:
 
 ```markdown
-- Lifecycle commands (`serve`, `stop`, `switch`, `status`, `logs`) are designed in [`2026-05-17-lifecycle-and-serve.md`](2026-05-17-lifecycle-and-serve.md). They replace sections 7.2 and 7.3: no `state/active.yaml`, no `llm default`, one managed systemd unit (`llm.service`), and a single in-flight service across all modes.
+- Lifecycle commands (`serve`, `stop`, `switch`, `status`, `logs`) are designed in [`2026-05-17-lifecycle-and-serve.md`](2026-05-17-lifecycle-and-serve.md). They replace sections 7.2 and 7.3: no `state/active.yaml`, no `loco default`, one managed systemd unit (`loco.service`), and a single in-flight service across all modes.
 ```
 
 - [ ] **Step 2: Commit**
@@ -3407,7 +3407,7 @@ git commit -m "docs(spec): cross-reference lifecycle-and-serve redesign"
 
 ---
 
-## Phase 8 — `llm doctor` gains a systemd-linger check
+## Phase 8 — `loco doctor` gains a systemd-linger check
 
 ### Task 32: `systemd-linger` doctor check
 
@@ -3481,7 +3481,7 @@ def detect_systemd_linger() -> str | None:
 
 Add `import os` at the top of the file if missing.
 
-Then in the `check_all` function (or wherever results are assembled), append a synthesized result so the existing `llm doctor` table picks it up. Match the existing `CheckResult` shape — likely:
+Then in the `check_all` function (or wherever results are assembled), append a synthesized result so the existing `loco doctor` table picks it up. Match the existing `CheckResult` shape — likely:
 
 ```python
 from llm_cli.core.doctor import CheckResult, CheckStatus  # already exported
@@ -3544,13 +3544,13 @@ Expected: all tests pass. Systemd integration test is skipped unless `systemctl 
 - [ ] **Step 2: End-to-end background smoke**
 
 ```bash
-llm serve stub-runtime__stub-model__default
-llm status
+loco serve stub-runtime__stub-model__default
+loco status
 # Verify "running" with port 18080.
 curl -s 127.0.0.1:18080 || true   # may print "stub-runtime: hello" then EOF
-llm logs -n 5
-llm stop
-llm status   # should print "not running"
+loco logs -n 5
+loco stop
+loco status   # should print "not running"
 ```
 
 - [ ] **Step 3: End-to-end switch smoke**
@@ -3558,21 +3558,21 @@ llm status   # should print "not running"
 Create a second stub config with a different port (e.g. copy `configs/stub-runtime__stub-model__default.yaml` → `stub-runtime__stub-model__alt.yaml`, change `id:` and `port:` to 18081).
 
 ```bash
-llm serve stub-runtime__stub-model__default
-llm switch stub-runtime__stub-model__alt
-llm status   # config should be the alt
-llm stop
+loco serve stub-runtime__stub-model__default
+loco switch stub-runtime__stub-model__alt
+loco status   # config should be the alt
+loco stop
 ```
 
 - [ ] **Step 4: (Optional, if systemctl --user works) systemd smoke**
 
 ```bash
-llm serve stub-runtime__stub-model__default --systemd
-llm status
-systemctl --user is-active llm.service   # active
-llm switch stub-runtime__stub-model__alt
-systemctl --user status llm.service --no-pager  # should reference alt config in Description
-llm stop
+loco serve stub-runtime__stub-model__default --systemd
+loco status
+systemctl --user is-active loco.service   # active
+loco switch stub-runtime__stub-model__alt
+systemctl --user status loco.service --no-pager  # should reference alt config in Description
+loco stop
 ```
 
 - [ ] **Step 5: Commit (no-op if everything passes)**
@@ -3599,4 +3599,4 @@ Nothing to commit unless smoke surfaced fixes. If it did, commit those individua
    - §9 open/deferred → not implemented (correct: they're deferred)
    - linger doctor → Task 32
 2. **Placeholder scan** — no "TBD", no "fill in details". Where the existing codebase shape needs to be matched (Task 32's `CheckResult`/`Requirement` fields), the task says explicitly "mirror the local shape" with the test pinning down the contract.
-3. **Type consistency** — `LifecycleRecord` field names (`mode`, `config_id`, `port`, `started_at`, `pid`, `log_path`, `unit`) are used identically in lifecycle.py, serve.py, lifecycle_cmds.py, and tests. The systemd unit name is `llm.service` everywhere.
+3. **Type consistency** — `LifecycleRecord` field names (`mode`, `config_id`, `port`, `started_at`, `pid`, `log_path`, `unit`) are used identically in lifecycle.py, serve.py, lifecycle_cmds.py, and tests. The systemd unit name is `loco.service` everywhere.

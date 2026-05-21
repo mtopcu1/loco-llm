@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
+import { unwrapApi } from '@/api/helpers'
+import { useConfigDocument } from '@/hooks/useConfigDocument'
 import { errorToToast } from '@/lib/errorToToast'
 import { ErrorCard } from '@/components/ErrorCard'
 import { Button } from '@/components/ui/button'
@@ -18,24 +20,16 @@ export function ConfigDetailPage() {
   const qc = useQueryClient()
   const [editing, setEditing] = useState(false)
 
-  const config = useQuery({
-    queryKey: ['configs', id],
-    queryFn: async () => {
-      const { data, error } = await api.GET('/configs/{config_id}', {
-        params: { path: { config_id: id } },
-      })
-      if (error) throw new Error('Failed to load config')
-      return data as Record<string, unknown>
-    },
-  })
+  const config = useConfigDocument(id)
 
   const validate = useQuery({
     queryKey: ['configs', id, 'validate'],
     queryFn: async () => {
-      const { data, error } = await api.GET('/configs/{config_id}/validate', {
-        params: { path: { config_id: id } },
-      })
-      if (error) throw new Error('Validation failed')
+      const data = await unwrapApi(() =>
+        api.GET('/configs/{config_id}/validate', {
+          params: { path: { config_id: id } },
+        }),
+      )
       return data as { valid: boolean; errors: string[] }
     },
     enabled: false,
@@ -43,10 +37,11 @@ export function ConfigDetailPage() {
 
   const remove = useMutation({
     mutationFn: async () => {
-      const { error } = await api.DELETE('/configs/{config_id}', {
-        params: { path: { config_id: id } },
-      })
-      if (error) throw error
+      await unwrapApi(() =>
+        api.DELETE('/configs/{config_id}', {
+          params: { path: { config_id: id } },
+        }),
+      )
     },
     onSuccess: () => {
       toast.success('Config deleted')
@@ -59,9 +54,8 @@ export function ConfigDetailPage() {
   if (config.isPending) return <Skeleton className="h-64 w-full" />
   if (config.isError) return <ErrorCard title="Failed to load config" message={String(config.error)} />
 
-  const cfg = config.data!
-  const raw = (cfg.raw ?? cfg.resolved) as Record<string, unknown>
-  const serve = raw.serve as { params?: Record<string, unknown> } | undefined
+  const { detail, document } = config.data!
+  const serve = document.serve
 
   return (
     <div className="space-y-6">
@@ -70,11 +64,16 @@ export function ConfigDetailPage() {
           <Link to="/configs" className="text-sm text-zinc-500 hover:underline">
             ← Configs
           </Link>
-          <h1 className="text-2xl font-semibold font-mono mt-1">{String(cfg.id)}</h1>
-          <p className="text-sm text-zinc-500">source: {String(cfg.source ?? '—')}</p>
+          <h1 className="text-2xl font-semibold font-mono mt-1">{detail.id}</h1>
+          <p className="text-sm text-zinc-500">source: {detail.source ?? '—'}</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => setEditing((e) => !e)}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setEditing((e) => !e)}
+            className="hidden sm:inline-flex"
+          >
             {editing ? 'Cancel edit' : 'Edit'}
           </Button>
           <Button
@@ -90,36 +89,41 @@ export function ConfigDetailPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="overview">
+      <Tabs defaultValue="params">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="params">Params</TabsTrigger>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="validate">Validate</TabsTrigger>
           <TabsTrigger value="raw">Raw YAML</TabsTrigger>
         </TabsList>
-        <TabsContent value="overview">
-          {editing ? (
-            <ConfigForm
-              mode="update"
-              initial={{
-                id: String(cfg.id),
-                runtime: String(raw.runtime ?? ''),
-                model: raw.model ? String(raw.model) : undefined,
-                serve,
-              }}
-              onCancel={() => setEditing(false)}
-            />
-          ) : (
-            <div className="space-y-4">
-              <PerformanceMetricsCard configId={id} />
-              <pre className="text-sm bg-zinc-50 p-3 rounded border overflow-x-auto">
-                {JSON.stringify(cfg.resolved ?? cfg.raw, null, 2)}
-              </pre>
-            </div>
-          )}
-        </TabsContent>
         <TabsContent value="params">
           <ParamsView configId={id} />
+        </TabsContent>
+        <TabsContent value="overview">
+          <div className="space-y-4">
+            <PerformanceMetricsCard configId={id} />
+            <dl className="grid grid-cols-2 gap-3 text-sm max-w-lg">
+              <div>
+                <dt className="text-zinc-500">Runtime</dt>
+                <dd className="font-mono">{document.runtime ?? '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Model</dt>
+                <dd className="font-mono break-all">{document.model ?? '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Serve host</dt>
+                <dd className="font-mono">{serve?.host ?? '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Serve port</dt>
+                <dd className="font-mono">{serve?.port ?? '—'}</dd>
+              </div>
+            </dl>
+            <p className="text-sm text-zinc-500">
+              Edit launch parameters on the Params tab; use Raw YAML for full document edits.
+            </p>
+          </div>
         </TabsContent>
         <TabsContent value="validate" className="space-y-4">
           <Button onClick={() => validate.refetch()} disabled={validate.isFetching}>
@@ -146,17 +150,22 @@ export function ConfigDetailPage() {
             <ConfigForm
               mode="update"
               initial={{
-                id: String(cfg.id),
-                runtime: String(raw.runtime ?? ''),
-                model: raw.model ? String(raw.model) : undefined,
+                id: detail.id,
+                runtime: document.runtime ?? '',
+                model: document.model,
                 serve,
               }}
               onCancel={() => setEditing(false)}
             />
           ) : (
-            <pre className="text-sm bg-zinc-50 p-3 rounded border overflow-x-auto">
-              {JSON.stringify(cfg.raw, null, 2)}
-            </pre>
+            <div className="space-y-3">
+              <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+                Edit YAML
+              </Button>
+              <pre className="text-sm bg-zinc-50 p-3 rounded border overflow-x-auto">
+                {JSON.stringify(detail.raw, null, 2)}
+              </pre>
+            </div>
           )}
         </TabsContent>
       </Tabs>

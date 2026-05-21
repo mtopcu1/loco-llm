@@ -306,7 +306,7 @@ class MetricsScheduler:
         self._hubs: dict[str, object] = {}
 
     def hub_for(self, config_id: str):
-        from llm_cli.webapi.streams import EventHub
+        from llm_cli.core.events import EventHub
 
         h = self._hubs.get(config_id)
         if h is None:

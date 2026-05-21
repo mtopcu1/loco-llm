@@ -66,7 +66,7 @@ Paths can be changed later with: loco settings edit data_root
 
 **Exit:** non-zero on hard failure or config abort; skips are fine.
 
-**Branding:** user-facing strings in chain use `loco`, not `llm`.
+**Branding:** user-facing strings in chain use `loco`, not `loco`.
 
 **No** bootstrap, **no** seeding, **no** summary of paths, **no** “recommended next steps” list at end of setup (chain already prints next action).
 

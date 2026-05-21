@@ -1,41 +1,25 @@
-"""`llm stop`, `llm status`, `llm logs`."""
+"""`loco stop`, `loco status`, `loco logs`."""
 from __future__ import annotations
 
 import json
-import os
-import signal
 import subprocess
-import time
 from datetime import datetime, timezone
 
 import typer
 from rich.console import Console
 
 from llm_cli.core.lifecycle import (
-    append_history,
-    clear_running,
+    LifecycleError,
     is_alive,
     read_running,
     reconcile,
     state_root,
+    stop_instance,
 )
 from llm_cli.core.settings import load_settings, resolve
 from llm_cli.core.systemd_unit import is_active as systemd_is_active
-from llm_cli.core.systemd_unit import stop_unit
 
 console = Console()
-
-# Windows' `signal` module has no SIGKILL; POSIX uses 9.
-_SIGKILL = int(getattr(signal, "SIGKILL", 9))
-
-
-def _wait_pid_gone(pid: int, timeout_s: float = 10.0, poll_s: float = 0.2) -> bool:
-    deadline = time.monotonic() + timeout_s
-    while is_alive(pid):
-        if time.monotonic() >= deadline:
-            return False
-        time.sleep(poll_s)
-    return True
 
 
 def stop() -> None:
@@ -47,40 +31,18 @@ def stop() -> None:
     if rec is None:
         console.print("nothing running")
         return
-    if rec.mode in ("foreground", "background"):
-        if rec.pid is None:
-            clear_running(state_base)
-            console.print("cleared stale record (no pid)")
-            return
-        try:
-            os.kill(rec.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-        if not _wait_pid_gone(rec.pid, timeout_s=10.0):
-            try:
-                os.kill(rec.pid, _SIGKILL)
-            except ProcessLookupError:
-                pass
-            _wait_pid_gone(rec.pid, timeout_s=2.0)
-        clear_running(state_base)
-        append_history(
-            state_base, {"action": "stop", "mode": rec.mode, "config_id": rec.config_id}
-        )
-        console.print(f"[green]stopped[/green] {rec.config_id}")
+    try:
+        stopped = stop_instance(strict_systemd=False)
+    except LifecycleError as exc:
+        console.print(f"[red]error:[/red] {exc.message}")
+        raise typer.Exit(code=1) from exc
+    if stopped is None:
+        console.print("nothing running")
         return
     if rec.mode == "systemd":
-        try:
-            stop_unit("llm.service")
-        except RuntimeError as exc:
-            console.print(f"[yellow]warning:[/yellow] systemctl stop failed: {exc}")
-        clear_running(state_base)
-        append_history(
-            state_base, {"action": "stop", "mode": "systemd", "config_id": rec.config_id}
-        )
-        console.print(f"[green]stopped[/green] {rec.config_id} (systemd)")
-        return
-    console.print(f"[red]error:[/red] unknown mode {rec.mode!r}")
-    raise typer.Exit(code=1)
+        console.print(f"[green]stopped[/green] {stopped} (systemd)")
+    else:
+        console.print(f"[green]stopped[/green] {stopped}")
 
 
 def _parse_iso(ts: str) -> datetime | None:
@@ -147,7 +109,7 @@ def status(
     console.print(f"port:   {rec.port}")
     if rec.mode == "systemd":
         console.print(f"unit:   {rec.unit}")
-        u = rec.unit or "llm.service"
+        u = rec.unit or "loco.service"
         console.print(f"journalctl: journalctl --user -u {u}")
     else:
         console.print(f"pid:    {rec.pid}")
@@ -168,7 +130,7 @@ def logs(
         console.print("nothing running")
         raise typer.Exit(code=1)
     if rec.mode == "systemd":
-        cmd = ["journalctl", "--user", "-u", rec.unit or "llm.service", "-n", str(lines)]
+        cmd = ["journalctl", "--user", "-u", rec.unit or "loco.service", "-n", str(lines)]
         if follow:
             cmd.append("-f")
         raise typer.Exit(code=subprocess.call(cmd))

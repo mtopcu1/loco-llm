@@ -121,10 +121,10 @@ def test_systemd_linger_advisory_skips_on_nonzero_exit() -> None:
 def test_install_channel_check_warns_when_not_on_tag(
     tmp_path: Path, monkeypatch
 ) -> None:
-    from llm_cli.commands.doctor import _check_on_release_tag
+    from llm_cli.core.doctor_install import check_on_release_tag
 
     monkeypatch.setenv("LOCO_INSTALL", str(tmp_path))
-    cid, status, _ = _check_on_release_tag()
+    cid, status, _ = check_on_release_tag()
     assert cid == "install-channel"
     assert status in {"warn", "error"}
 

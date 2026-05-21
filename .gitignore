@@ -9,6 +9,9 @@ __pycache__/
 .venv-*/
 venv/
 
+# uv lockfile (local dev only; deps pinned via pyproject.toml + CI)
+uv.lock
+
 # OS
 .DS_Store
 Thumbs.db

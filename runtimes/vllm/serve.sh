@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run vllm serve in the foreground.
+# Run vloco serve in the foreground.
 set -euo pipefail
 
 # shellcheck source=_serve_flags.sh
@@ -12,7 +12,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/_serve_flags.sh"
 
 VENV="${LLM_RUNTIMES}/vllm/venv"
 if [[ ! -f "${VENV}/bin/activate" ]]; then
-  echo "error: missing venv at ${VENV}; run llm runtime install vllm" >&2
+  echo "error: missing venv at ${VENV}; run loco runtime install vllm" >&2
   exit 1
 fi
 

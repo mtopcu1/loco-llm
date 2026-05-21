@@ -127,7 +127,7 @@ def test_run_param_grid_keyboard_interrupt_returns_abort(monkeypatch) -> None:
     def _raise(*_args, **_kwargs):
         raise KeyboardInterrupt
 
-    monkeypatch.setattr("llm_cli.core.param_grid._run_param_grid_tui", _raise)
+    monkeypatch.setattr("llm_cli.core.param_grid.run_param_grid_tui", _raise)
     got = run_param_grid([], [], specs=[], title="T")
     assert got.action == "abort"
 
@@ -139,7 +139,7 @@ def test_run_param_grid_falls_back_on_import_error(monkeypatch) -> None:
     def _boom(*_args, **_kwargs):
         raise ImportError("missing prompt_toolkit")
 
-    monkeypatch.setattr("llm_cli.core.param_grid._run_param_grid_tui", _boom)
+    monkeypatch.setattr("llm_cli.core.param_grid.run_param_grid_tui", _boom)
     monkeypatch.setattr(
         "llm_cli.core.param_grid.run_param_grid_plain",
         lambda cells, meta, *, specs, title, theme: expected,

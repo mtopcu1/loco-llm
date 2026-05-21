@@ -11,7 +11,7 @@ from llm_cli.core.specs import (
 SCAFFOLD = f"""\
 # System Specs
 
-<!-- AUTO-GENERATED: do not edit between markers. Run `llm specs` to regenerate. -->
+<!-- AUTO-GENERATED: do not edit between markers. Run `loco specs` to regenerate. -->
 {SPECS_START_MARKER}
 OLD CONTENT
 {SPECS_END_MARKER}

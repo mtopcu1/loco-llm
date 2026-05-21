@@ -22,6 +22,28 @@ def test_list_jobs_empty(test_client):
 
 
 @pytest.mark.webapi
+def test_get_job_log(test_client, monkeypatch, tmp_path):
+    from datetime import UTC, datetime
+
+    monkeypatch.setattr(jobs_module, "_jobs_dir", lambda: tmp_path)
+    job_id = "log-job"
+    (tmp_path / f"{job_id}.log").write_text("alpha\nbeta\n", encoding="utf-8")
+    jobs_module.registry()._record(
+        jobs_module.Job(
+            id=job_id,
+            kind="instance_start_wait",
+            status="failed",
+            created_at=datetime.now(tz=UTC),
+            context={},
+        )
+    )
+    jobs_module.registry()._order.insert(0, job_id)
+    r = test_client.get(f"/api/jobs/{job_id}/log", headers={"Host": "testserver"})
+    assert r.status_code == 200
+    assert r.json() == {"lines": ["alpha", "beta"]}
+
+
+@pytest.mark.webapi
 def test_get_job_404(test_client):
     r = test_client.get("/api/jobs/no-such-id", headers={"Host": "testserver"})
     assert r.status_code == 404
@@ -105,7 +127,7 @@ async def test_job_stream_events_include_json_log_tail(monkeypatch, tmp_path):
         jobs_module.Job(
             id=job_id,
             kind="model_pull",
-            status="succeeded",
+            status="running",
             created_at=datetime.now(tz=UTC),
             context={"url": "https://example.com/x.gguf"},
         )

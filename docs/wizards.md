@@ -6,23 +6,23 @@ Release **0.2** adds guided flows alongside existing one-shot commands.
 
 | Goal | Wizard | One-shot |
 |---|---|---|
-| First-time setup end-to-end | `llm setup` | `llm setup --default` |
-| Install or register a runtime | `llm runtime setup` | `llm runtime install <id>` |
-| Scaffold a launch config | `llm config setup` | `llm config new --runtime X --model Y --param k=v` |
-| VRAM-aware suggestions | `llm advisor` | `llm advisor --runtime X --model Y --json` |
+| First-time setup end-to-end | `loco setup` | `loco setup --default` |
+| Install or register a runtime | `loco runtime setup` | `loco runtime install <id>` |
+| Scaffold a launch config | `loco config setup` | `loco config new --runtime X --model Y --param k=v` |
+| VRAM-aware suggestions | `loco advisor` | `loco advisor --runtime X --model Y --json` |
 
-## `llm setup`
+## `loco setup`
 
 Writes machine settings, then offers a Y/n chain: runtime → HF URL → config → background serve. `--default` skips interactive settings prompts and the chain (only prints recommended next steps).
 
-## `llm runtime setup`
+## `loco runtime setup`
 
-- **Preset** — pick an official runtime (`kind: official`); delegates to the same install flow as `llm runtime install`.
+- **Preset** — pick an official runtime (`kind: official`); delegates to the same install flow as `loco runtime install`.
 - **Custom** — generate `runtimes/<id>/` with `kind: custom`, `params.yaml`, wrapped `serve.sh`, template `healthcheck.sh`, and `.installed` (no build).
 
 Interactive **runtime install / rebuild** steps that collect **build** parameters use the same **param grid** as config setup (not a one-field-at-a-time loop). Saving stores only **enabled** keys in `.installed` **`build_params`** (same opt-in rules as `serve.params`).
 
-## `llm config setup`
+## `loco config setup`
 
 Runtime and model picks stay **questionary** selects. Editing is a **two-step wizard**:
 
@@ -33,9 +33,9 @@ Runtime and model picks stay **questionary** selects. Editing is a **two-step wi
 
 Saving validates types against the runtime schema before writing YAML.
 
-## `llm advisor`
+## `loco advisor`
 
-Three forms: interactive (pick runtime + model), `llm advisor <config-id>`, or `--runtime` / `--model`. `--json` prints machine + recommendations. After plain-text output, an optional prompt can open `llm config setup` with the same pair (`--json` suppresses it).
+Three forms: interactive (pick runtime + model), `loco advisor <config-id>`, or `--runtime` / `--model`. `--json` prints machine + recommendations. After plain-text output, an optional prompt can open `loco config setup` with the same pair (`--json` suppresses it).
 
 ## TUI behavior
 

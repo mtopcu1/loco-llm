@@ -1,4 +1,4 @@
-"""`llm specs` — regenerate the auto block in specs.md."""
+"""`loco specs` — regenerate the auto block in specs.md."""
 from __future__ import annotations
 
 from datetime import datetime, timezone

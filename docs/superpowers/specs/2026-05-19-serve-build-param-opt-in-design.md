@@ -6,7 +6,7 @@
 
 ## Problem
 
-Today, `llm config setup` and runtime install pre-fill every param that has a schema `default`, save the full map to YAML / `.installed`, and `validate_params` back-fills missing keys with defaults. At serve time, those values become env vars and CLI flags. Users cannot express “let the runtime decide” for optional knobs — defaults are shipped as real overrides.
+Today, `loco config setup` and runtime install pre-fill every param that has a schema `default`, save the full map to YAML / `.installed`, and `validate_params` back-fills missing keys with defaults. At serve time, those values become env vars and CLI flags. Users cannot express “let the runtime decide” for optional knobs — defaults are shipped as real overrides.
 
 Catalog `default` values were meant as suggestions, not as implicit configuration.
 
@@ -23,7 +23,7 @@ Catalog `default` values were meant as suggestions, not as implicit configuratio
 - Auto-migration command or doctor-driven cleanup of legacy full-param configs.
 - Advisor-driven bulk enable (future: advisor proposes values separately).
 - Changing YAML top-level shape (`serve.params` remains a flat map).
-- `llm config edit` interactive wizard (still out of scope).
+- `loco config edit` interactive wizard (still out of scope).
 
 ---
 
@@ -59,7 +59,7 @@ Catalog `default` values were meant as suggestions, not as implicit configuratio
 ### Legacy configs
 
 - No migration tooling.
-- Existing YAML with many keys remains **structurally valid** (keys present → still shipped) until the user re-runs `llm config setup` or deletes keys manually.
+- Existing YAML with many keys remains **structurally valid** (keys present → still shipped) until the user re-runs `loco config setup` or deletes keys manually.
 - Document that pre-opt-in “full default” configs should be recreated for intended behavior.
 
 ---
@@ -138,11 +138,11 @@ Replace `_resolve_build_params` interactive path:
 `config_cmd.do_config_setup` / `do_config_new`:
 
 - Save filtered `serve.params`.
-- `llm serve` → `_serve_env_from_params` unchanged: only keys in map get env vars.
+- `loco serve` → `_serve_env_from_params` unchanged: only keys in map get env vars.
 
 ### Doctor / validate
 
-- `llm config validate`: required keys must appear in map; unknown keys error; no default fill.
+- `loco config validate`: required keys must appear in map; unknown keys error; no default fill.
 - Optional: future warning if map size exceeds N (not v1).
 
 ---

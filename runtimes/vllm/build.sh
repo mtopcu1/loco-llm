@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${LLM_RUNTIMES:?LLM_RUNTIMES must be set (eval \"\$(llm settings env)\")}"
+: "${LLM_RUNTIMES:?LLM_RUNTIMES must be set (eval \"\$(loco settings env)\")}"
 
 ROOT="${LLM_RUNTIMES}/vllm"
 VENV="${ROOT}/venv"
@@ -53,5 +53,5 @@ if [[ -n "${EXTRA_PIP_PACKAGES}" ]]; then
   python -m pip install "${INSTALL_ARGS[@]}" ${EXTRA_PIP_PACKAGES}
 fi
 
-vllm --version
-echo "vllm build: ok (version=${VLLM_VERSION}, pip_extra=${PIP_EXTRA})"
+vloco --version
+echo "vloco build: ok (version=${VLLM_VERSION}, pip_extra=${PIP_EXTRA})"

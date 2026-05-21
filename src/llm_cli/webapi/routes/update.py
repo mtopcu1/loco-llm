@@ -1,19 +1,15 @@
 from __future__ import annotations
 
-import sys
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Query
 
 from llm_cli.core import jobs as jobs_module, versions
+from llm_cli.webapi.job_runners import update_job
 
 router = APIRouter(tags=["update"])
 
 _CACHE: tuple[datetime, dict] | None = None
-
-
-def _llm_argv(*args: str) -> list[str]:
-    return [sys.executable, "-m", "llm_cli", *args]
 
 
 @router.get("/update/check")
@@ -34,12 +30,12 @@ def check_update():
 
 @router.post("/update")
 def trigger_update(restart_dashboard: bool = Query(default=True)):
-    argv = _llm_argv("update")
-    if restart_dashboard:
-        argv.append("--restart")
-    job_id = jobs_module.registry().start_subprocess(
+    async def factory(report):
+        await update_job(restart=restart_dashboard, report=report)
+
+    job_id = jobs_module.registry().start_async(
         kind="update",
         context={"restart_dashboard": restart_dashboard},
-        argv=argv,
+        coro_factory=factory,
     )
     return {"job_id": job_id}

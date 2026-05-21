@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make runtimes a first-class, schema-driven object: typed manifests, install lifecycle (`llm runtime [list|info|install|uninstall|rebuild]`), typed `serve.params` validated against runtime schemas, scoped `llm doctor`, and a `.installed` marker that gates `llm serve`.
+**Goal:** Make runtimes a first-class, schema-driven object: typed manifests, install lifecycle (`loco runtime [list|info|install|uninstall|rebuild]`), typed `serve.params` validated against runtime schemas, scoped `loco doctor`, and a `.installed` marker that gates `loco serve`.
 
 **Architecture:** Two new core modules (`params.py` for the type system + path templating + when-clauses, `install_record.py` for the `.installed` JSON marker). `registry.py` grows a typed `RuntimeManifest` and tightens `validate_config`. `doctor.py` becomes scope-aware. Two new Typer sub-apps (`runtime`, `model`) replace top-level `build`/`pull`. Existing `llamacpp` + `stub-runtime` migrate to the new shape; the two existing configs flip from `serve.env` to `serve.params`. Docs follow.
 
@@ -1231,7 +1231,7 @@ def validate_config_v2(
     if rt_manifest is not None and not is_installed(settings.runtimes_dir, rt_id):
         warnings.append(
             f"{cfg.id}: runtime {rt_id!r} is not installed; "
-            f"run `llm runtime install {rt_id}` before `llm serve`."
+            f"run `loco runtime install {rt_id}` before `loco serve`."
         )
 
     return errors, warnings
@@ -1495,7 +1495,7 @@ git commit -m "feat(doctor): requirements_for_all_runtimes (installed-only and f
 
 ---
 
-### Task D3: `llm doctor` flags — `--runtime`, `--all`
+### Task D3: `loco doctor` flags — `--runtime`, `--all`
 
 **Files:**
 - Modify: `src/llm_cli/commands/doctor.py`
@@ -1766,7 +1766,7 @@ git commit -m "feat(doctor): render-requirements emits universal + per-runtime s
 
 ---
 
-## Phase E — `llm runtime` sub-app
+## Phase E — `loco runtime` sub-app
 
 ### Task E1: `commands/runtime_cmd.py` scaffold + `list` subcommand
 
@@ -1844,7 +1844,7 @@ Expected: FAIL (sub-app not registered).
 
 ```python
 # src/llm_cli/commands/runtime_cmd.py
-"""`llm runtime` — manage runtime installs."""
+"""`loco runtime` — manage runtime installs."""
 from __future__ import annotations
 
 import json
@@ -1945,7 +1945,7 @@ git commit -m "feat(runtime): runtime_app sub-app with `list` command"
 
 ---
 
-### Task E2: `llm runtime info <id>`
+### Task E2: `loco runtime info <id>`
 
 **Files:**
 - Modify: `src/llm_cli/commands/runtime_cmd.py`
@@ -2017,7 +2017,7 @@ def runtime_info(runtime_id: str = typer.Argument(...)) -> None:
     rec = read_record(settings.runtimes_dir, mf.id)
     if rec is None:
         console.print("\n[yellow]not installed[/yellow]")
-        console.print(f"hint: llm runtime install {mf.id}")
+        console.print(f"hint: loco runtime install {mf.id}")
         return
 
     console.print("\n[bold]install:[/bold] [green]installed[/green]")
@@ -2037,7 +2037,7 @@ def runtime_info(runtime_id: str = typer.Argument(...)) -> None:
     if rec.schema_hash and cur_schema and cur_schema != rec.schema_hash:
         console.print(
             "[yellow]drift:[/yellow] build schema changed since install; "
-            f"run `llm runtime rebuild {mf.id} --reset` to refresh"
+            f"run `loco runtime rebuild {mf.id} --reset` to refresh"
         )
 ```
 
@@ -2055,7 +2055,7 @@ git commit -m "feat(runtime): runtime info shows schema, install record, drift"
 
 ---
 
-### Task E3: `llm runtime install <id>` — param resolution + dispatch
+### Task E3: `loco runtime install <id>` — param resolution + dispatch
 
 **Files:**
 - Modify: `src/llm_cli/commands/runtime_cmd.py`
@@ -2328,7 +2328,7 @@ git commit -m "feat(runtime): install command (params, pre-flight, build+verify,
 
 ---
 
-### Task E4: `llm runtime uninstall <id>`
+### Task E4: `loco runtime uninstall <id>`
 
 **Files:**
 - Modify: `src/llm_cli/commands/runtime_cmd.py`
@@ -2437,7 +2437,7 @@ git commit -m "feat(runtime): uninstall (marker by default, --purge wipes tree)"
 
 ---
 
-### Task E5: `llm runtime rebuild <id>`
+### Task E5: `loco runtime rebuild <id>`
 
 **Files:**
 - Modify: `src/llm_cli/commands/runtime_cmd.py`
@@ -2528,7 +2528,7 @@ git commit -m "feat(runtime): rebuild (reuse stored params; --reset re-prompts)"
 
 ---
 
-## Phase F — `llm model` sub-app
+## Phase F — `loco model` sub-app
 
 ### Task F1: `commands/model_cmd.py` with list / info / pull
 
@@ -2605,7 +2605,7 @@ Expected: FAIL (sub-app not registered).
 
 ```python
 # src/llm_cli/commands/model_cmd.py
-"""`llm model` — list/info/pull model definitions."""
+"""`loco model` — list/info/pull model definitions."""
 from __future__ import annotations
 
 import json
@@ -2904,7 +2904,7 @@ def test_serve_refuses_when_runtime_uninstalled(tmp_path: Path) -> None:
     result = runner.invoke(app, ["serve", "cfg-a"], catch_exceptions=False)
     assert result.exit_code != 0
     assert "not installed" in result.stdout.lower()
-    assert "llm runtime install" in result.stdout
+    assert "loco runtime install" in result.stdout
 ```
 
 - [ ] **Step 2: Run test**
@@ -2923,7 +2923,7 @@ if not _is_installed(settings.runtimes_dir, str(cfg.data["runtime"])):
     console.print(
         f"[red]error:[/red] runtime {cfg.data['runtime']!r} is not installed"
     )
-    console.print(f"hint:  llm runtime install {cfg.data['runtime']}")
+    console.print(f"hint:  loco runtime install {cfg.data['runtime']}")
     raise typer.Exit(code=1)
 ```
 
@@ -2947,7 +2947,7 @@ git commit -m "feat(serve): refuse to start when runtime is not installed (with 
 
 ## Phase H — Setup hint, sub-app wiring, drop top-level commands
 
-### Task H1: Append "next steps" panel to `llm setup`
+### Task H1: Append "next steps" panel to `loco setup`
 
 **Files:**
 - Modify: `src/llm_cli/commands/setup.py`
@@ -2966,9 +2966,9 @@ def test_setup_prints_next_steps_panel(tmp_path, monkeypatch):
     result = CliRunner().invoke(app, ["setup", "--default"], catch_exceptions=False)
     assert result.exit_code == 0
     assert "Recommended next steps" in result.stdout
-    assert "llm runtime install" in result.stdout
-    assert "llm model pull" in result.stdout
-    assert "llm serve" in result.stdout
+    assert "loco runtime install" in result.stdout
+    assert "loco model pull" in result.stdout
+    assert "loco serve" in result.stdout
 ```
 
 - [ ] **Step 2: Run test**
@@ -2982,13 +2982,13 @@ Expected: FAIL.
 # Append to src/llm_cli/commands/setup.py, at the end of setup():
     console.print()
     console.print("[bold]Recommended next steps:[/bold]")
-    console.print("  1. llm doctor                  # verify cross-cutting prereqs")
-    console.print("  2. llm runtime list            # see available runtimes")
-    console.print("  3. llm runtime install <id>    # install one (e.g. `llm runtime install llamacpp`)")
-    console.print("  4. llm model list              # browse model definitions")
-    console.print("  5. llm model pull <id>         # download weights")
-    console.print("  6. llm config validate         # check launch configs")
-    console.print("  7. llm serve <config-id>       # start a server")
+    console.print("  1. loco doctor                  # verify cross-cutting prereqs")
+    console.print("  2. loco runtime list            # see available runtimes")
+    console.print("  3. loco runtime install <id>    # install one (e.g. `loco runtime install llamacpp`)")
+    console.print("  4. loco model list              # browse model definitions")
+    console.print("  5. loco model pull <id>         # download weights")
+    console.print("  6. loco config validate         # check launch configs")
+    console.print("  7. loco serve <config-id>       # start a server")
 ```
 
 - [ ] **Step 4: Run test**
@@ -3005,7 +3005,7 @@ git commit -m "feat(setup): print 'Recommended next steps' panel after settings 
 
 ---
 
-### Task H2: Remove top-level `llm build` / `llm pull`; delete `artifacts.py`
+### Task H2: Remove top-level `loco build` / `loco pull`; delete `artifacts.py`
 
 **Files:**
 - Modify: `src/llm_cli/main.py`
@@ -3023,7 +3023,7 @@ def test_top_level_build_pull_removed():
     from llm_cli.main import app
 
     runner = CliRunner()
-    # `llm build x` should fail with usage error (unknown command).
+    # `loco build x` should fail with usage error (unknown command).
     r1 = runner.invoke(app, ["build", "rt-a"])
     assert r1.exit_code != 0
     r2 = runner.invoke(app, ["pull", "md-a"])
@@ -3071,7 +3071,7 @@ Expected: PASS.
 
 ```bash
 git add src/llm_cli/main.py tests/integration/test_cli_help.py
-git commit -m "feat(cli): remove top-level llm build/pull; runtime/model sub-apps are the surface"
+git commit -m "feat(cli): remove top-level loco build/pull; runtime/model sub-apps are the surface"
 ```
 
 ---
@@ -3092,7 +3092,7 @@ id: stub-runtime
 display_name: Stub Runtime (smoke)
 official: true
 description: >
-  Minimal runtime package for exercising discovery, `llm runtime install`, and
+  Minimal runtime package for exercising discovery, `loco runtime install`, and
   layout validation. Replace with a real inference server (vLLM, llama.cpp, …).
 build: {}
 serve: {}
@@ -3191,7 +3191,7 @@ serve:
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${LLM_RUNTIMES:?LLM_RUNTIMES must be set (eval \"\$(llm settings env)\")}"
+: "${LLM_RUNTIMES:?LLM_RUNTIMES must be set (eval \"\$(loco settings env)\")}"
 
 ROOT="${LLM_RUNTIMES}/llamacpp"
 SRC="${ROOT}/llama.cpp"
@@ -3335,8 +3335,8 @@ Replace the entire contents of `docs/add-a-runtime.md` with a HOWTO oriented aro
 3. Param types and the `env:` field.
 4. `when:` clauses for conditional deps.
 5. Script contracts (env vars each receives; `LLM_BUILD_*` for build.sh; runtime-named for serve.sh).
-6. Install flow (`llm runtime install <id>`), then `verify`, then `serve.params` validation in configs.
-7. Verification commands (`llm runtime info`, `llm doctor --runtime <id>`, `llm config validate`, `llm serve`).
+6. Install flow (`loco runtime install <id>`), then `verify`, then `serve.params` validation in configs.
+7. Verification commands (`loco runtime info`, `loco doctor --runtime <id>`, `loco config validate`, `loco serve`).
 8. Cross-links to the spec, the lifecycle doc, and `docs/repo-conventions.md`.
 
 - [ ] **Step 2: Commit**
@@ -3360,7 +3360,7 @@ Cover:
 2. What the `.installed` record contains and where it lives.
 3. Build params vs serve params: who picks what when.
 4. Drift behavior (build.sh sha, schema_hash) — informational, fixed via `rebuild --reset`.
-5. Pre-flight: `llm doctor --runtime <id>` semantics.
+5. Pre-flight: `loco doctor --runtime <id>` semantics.
 6. Why serve refuses to start without `.installed`.
 7. Cross-links to spec + `docs/lifecycle.md`.
 
@@ -3383,9 +3383,9 @@ git commit -m "docs(runtime-lifecycle): install/uninstall/rebuild, .installed, d
 
 - [ ] **Step 1: Updates**
 
-- `docs/add-a-model.md`: replace `llm pull <id>` with `llm model pull <id>`. Add a note: "Model parameter schema is a follow-up spec — for now, pull.sh keeps its free-form env contract."
-- `docs/lifecycle.md`: in the pre-serve section, add a line: "Before any spawn, the CLI checks `${runtimes_dir}/<runtime-id>/.installed`. If absent, serve refuses with hint `llm runtime install <id>`."
-- `README.md`: replace `llm build` / `llm pull` rows in the CLI table with `llm runtime [list|info|install|uninstall|rebuild]` and `llm model [list|info|pull]`. Update the Getting Started snippet to: `llm setup` → `llm runtime install llamacpp` → `llm model pull unsloth-qwen3.6-35b-a3b` → `llm config validate` → `llm serve llamacpp__unsloth-qwen3.6-35b-a3b__default`.
+- `docs/add-a-model.md`: replace `loco pull <id>` with `loco model pull <id>`. Add a note: "Model parameter schema is a follow-up spec — for now, pull.sh keeps its free-form env contract."
+- `docs/lifecycle.md`: in the pre-serve section, add a line: "Before any spawn, the CLI checks `${runtimes_dir}/<runtime-id>/.installed`. If absent, serve refuses with hint `loco runtime install <id>`."
+- `README.md`: replace `loco build` / `loco pull` rows in the CLI table with `loco runtime [list|info|install|uninstall|rebuild]` and `loco model [list|info|pull]`. Update the Getting Started snippet to: `loco setup` → `loco runtime install llamacpp` → `loco model pull unsloth-qwen3.6-35b-a3b` → `loco config validate` → `loco serve llamacpp__unsloth-qwen3.6-35b-a3b__default`.
 - Old design spec (`2026-05-15-localllm-scaffolding-design.md`): add a third "Updated …" note at the top pointing at this new spec, similar to the existing notes for settings and lifecycle.
 
 - [ ] **Step 2: Run tests** (no test impact expected; sanity check)
@@ -3428,15 +3428,15 @@ git commit -m "docs(requirements): regenerate with universal + per-runtime secti
 - [ ] **Step 4: Sanity-test the CLI manually inside WSL**
 
 ```bash
-llm setup --default
-llm runtime list
-llm runtime install stub-runtime --yes
-llm runtime info stub-runtime
-llm config validate
-llm serve stub-runtime__stub-model__default
-llm status
-llm stop
-llm runtime uninstall stub-runtime --yes
+loco setup --default
+loco runtime list
+loco runtime install stub-runtime --yes
+loco runtime info stub-runtime
+loco config validate
+loco serve stub-runtime__stub-model__default
+loco status
+loco stop
+loco runtime uninstall stub-runtime --yes
 ```
 
 Expected: each command succeeds (serve is the existing toy TCP listener, healthcheck passes within a couple of seconds).

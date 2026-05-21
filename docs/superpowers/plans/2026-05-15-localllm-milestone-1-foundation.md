@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Bootstrap the LocalLLM repo with the Python CLI skeleton, `llm init`, `llm specs`, and `llm doctor`. After this milestone, you can document your machine to `specs.md` and verify external prerequisites against `requirements.yaml`/`requirements.md`.
+**Goal:** Bootstrap the LocalLLM repo with the Python CLI skeleton, `loco init`, `loco specs`, and `loco doctor`. After this milestone, you can document your machine to `specs.md` and verify external prerequisites against `requirements.yaml`/`requirements.md`.
 
 **Architecture:** A Python package `llm_cli` (src layout), Typer-based CLI with a console-script entrypoint registered via `pyproject.toml`. Core modules under `llm_cli/core/` hold the testable logic (paths, version comparison, hardware detection, requirements checks); per-command modules under `llm_cli/commands/` are thin Typer wrappers.
 
 **Tech Stack:** Python 3.11+, Typer (CLI), PyYAML (config), httpx (later milestones), Rich (output), pytest + pytest-mock (tests), Hatch (build backend), pip editable install via `install.sh`.
 
-**Spec deviation flagged:** the spec lists `scripts/llm` and `scripts/_*.py`. The implementation uses `src/llm_cli/` with a console-script entrypoint instead — same external API (`llm` on PATH after install), better Python packaging idiom, easier to test. The repo will not have a `scripts/` directory; `install.sh` lives at the repo root.
+**Spec deviation flagged:** the spec lists `scripts/llm` and `scripts/_*.py`. The implementation uses `src/llm_cli/` with a console-script entrypoint instead — same external API (`loco` on PATH after install), better Python packaging idiom, easier to test. The repo will not have a `scripts/` directory; `install.sh` lives at the repo root.
 
 **Reference spec:** `docs/superpowers/specs/2026-05-15-localllm-scaffolding-design.md`
 
@@ -132,7 +132,7 @@ dist/
 
 ```yaml
 # Single source of truth for where LLM data lives in WSL.
-# Edit and re-run `llm init` to relocate.
+# Edit and re-run `loco init` to relocate.
 
 data_root: ~/llm
 runtimes: ${data_root}/runtimes
@@ -349,7 +349,7 @@ Commit message:
 ```
 feat: add Python package skeleton and CLI smoke test
 
-src/llm_cli/ package with Typer app, pyproject.toml registering the `llm`
+src/llm_cli/ package with Typer app, pyproject.toml registering the `loco`
 console script, and a smoke test that exercises --help and --version.
 ```
 
@@ -852,14 +852,14 @@ callers branch on the result.
 
 ---
 
-## Task 6: `llm init` command
+## Task 6: `loco init` command
 
 **Files:**
 - Create: `src/llm_cli/commands/init.py`
 - Modify: `src/llm_cli/main.py` (register command)
 - Create: `tests/integration/test_cli_init.py`
 
-`llm init` reads `paths.yaml`, creates the `$LLM_DATA_ROOT/{runtimes,models,cache}` directories, and writes a resolved `.llm-env` at the repo root for shell scripts to source.
+`loco init` reads `paths.yaml`, creates the `$LLM_DATA_ROOT/{runtimes,models,cache}` directories, and writes a resolved `.llm-env` at the repo root for shell scripts to source.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -941,7 +941,7 @@ Expected: failure — `init` command doesn't exist (Typer error: "No such comman
 
 ```python
 # src/llm_cli/commands/init.py
-"""`llm init` — read paths.yaml, create data root layout, write .llm-env."""
+"""`loco init` — read paths.yaml, create data root layout, write .llm-env."""
 from __future__ import annotations
 
 import os
@@ -1050,7 +1050,7 @@ git commit -F-
 Commit message:
 
 ```
-feat(cli): add `llm init` command
+feat(cli): add `loco init` command
 
 Reads paths.yaml, creates the data-root subdirectories, writes a resolved
 .llm-env file at the repo root. Idempotent. Resolves repo root from
@@ -1228,7 +1228,7 @@ Expected: ImportError.
 
 ```python
 # src/llm_cli/core/specs.py
-"""Hardware and environment detection for `llm specs`.
+"""Hardware and environment detection for `loco specs`.
 
 Detection functions accept injected `read_text` and `run_command` callables
 so tests can substitute fakes. Each detector degrades gracefully — missing
@@ -1460,7 +1460,7 @@ git commit -F-
 Commit message:
 
 ```
-feat(core): add hardware/env detection for llm specs
+feat(core): add hardware/env detection for loco specs
 
 CPU, RAM, GPU, CUDA, OS, WSL distro/kernel, and systemd-enabled detection.
 Each detector accepts injected IO so tests use fakes; missing tools
@@ -1644,7 +1644,7 @@ from llm_cli.core.specs import (
 SCAFFOLD = f"""\
 # System Specs
 
-<!-- AUTO-GENERATED: do not edit between markers. Run `llm specs` to regenerate. -->
+<!-- AUTO-GENERATED: do not edit between markers. Run `loco specs` to regenerate. -->
 {SPECS_START_MARKER}
 OLD CONTENT
 {SPECS_END_MARKER}
@@ -1718,7 +1718,7 @@ SPECS_END_MARKER = "<!-- llm:specs:end -->"
 
 _AUTOGEN_HEADER_COMMENT = (
     "<!-- AUTO-GENERATED: do not edit between markers. "
-    "Run `llm specs` to regenerate. -->"
+    "Run `loco specs` to regenerate. -->"
 )
 
 
@@ -1787,14 +1787,14 @@ Missing markers raise MarkersMissingError unless force=True.
 
 ---
 
-## Task 10: `llm specs` command
+## Task 10: `loco specs` command
 
 **Files:**
 - Create: `src/llm_cli/commands/specs.py`
 - Modify: `src/llm_cli/main.py` (register command)
 - Create: `tests/integration/test_cli_specs.py`
 
-`llm specs` regenerates the auto block in `specs.md`. Flags: `--check` exits nonzero on drift, `--print` prints detection without touching the file.
+`loco specs` regenerates the auto block in `specs.md`. Flags: `--check` exits nonzero on drift, `--print` prints detection without touching the file.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1935,7 +1935,7 @@ Expected: failure — `specs` command doesn't exist.
 
 ```python
 # src/llm_cli/commands/specs.py
-"""`llm specs` — regenerate the auto block in specs.md."""
+"""`loco specs` — regenerate the auto block in specs.md."""
 from __future__ import annotations
 
 import os
@@ -2093,7 +2093,7 @@ git commit -F-
 Commit message:
 
 ```
-feat(cli): add `llm specs` command
+feat(cli): add `loco specs` command
 
 Regenerates the llm:specs auto block in specs.md, preserving the Notes
 section and any other content outside markers. --check exits nonzero on
@@ -2534,9 +2534,9 @@ Append to `src/llm_cli/core/doctor.py`:
 _REQ_HEADER = (
     "# External Requirements\n\n"
     "<!-- AUTO-GENERATED from requirements.yaml — do not edit by hand. "
-    "Run `llm doctor render-requirements` to regenerate. -->\n\n"
+    "Run `loco doctor render-requirements` to regenerate. -->\n\n"
     "These prerequisites must exist on the machine for the LocalLLM CLI and the "
-    "runtimes' build/serve scripts to function. Run `llm doctor` to verify the "
+    "runtimes' build/serve scripts to function. Run `loco doctor` to verify the "
     "current state of each.\n\n"
 )
 
@@ -2586,20 +2586,20 @@ Commit message:
 feat(core): render requirements.yaml to a Markdown table
 
 render_requirements_md emits a single table (ID, Name, Min, Verify,
-Install, Why) with an auto-generated header. Used by `llm doctor
+Install, Why) with an auto-generated header. Used by `loco doctor
 render-requirements`.
 ```
 
 ---
 
-## Task 14: `llm doctor` command + `render-requirements` subcommand
+## Task 14: `loco doctor` command + `render-requirements` subcommand
 
 **Files:**
 - Create: `src/llm_cli/commands/doctor.py`
 - Modify: `src/llm_cli/main.py` (register command group)
 - Create: `tests/integration/test_cli_doctor.py`
 
-`llm doctor` prints a colored status table for each requirement and exits 0 if all OK, 1 otherwise. `llm doctor render-requirements` writes `requirements.md` from `requirements.yaml`.
+`loco doctor` prints a colored status table for each requirement and exits 0 if all OK, 1 otherwise. `loco doctor render-requirements` writes `requirements.md` from `requirements.yaml`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2705,7 +2705,7 @@ Expected: failure — `doctor` command doesn't exist.
 
 ```python
 # src/llm_cli/commands/doctor.py
-"""`llm doctor` — verify external requirements; `llm doctor render-requirements` regenerates the markdown."""
+"""`loco doctor` — verify external requirements; `loco doctor render-requirements` regenerates the markdown."""
 from __future__ import annotations
 
 import os
@@ -2862,7 +2862,7 @@ Expected: all integration tests PASS (help, init, specs, doctor).
 ```powershell
 $env:LLM_REPO_ROOT = (Get-Location).Path
 .\.venv\Scripts\Activate.ps1
-llm doctor render-requirements
+loco doctor render-requirements
 ```
 
 Verify `requirements.md` was created at the repo root and contains the requirements table.
@@ -2877,7 +2877,7 @@ git commit -F-
 Commit message:
 
 ```
-feat(cli): add `llm doctor` and `llm doctor render-requirements`
+feat(cli): add `loco doctor` and `loco doctor render-requirements`
 
 doctor runs all checks from requirements.yaml and prints a colored status
 table; exits 1 if any requirement is not OK. render-requirements
@@ -2891,13 +2891,13 @@ regenerates requirements.md (also committed in this commit).
 **Files:**
 - Create: `install.sh`
 
-Creates a venv at `~/llm/.cli-venv/`, runs `pip install -e <repo>`, and symlinks the resulting `llm` entrypoint into `~/.local/bin/`. Prints next-step instructions.
+Creates a venv at `~/llm/.cli-venv/`, runs `pip install -e <repo>`, and symlinks the resulting `loco` entrypoint into `~/.local/bin/`. Prints next-step instructions.
 
 - [ ] **Step 1: Create `install.sh`**
 
 ```bash
 #!/usr/bin/env bash
-# Install the LocalLLM CLI into a venv and expose `llm` on PATH.
+# Install the LocalLLM CLI into a venv and expose `loco` on PATH.
 # Run inside WSL2 from the repo root.
 
 set -euo pipefail
@@ -2927,9 +2927,9 @@ echo "Installed. Make sure ~/.local/bin is on your PATH:"
 echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
 echo
 echo "Next steps:"
-echo "  llm init                    # create data-root subdirectories"
-echo "  llm specs                   # generate specs.md"
-echo "  llm doctor                  # verify requirements"
+echo "  loco init                    # create data-root subdirectories"
+echo "  loco specs                   # generate specs.md"
+echo "  loco doctor                  # verify requirements"
 ```
 
 - [ ] **Step 2: Make it executable**
@@ -2990,20 +2990,20 @@ Inside WSL2:
 ```bash
 # 1. Verify external prerequisites you'll need
 cat requirements.md     # human-readable list
-# (or after install:) llm doctor render-requirements && cat requirements.md
+# (or after install:) loco doctor render-requirements && cat requirements.md
 
 # 2. Install the CLI into a venv at ~/llm/.cli-venv/
 ./install.sh
 export PATH="$HOME/.local/bin:$PATH"   # if not already
 
 # 3. Initialize data-root subdirectories
-llm init
+loco init
 
 # 4. Document the machine
-llm specs
+loco specs
 
 # 5. Verify external requirements
-llm doctor
+loco doctor
 ```
 
 ## Layout
@@ -3025,14 +3025,14 @@ for the full design.
 
 | Command | Purpose |
 |---|---|
-| `llm init` | Read `paths.yaml`, create data-root subdirectories, write `.llm-env` |
-| `llm specs` | Regenerate the auto block in `specs.md` |
-| `llm specs --check` | Exit nonzero if `specs.md` differs from current detection |
-| `llm specs --print` | Print detection without writing |
-| `llm doctor` | Run all checks from `requirements.yaml` |
-| `llm doctor render-requirements` | Regenerate `requirements.md` from `requirements.yaml` |
+| `loco init` | Read `paths.yaml`, create data-root subdirectories, write `.llm-env` |
+| `loco specs` | Regenerate the auto block in `specs.md` |
+| `loco specs --check` | Exit nonzero if `specs.md` differs from current detection |
+| `loco specs --print` | Print detection without writing |
+| `loco doctor` | Run all checks from `requirements.yaml` |
+| `loco doctor render-requirements` | Regenerate `requirements.md` from `requirements.yaml` |
 
-Future milestones add `llm list / status / build / pull / start / stop / switch / default / bench / results`.
+Future milestones add `loco list / status / build / pull / start / stop / switch / default / bench / results`.
 
 ## Discipline
 
@@ -3054,7 +3054,7 @@ Commit message:
 ```
 docs: add project README with bootstrap flow and layout reference
 
-Walks through install.sh -> llm init -> llm specs -> llm doctor for first-time
+Walks through install.sh -> loco init -> loco specs -> loco doctor for first-time
 setup, and links to the design spec. Lists the M1 CLI commands.
 ```
 
@@ -3168,19 +3168,19 @@ pip install -U huggingface_hub[cli]
 cd /mnt/c/Private/Projects/LocalLLM   # or wherever the repo lives
 ./install.sh
 export PATH="$HOME/.local/bin:$PATH"
-llm init
-llm specs
-llm doctor
+loco init
+loco specs
+loco doctor
 ```
 
-`llm doctor` should report all requirements as OK. If something is missing or outdated, the doctor's output includes the install hint.
+`loco doctor` should report all requirements as OK. If something is missing or outdated, the doctor's output includes the install hint.
 
 ## Common pitfalls
 
 - **`nvidia-smi: command not found` inside WSL** — you installed the driver inside WSL or used an old driver. Uninstall any in-WSL CUDA driver and install the latest host driver from NVIDIA.
 - **Models stored on `/mnt/c/...`** — disastrously slow for weight loading. Always store under `~/llm/` (WSL ext4) or a dedicated mounted Linux drive.
 - **`systemctl is-system-running` returns `offline`** — `/etc/wsl.conf` change didn't take. Confirm the file content, then `wsl --shutdown` and re-open.
-- **`llm` not on PATH** — add `export PATH="$HOME/.local/bin:$PATH"` to `~/.bashrc`.
+- **`loco` not on PATH** — add `export PATH="$HOME/.local/bin:$PATH"` to `~/.bashrc`.
 ```
 
 - [ ] **Step 3: Commit**
@@ -3217,14 +3217,14 @@ Expected: every test PASSES (no failures, no errors).
 ```powershell
 .\.venv\Scripts\Activate.ps1
 $env:LLM_REPO_ROOT = (Get-Location).Path
-llm --version
-llm --help
-llm init
-llm specs --print           # should print a markdown block (most fields will be 'not detected' on Windows host)
-llm doctor render-requirements
+loco --version
+loco --help
+loco init
+loco specs --print           # should print a markdown block (most fields will be 'not detected' on Windows host)
+loco doctor render-requirements
 ```
 
-Expected: each command succeeds. `llm specs` and `llm doctor` will report many fields as not-detected when run from Windows (vs WSL); that's fine for verification of the code path.
+Expected: each command succeeds. `loco specs` and `loco doctor` will report many fields as not-detected when run from Windows (vs WSL); that's fine for verification of the code path.
 
 - [ ] **Step 3: Confirm git state is clean**
 

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace `paths.yaml` + `llm init` + `.llm-env` with a clean separation between machine-local settings (`~/.config/llm/config.yaml`) and repo content. Add `llm setup` (first-run + re-runnable) and `llm settings show / env / edit` commands. Make `repo_root` a settings key (no env-var override, no walk-up).
+**Goal:** Replace `paths.yaml` + `loco init` + `.llm-env` with a clean separation between machine-local settings (`~/.config/llm/config.yaml`) and repo content. Add `loco setup` (first-run + re-runnable) and `loco settings show / env / edit` commands. Make `repo_root` a settings key (no env-var override, no walk-up).
 
 **Architecture:** A new module `src/llm_cli/core/settings.py` owns load/save/resolve/registry. Two new command modules (`commands/setup.py`, `commands/settings_cmd.py`) provide the CLI surface. `core/repo.py` shrinks to reading `Settings.repo_root`. `core/wsl.py` injects `LLM_*` env vars into bash subprocesses directly — `.llm-env` is gone. `paths.yaml`, `core/paths.py`, and `commands/init.py` are deleted.
 
@@ -189,7 +189,7 @@ KEY_REGISTRY: dict[str, dict[str, Any]] = {
 
 
 def default_settings() -> dict[str, str]:
-    """The minimum stored dict; repo_root is filled in by `llm setup`."""
+    """The minimum stored dict; repo_root is filled in by `loco setup`."""
     return {"data_root": KEY_REGISTRY["data_root"]["default"]}
 ```
 
@@ -526,7 +526,7 @@ def resolve(values: dict[str, str]) -> Settings:
     repo_root_raw = values.get("repo_root")
     if not repo_root_raw:
         raise MissingSettingError(
-            "repo_root is not configured; run `llm setup` from inside the repo"
+            "repo_root is not configured; run `loco setup` from inside the repo"
         )
     repo_root = _expand(repo_root_raw)
 
@@ -663,9 +663,9 @@ git commit -m "test: autouse XDG_CONFIG_HOME isolation fixture"
 
 ---
 
-## Phase 2 — `llm setup` command
+## Phase 2 — `loco setup` command
 
-### Task 8: `llm setup --default` (non-interactive)
+### Task 8: `loco setup --default` (non-interactive)
 
 **Files:**
 - Create: `src/llm_cli/commands/setup.py`
@@ -675,7 +675,7 @@ git commit -m "test: autouse XDG_CONFIG_HOME isolation fixture"
 
 ```python
 # tests/integration/test_cli_setup.py
-"""Integration tests for `llm setup`."""
+"""Integration tests for `loco setup`."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -722,7 +722,7 @@ Expected: FAIL — `setup` command doesn't exist.
 
 ```python
 # src/llm_cli/commands/setup.py
-"""`llm setup` — first-run interactive configurator."""
+"""`loco setup` — first-run interactive configurator."""
 from __future__ import annotations
 
 import os
@@ -795,12 +795,12 @@ Expected: PASS.
 
 ```bash
 git add src/llm_cli/commands/setup.py src/llm_cli/main.py tests/integration/test_cli_setup.py
-git commit -m "feat(setup): add `llm setup --default` (non-interactive)"
+git commit -m "feat(setup): add `loco setup --default` (non-interactive)"
 ```
 
 ---
 
-### Task 9: `llm setup` interactive — data_root prompt + default layout
+### Task 9: `loco setup` interactive — data_root prompt + default layout
 
 **Files:**
 - Modify: `src/llm_cli/commands/setup.py`
@@ -893,7 +893,7 @@ git commit -m "feat(setup): interactive data_root prompt + default layout"
 
 ---
 
-### Task 10: `llm setup` interactive — granular layout branch
+### Task 10: `loco setup` interactive — granular layout branch
 
 **Files:**
 - Modify: `src/llm_cli/commands/setup.py`
@@ -972,9 +972,9 @@ git commit -m "feat(setup): granular per-directory override prompts"
 
 ---
 
-## Phase 3 — `llm settings` sub-app
+## Phase 3 — `loco settings` sub-app
 
-### Task 11: `llm settings show`
+### Task 11: `loco settings show`
 
 **Files:**
 - Create: `src/llm_cli/commands/settings_cmd.py`
@@ -985,7 +985,7 @@ git commit -m "feat(setup): granular per-directory override prompts"
 
 ```python
 # tests/integration/test_cli_settings.py
-"""Integration tests for `llm settings ...`."""
+"""Integration tests for `loco settings ...`."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -1028,7 +1028,7 @@ Expected: FAIL — `settings` sub-command doesn't exist.
 
 ```python
 # src/llm_cli/commands/settings_cmd.py
-"""`llm settings ...` — inspect and edit user-level settings."""
+"""`loco settings ...` — inspect and edit user-level settings."""
 from __future__ import annotations
 
 import typer
@@ -1084,12 +1084,12 @@ Expected: PASS.
 
 ```bash
 git add src/llm_cli/commands/settings_cmd.py src/llm_cli/main.py tests/integration/test_cli_settings.py
-git commit -m "feat(settings): add `llm settings show`"
+git commit -m "feat(settings): add `loco settings show`"
 ```
 
 ---
 
-### Task 12: `llm settings env`
+### Task 12: `loco settings env`
 
 **Files:**
 - Modify: `src/llm_cli/commands/settings_cmd.py`
@@ -1148,7 +1148,7 @@ _ENV_MAPPING = (
 
 @settings_app.command("env")
 def env() -> None:
-    """Print `export LLM_*=...` lines for `eval \"$(llm settings env)\"`."""
+    """Print `export LLM_*=...` lines for `eval \"$(loco settings env)\"`."""
     resolved = resolve(load_settings())
     for var, attr in _ENV_MAPPING:
         value = getattr(resolved, attr).as_posix()
@@ -1164,12 +1164,12 @@ Expected: PASS.
 
 ```bash
 git add src/llm_cli/commands/settings_cmd.py tests/integration/test_cli_settings.py
-git commit -m "feat(settings): add `llm settings env` (eval-friendly export lines)"
+git commit -m "feat(settings): add `loco settings env` (eval-friendly export lines)"
 ```
 
 ---
 
-### Task 13: `llm settings edit <key>` (interactive)
+### Task 13: `loco settings edit <key>` (interactive)
 
 **Files:**
 - Modify: `src/llm_cli/commands/settings_cmd.py`
@@ -1242,7 +1242,7 @@ def edit(
         if meta.get("required") and meta.get("default") is None:
             console.print(
                 f"[red]error:[/red] {key!r} has no built-in default; "
-                f"use `llm settings edit {key}` to set a new value."
+                f"use `loco settings edit {key}` to set a new value."
             )
             raise typer.Exit(code=1)
         if meta["default"] is None:
@@ -1272,12 +1272,12 @@ Expected: PASS.
 
 ```bash
 git add src/llm_cli/commands/settings_cmd.py tests/integration/test_cli_settings.py
-git commit -m "feat(settings): add interactive `llm settings edit <key>`"
+git commit -m "feat(settings): add interactive `loco settings edit <key>`"
 ```
 
 ---
 
-### Task 14: `llm settings edit <key> --default` semantics
+### Task 14: `loco settings edit <key> --default` semantics
 
 **Files:**
 - Test only: `tests/integration/test_cli_settings.py`
@@ -1344,9 +1344,9 @@ git commit -m "test(settings): cover --default semantics for edit"
 
 ---
 
-## Phase 4 — Wire commands + remove `llm init`
+## Phase 4 — Wire commands + remove `loco init`
 
-### Task 15: Remove `llm init` from `main.py`, delete `init.py` and its tests
+### Task 15: Remove `loco init` from `main.py`, delete `init.py` and its tests
 
 **Files:**
 - Modify: `src/llm_cli/main.py`
@@ -1372,9 +1372,9 @@ app.command("init", help="Read paths.yaml, create data-root dirs, write .llm-env
 git rm src/llm_cli/commands/init.py tests/integration/test_cli_init.py
 ```
 
-- [ ] **Step 3: Confirm `llm init` is gone**
+- [ ] **Step 3: Confirm `loco init` is gone**
 
-Run: `llm --help` should not list `init`. Also run the test suite to confirm no import errors:
+Run: `loco --help` should not list `init`. Also run the test suite to confirm no import errors:
 
 Run: `pytest tests -q`
 Expected: tests pass; one fewer integration test file.
@@ -1383,7 +1383,7 @@ Expected: tests pass; one fewer integration test file.
 
 ```bash
 git add -A
-git commit -m "refactor(cli): remove `llm init` (absorbed into `llm setup`)"
+git commit -m "refactor(cli): remove `loco init` (absorbed into `loco setup`)"
 ```
 
 ---
@@ -1487,7 +1487,7 @@ def repo_root() -> Path:
     if not resolved.repo_root.is_dir():
         raise RepoRootMissing(
             f"repo_root points at {resolved.repo_root}, which is not a directory; "
-            "run `llm settings edit repo_root` to fix"
+            "run `loco settings edit repo_root` to fix"
         )
     return resolved.repo_root.resolve()
 ```
@@ -1701,7 +1701,7 @@ git commit -m "refactor(wsl): inject LLM_* env from Settings, drop .llm-env sour
 Replace the body of `src/llm_cli/commands/artifacts.py`:
 
 ```python
-"""`llm build` and `llm pull` — run WSL bash scripts for runtimes and models."""
+"""`loco build` and `loco pull` — run WSL bash scripts for runtimes and models."""
 from __future__ import annotations
 
 import typer
@@ -1875,7 +1875,7 @@ git commit -m "chore: remove paths.yaml (settings live in ~/.config/llm/)"
 
 ## Phase 7 — install.sh
 
-### Task 24: Update `install.sh` to auto-invoke `llm setup`
+### Task 24: Update `install.sh` to auto-invoke `loco setup`
 
 **Files:**
 - Modify: `install.sh`
@@ -1884,7 +1884,7 @@ git commit -m "chore: remove paths.yaml (settings live in ~/.config/llm/)"
 
 ```bash
 #!/usr/bin/env bash
-# Install the LocalLLM CLI into a venv and expose `llm` on PATH.
+# Install the LocalLLM CLI into a venv and expose `loco` on PATH.
 # Run inside WSL2 from the repo root.
 
 set -euo pipefail
@@ -1920,9 +1920,9 @@ echo "Installed. Make sure ~/.local/bin is on your PATH:"
 echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
 echo
 echo "Next steps:"
-echo "  llm settings show   # confirm settings"
-echo "  llm doctor          # verify external prerequisites"
-echo "  llm list            # list runtimes, models, configs, benchmarks"
+echo "  loco settings show   # confirm settings"
+echo "  loco doctor          # verify external prerequisites"
+echo "  loco list            # list runtimes, models, configs, benchmarks"
 ```
 
 - [ ] **Step 2: Smoke check the script syntax**
@@ -1934,7 +1934,7 @@ Expected: no output, exit 0.
 
 ```bash
 git add install.sh
-git commit -m "feat(install): auto-invoke `llm setup` on first install"
+git commit -m "feat(install): auto-invoke `loco setup` on first install"
 ```
 
 ---
@@ -1956,17 +1956,17 @@ Inside WSL2:
 ```bash
 # 1. Verify external prerequisites
 cat requirements.md
-# (or after install:) llm doctor
+# (or after install:) loco doctor
 
 # 2. Install the CLI into a venv and run first-time setup
 ./install.sh
 export PATH="$HOME/.local/bin:$PATH"   # if not already
 
 # 3. Inspect settings (settings live at ~/.config/llm/config.yaml)
-llm settings show
+loco settings show
 
 # 4. Document the machine
-llm specs
+loco specs
 ```
 `````
 
@@ -1977,22 +1977,22 @@ llm specs
 
 | Command | Purpose |
 |---|---|
-| `llm setup` | Interactive first-time configurator. Writes `~/.config/llm/config.yaml`, creates data-root subdirectories. Re-runnable. |
-| `llm setup --default` | Non-interactive: use built-in defaults for every key. |
-| `llm settings show` | Print settings file path, stored contents, and resolved view. |
-| `llm settings env` | Print `export LLM_*=...` lines for `eval "$(llm settings env)"`. |
-| `llm settings edit <key>` | Interactive prompt to update one key. |
-| `llm settings edit <key> --default` | Reset key to its built-in default (`data_root`) or remove the override (`runtimes_dir`/`models_dir`/`cache_dir`). |
-| `llm specs` | Regenerate the auto block in `specs.md` |
-| `llm specs --check` | Exit nonzero if `specs.md` differs from current detection |
-| `llm specs --print` | Print detection without writing |
-| `llm doctor` | Run all checks from `requirements.yaml` |
-| `llm doctor render-requirements` | Regenerate `requirements.md` from `requirements.yaml` |
-| `llm list` | List runtimes, models, configs, and benchmarks |
-| `llm config show <id>` | Print a single launch config (with `${data_root}` expanded in `serve.env`) |
-| `llm config validate` | Validate every `configs/*.yaml` against manifests and script layout |
-| `llm build <runtime-id>` | Run `runtimes/<id>/build.sh` via WSL bash with `LLM_*` env injected |
-| `llm pull <model-id>` | Run `models/<id>/pull.sh` via WSL bash with `LLM_*` env injected |
+| `loco setup` | Interactive first-time configurator. Writes `~/.config/llm/config.yaml`, creates data-root subdirectories. Re-runnable. |
+| `loco setup --default` | Non-interactive: use built-in defaults for every key. |
+| `loco settings show` | Print settings file path, stored contents, and resolved view. |
+| `loco settings env` | Print `export LLM_*=...` lines for `eval "$(loco settings env)"`. |
+| `loco settings edit <key>` | Interactive prompt to update one key. |
+| `loco settings edit <key> --default` | Reset key to its built-in default (`data_root`) or remove the override (`runtimes_dir`/`models_dir`/`cache_dir`). |
+| `loco specs` | Regenerate the auto block in `specs.md` |
+| `loco specs --check` | Exit nonzero if `specs.md` differs from current detection |
+| `loco specs --print` | Print detection without writing |
+| `loco doctor` | Run all checks from `requirements.yaml` |
+| `loco doctor render-requirements` | Regenerate `requirements.md` from `requirements.yaml` |
+| `loco list` | List runtimes, models, configs, and benchmarks |
+| `loco config show <id>` | Print a single launch config (with `${data_root}` expanded in `serve.env`) |
+| `loco config validate` | Validate every `configs/*.yaml` against manifests and script layout |
+| `loco build <runtime-id>` | Run `runtimes/<id>/build.sh` via WSL bash with `LLM_*` env injected |
+| `loco pull <model-id>` | Run `models/<id>/pull.sh` via WSL bash with `LLM_*` env injected |
 ```
 
 - [ ] **Step 3: Commit**
@@ -2014,7 +2014,7 @@ git commit -m "docs(readme): replace init flow with setup + settings"
 Find the row mentioning `paths.yaml` and replace with:
 
 ```markdown
-| `~/.config/llm/config.yaml` | Per-machine settings (managed via `llm settings ...`); not in the repo |
+| `~/.config/llm/config.yaml` | Per-machine settings (managed via `loco settings ...`); not in the repo |
 ```
 
 - [ ] **Step 2: Add a "Settings vs configs" callout**
@@ -2026,10 +2026,10 @@ Below the table, add:
 
 Two namespaces, intentionally separate:
 
-- **`llm settings ...`** edits `~/.config/llm/config.yaml` (where data lives on this machine, where the repo is, etc.).
-- **`llm config show/validate`** operates on `configs/*.yaml` (launch units pairing a runtime + model + serve block).
+- **`loco settings ...`** edits `~/.config/llm/config.yaml` (where data lives on this machine, where the repo is, etc.).
+- **`loco config show/validate`** operates on `configs/*.yaml` (launch units pairing a runtime + model + serve block).
 
-For manual bash, `eval "$(llm settings env)"` injects `LLM_DATA_ROOT`, `LLM_REPO_ROOT`, `LLM_RUNTIMES`, `LLM_MODELS`, `LLM_CACHE` into the current shell.
+For manual bash, `eval "$(loco settings env)"` injects `LLM_DATA_ROOT`, `LLM_REPO_ROOT`, `LLM_RUNTIMES`, `LLM_MODELS`, `LLM_CACHE` into the current shell.
 ```
 
 - [ ] **Step 3: Commit**
@@ -2049,13 +2049,13 @@ git commit -m "docs(conventions): describe settings/config namespace split"
 
 - [ ] **Step 1: In `add-a-runtime.md`**
 
-Replace any mention of `llm init` and `.llm-env` with this exact markdown (four-backtick outer fences let the inner triple-backticks render):
+Replace any mention of `loco init` and `.llm-env` with this exact markdown (four-backtick outer fences let the inner triple-backticks render):
 
 `````markdown
 The CLI injects `LLM_DATA_ROOT`, `LLM_REPO_ROOT`, `LLM_RUNTIMES`, `LLM_MODELS`, and `LLM_CACHE` into bash every time it spawns one. For ad-hoc shell use, run:
 
 ```bash
-eval "$(llm settings env)"
+eval "$(loco settings env)"
 bash runtimes/my-runtime/build.sh
 ```
 `````
@@ -2066,8 +2066,8 @@ Replace the "Build artifacts" step with:
 ## 5. Build artifacts
 
 ```bash
-llm setup           # once per machine, if not already done
-llm build my-runtime
+loco setup           # once per machine, if not already done
+loco build my-runtime
 ```
 `````
 
@@ -2075,8 +2075,8 @@ llm build my-runtime
 
 Same substitutions for the model side:
 
-- Replace `llm init` with `llm setup` in the "Pull weights" section.
-- Replace any `.llm-env` references with `eval "$(llm settings env)"`.
+- Replace `loco init` with `loco setup` in the "Pull weights" section.
+- Replace any `.llm-env` references with `eval "$(loco settings env)"`.
 
 - [ ] **Step 3: Commit**
 
@@ -2095,7 +2095,7 @@ git commit -m "docs(howto): replace init/.llm-env with setup + settings env"
 - [ ] **Step 1: Insert a note near the top (right after the date/status header)**
 
 ```markdown
-> **Updated 2026-05-17:** the `paths.yaml` / `llm init` / `.llm-env` mechanics
+> **Updated 2026-05-17:** the `paths.yaml` / `loco init` / `.llm-env` mechanics
 > in this document are superseded by the settings & setup redesign — see
 > [`2026-05-17-settings-and-setup-redesign.md`](2026-05-17-settings-and-setup-redesign.md).
 ```
@@ -2125,13 +2125,13 @@ cd /mnt/c/Private/Projects/LocalLLM
 ./install.sh
 ```
 
-Expected: `install.sh` runs, then `llm setup` prompts for `data_root` (default `~/llm`) and layout (default Y). After answering through, `~/.config/llm/config.yaml` exists and `~/llm/{runtimes,models,cache}` are created.
+Expected: `install.sh` runs, then `loco setup` prompts for `data_root` (default `~/llm`) and layout (default Y). After answering through, `~/.config/llm/config.yaml` exists and `~/llm/{runtimes,models,cache}` are created.
 
 - [ ] **Step 2: Inspect settings**
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
-llm settings show
+loco settings show
 ```
 
 Expected output: file path is `~/.config/llm/config.yaml`; `data_root` and `repo_root` are present; resolved view shows all five keys.
@@ -2139,7 +2139,7 @@ Expected output: file path is `~/.config/llm/config.yaml`; `data_root` and `repo
 - [ ] **Step 3: Env round-trip**
 
 ```bash
-eval "$(llm settings env)"
+eval "$(loco settings env)"
 echo "$LLM_DATA_ROOT $LLM_REPO_ROOT $LLM_RUNTIMES"
 ```
 
@@ -2148,8 +2148,8 @@ Expected: prints the three resolved paths separated by spaces.
 - [ ] **Step 4: Build + pull**
 
 ```bash
-llm build stub-runtime
-llm pull stub-model
+loco build stub-runtime
+loco pull stub-model
 test -f "$LLM_RUNTIMES/stub-runtime/.built-stub" && echo build-ok
 test -f "$LLM_MODELS/stub-model/README.txt" && echo pull-ok
 ```
@@ -2160,16 +2160,16 @@ Expected: both `*-ok` lines print; the artifacts are under your `data_root`.
 
 ```bash
 cd /tmp
-llm list
+loco list
 ```
 
-Expected: `llm list` still works because `repo_root` is now resolved from settings rather than cwd.
+Expected: `loco list` still works because `repo_root` is now resolved from settings rather than cwd.
 
 - [ ] **Step 6: Edit + reset**
 
 ```bash
-llm settings edit data_root --default
-llm settings show
+loco settings edit data_root --default
+loco settings show
 ```
 
 Expected: stored `data_root` is back to `~/llm`.
@@ -2184,6 +2184,6 @@ This task changes no files in the repo. If everything is green, the redesign is 
 
 When all tasks above are checked off, the redesign matches `docs/superpowers/specs/2026-05-17-settings-and-setup-redesign.md` and the CLI surface is:
 
-- `llm setup`, `llm setup --default`
-- `llm settings show / env / edit [--default]`
-- `llm specs`, `llm doctor`, `llm list`, `llm config show/validate`, `llm build`, `llm pull` (unchanged behavior, new internals)
+- `loco setup`, `loco setup --default`
+- `loco settings show / env / edit [--default]`
+- `loco specs`, `loco doctor`, `loco list`, `loco config show/validate`, `loco build`, `loco pull` (unchanged behavior, new internals)

@@ -19,10 +19,14 @@ vi.mock('@tanstack/react-query', async () => {
   return {
     ...actual,
     useQuery: vi.fn(({ queryKey }: { queryKey: unknown[] }) => {
-      if (queryKey[0] === 'configs') {
+      if (queryKey[0] === 'configs' && queryKey.length === 2) {
         return {
           isPending: false,
-          data: { id: 'default', raw: { runtime: 'vllm' } },
+          data: {
+            detail: { id: 'default', raw: { runtime: 'vllm' } },
+            document: { runtime: 'vllm' },
+            runtimeId: 'vllm',
+          },
         }
       }
       if (queryKey[0] === 'runtimes' && queryKey.length === 1) {
@@ -64,10 +68,14 @@ describe('MetricsTab', () => {
   it('shows no-metrics message for runtimes without metrics', async () => {
     const { useQuery } = await import('@tanstack/react-query')
     vi.mocked(useQuery).mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
-      if (queryKey[0] === 'configs') {
+      if (queryKey[0] === 'configs' && queryKey.length === 2) {
         return {
           isPending: false,
-          data: { id: 'default', raw: { runtime: 'stub-runtime' } },
+          data: {
+            detail: { id: 'default', raw: { runtime: 'stub-runtime' } },
+            document: { runtime: 'stub-runtime' },
+            runtimeId: 'stub-runtime',
+          },
         } as ReturnType<typeof useQuery>
       }
       if (queryKey[0] === 'runtimes') {

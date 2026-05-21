@@ -55,7 +55,7 @@ Re-open WSL, then verify:
 systemctl is-system-running    # 'running' or 'degraded' is fine
 ```
 
-If you plan to use **`llm serve --systemd`**, enable **user lingering** so the service survives closing all interactive sessions when systemd is your session manager:
+If you plan to use **`loco serve --systemd`**, enable **user lingering** so the service survives closing all interactive sessions when systemd is your session manager:
 
 ```bash
 loginctl show-user --property=Linger   # want Linger=yes
@@ -63,7 +63,7 @@ loginctl show-user --property=Linger   # want Linger=yes
 sudo loginctl enable-linger "$USER"
 ```
 
-`llm doctor` prints an advisory when it detects `Linger=no`.
+`loco doctor` prints an advisory when it detects `Linger=no`.
 
 ### 4. Tune WSL memory and swap (optional but recommended)
 
@@ -93,16 +93,16 @@ curl -LsSf https://hf.co/cli/install.sh | bash
 cd /mnt/c/Private/Projects/LocalLLM   # or wherever the repo lives
 ./install.sh
 export PATH="$HOME/.local/bin:$PATH"
-llm setup
-llm specs
-llm doctor
+loco setup
+loco specs
+loco doctor
 ```
 
-`llm doctor` should report all requirements as OK. If something is missing or outdated, the doctor's output includes the install hint.
+`loco doctor` should report all requirements as OK. If something is missing or outdated, the doctor's output includes the install hint.
 
 ## Common pitfalls
 
 - **`nvidia-smi: command not found` inside WSL** — you installed the driver inside WSL or used an old driver. Uninstall any in-WSL CUDA driver and install the latest host driver from NVIDIA.
 - **Models stored on `/mnt/c/...`** — very slow for weight loading. Always store under `~/llm/` (WSL ext4) or a dedicated mounted Linux drive.
 - **`systemctl is-system-running` returns `offline`** — `/etc/wsl.conf` change did not take. Confirm the file content, then `wsl --shutdown` and re-open.
-- **`llm` not on PATH** — add `export PATH="$HOME/.local/bin:$PATH"` to `~/.bashrc`.
+- **`loco` not on PATH** — add `export PATH="$HOME/.local/bin:$PATH"` to `~/.bashrc`.

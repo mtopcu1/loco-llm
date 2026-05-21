@@ -1,4 +1,4 @@
-"""`llm list` — enumerate runtimes, models, configs, and benchmarks."""
+"""`loco list` — enumerate runtimes, models, configs, and benchmarks."""
 from __future__ import annotations
 
 import json

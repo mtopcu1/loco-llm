@@ -34,7 +34,7 @@ def build_serve_inner(repo_posix: str, script_posix_relpath: str) -> str:
     """Inner bash for serve.sh — cd into repo and exec the script.
 
     The final `exec` is essential: it makes the script's PID become the
-    server's PID, so `kill -TERM <pid>` from `llm stop` reaches the server
+    server's PID, so `kill -TERM <pid>` from `loco stop` reaches the server
     directly with no intermediate bash wrapper.
     """
     rel = script_posix_relpath.lstrip("/")

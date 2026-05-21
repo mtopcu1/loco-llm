@@ -24,9 +24,9 @@ The underlying complexity stack: 3 workflows, 5+ CI jobs, PyPI trusted-publisher
 ## 3. Goals
 
 1. **One-command install** via `curl ... | bash` that clones the repo and sets up an editable install.
-2. **`llm update`** that pulls the latest tagged release (or a specified branch/tag) without leaving the user stranded.
+2. **`loco update`** that pulls the latest tagged release (or a specified branch/tag) without leaving the user stranded.
 3. **Two-workflow CI**: one for PRs (tests), one for release-please (tagging only — no publish job).
-4. **Hotfix channel**: `llm update --branch <name>` lets the user (or a power user) switch to a branch tip for a critical fix, with loud warnings that they're off mainline.
+4. **Hotfix channel**: `loco update --branch <name>` lets the user (or a power user) switch to a branch tip for a critical fix, with loud warnings that they're off mainline.
 5. **No PyPI**, no wheel publishing, no scaffold tarball, no GITHUB_TOKEN trigger gotcha.
 6. **Conventional commits + release-please** retained for CHANGELOG and tagging (the parts that work).
 
@@ -47,8 +47,8 @@ Settled during brainstorming on 2026-05-19:
 | Question | Decision |
 |---|---|
 | Keep PyPI, switch to hermes-style git installer, or hybrid? | **Hermes-style git installer** (Option A). |
-| Should `llm update` track `main` or tags? | **Tags only.** Re-anchor to latest stable tag on bare `llm update`. |
-| Need a `--branch` flag for hotfixes? | **Yes.** Re-anchor semantics on bare `llm update` brings the user back. |
+| Should `loco update` track `main` or tags? | **Tags only.** Re-anchor to latest stable tag on bare `loco update`. |
+| Need a `--branch` flag for hotfixes? | **Yes.** Re-anchor semantics on bare `loco update` brings the user back. |
 | Keep release-please? | **Yes**, for CHANGELOG and tagging. Drop the publish job. |
 | Native Windows support? | **No.** WSL2 / Linux / macOS only. |
 | Big-bang cleanup or incremental? | **One PR.** Pieces are interdependent; solo project; no users to break. |
@@ -96,7 +96,7 @@ The script:
 7. `uv venv "$LOCO_LLM_HOME/.venv" --python 3.11`.
 8. `uv pip install --python "$LOCO_LLM_HOME/.venv" -e "$LOCO_LLM_HOME"`.
 9. Ensure `~/.local/bin` exists; symlink `~/.local/bin/llm` → `$LOCO_LLM_HOME/.venv/bin/llm`.
-10. Print next-step hint: `run "llm setup" to configure paths`.
+10. Print next-step hint: `run "loco setup" to configure paths`.
 
 Flags accepted (only what we'll actually use):
 
@@ -109,18 +109,18 @@ Non-goals for the installer:
 - No interactive prompts. Pure non-interactive flow.
 - No detect-and-migrate from prior pipx install. Document the manual cleanup separately.
 
-## 8. Update flow (`llm update`)
+## 8. Update flow (`loco update`)
 
 ### Surface
 
 ```bash
-llm update                       # default: latest stable tag (re-anchors if you went off-rails)
-llm update --branch <name>       # checkout tip of that branch (the hotfix case)
-llm update --tag <vX.Y.Z>        # pin to a specific tag (rollback / testing)
-llm update --check               # report current vs. available, no changes
+loco update                       # default: latest stable tag (re-anchors if you went off-rails)
+loco update --branch <name>       # checkout tip of that branch (the hotfix case)
+loco update --tag <vX.Y.Z>        # pin to a specific tag (rollback / testing)
+loco update --check               # report current vs. available, no changes
 ```
 
-### Behavior of bare `llm update` (re-anchor)
+### Behavior of bare `loco update` (re-anchor)
 
 ```
 cd $LOCO_LLM_HOME
@@ -151,7 +151,7 @@ uv pip install -e .
 restore stash with warning
 print loud warning:
     "you are now on branch <name> — not a stable release.
-     run `llm update` to return to latest stable tag."
+     run `loco update` to return to latest stable tag."
 ```
 
 ### Refusal modes
@@ -162,8 +162,8 @@ print loud warning:
 
 ### Visibility
 
-- `llm --version` shows `loco-llm 0.4.2` on a tag, `loco-llm 0.4.2-7+gabc1234 (branch: hotfix/foo)` off-tag.
-- `llm doctor` adds a check: if HEAD is not an exact tag match, print a yellow warning with the re-anchor command.
+- `loco --version` shows `loco-llm 0.4.2` on a tag, `loco-llm 0.4.2-7+gabc1234 (branch: hotfix/foo)` off-tag.
+- `loco doctor` adds a check: if HEAD is not an exact tag match, print a yellow warning with the re-anchor command.
 
 ### Hotfix flow (worked example)
 
@@ -171,12 +171,12 @@ print loud warning:
 # something breaks in v0.4.1; you push hotfix/scaffold-perms to origin
 
 # on the affected machine:
-llm update --branch hotfix/scaffold-perms
+loco update --branch hotfix/scaffold-perms
 # warning: you are now on branch hotfix/scaffold-perms — not a stable release.
 
 # fix verified, you open PR, merge, release-please cuts v0.4.2
 
-llm update
+loco update
 # currently on branch hotfix/scaffold-perms, switching back to latest stable tag v0.4.2
 # updated to v0.4.2
 ```
@@ -235,7 +235,7 @@ What this workflow does:
 2. Opens / updates a single long-lived release PR containing CHANGELOG + version bump in `pyproject.toml` and `src/llm_cli/__init__.py`.
 3. When the release PR merges → creates git tag `vX.Y.Z` and a GitHub Release with the CHANGELOG body.
 
-`llm update` finds the tag on its next run. That is the publish.
+`loco update` finds the tag on its next run. That is the publish.
 
 ## 11. Branch protection on `main`
 
@@ -265,7 +265,7 @@ feature branch
                           tag vX.Y.Z + GitHub Release + CHANGELOG
                                        │
                                        ▼
-                          users run `llm update` → picks up tag
+                          users run `loco update` → picks up tag
 ```
 
 ## 13. Burn-down list
@@ -294,7 +294,7 @@ feature branch
 | `.github/workflows/release-please.yml` | Per section 10 (no publish job) |
 | `tests/unit/test_update_cmd.py` | Coverage for git-based update flow |
 | `tests/unit/test_workflows.py` | Slim to shape checks for `ci` + `release-please` only |
-| `README.md` | curl install one-liner; `llm update`; remove all `pipx install` references |
+| `README.md` | curl install one-liner; `loco update`; remove all `pipx install` references |
 | `CONTRIBUTING.md` | Drop PyPI section; keep conventional commits |
 | `docs/RELEASE_SETUP.md` | Reduce to: enable Actions PR creation + branch protection note |
 
@@ -337,11 +337,11 @@ User data (`~/.config/localllm/settings.yaml`, `~/.local/share/localllm/`) is un
 
 1. Merge the rewrite PR (will contain a `feat!:` breaking-change commit → minor or major bump per pre-1.0 semantics).
 2. Merge the release-please-generated release PR → tag `vX.Y.0` created.
-3. In a fresh WSL2 environment: run the curl one-liner; verify `llm --version` returns the new tag.
-4. Run `llm update` — should report "already on latest stable".
+3. In a fresh WSL2 environment: run the curl one-liner; verify `loco --version` returns the new tag.
+4. Run `loco update` — should report "already on latest stable".
 5. Push a trivial `fix:` commit, merge, merge the new release PR → tag `vX.Y.1`.
-6. Run `llm update` on the test machine — should pull `vX.Y.1`.
-7. Test the hotfix path: push a branch, `llm update --branch <name>` from the test machine, verify warning, then bare `llm update` to re-anchor.
+6. Run `loco update` on the test machine — should pull `vX.Y.1`.
+7. Test the hotfix path: push a branch, `loco update --branch <name>` from the test machine, verify warning, then bare `loco update` to re-anchor.
 
 ## 17. Open implementation questions
 
@@ -349,16 +349,16 @@ User data (`~/.config/localllm/settings.yaml`, `~/.local/share/localllm/`) is un
 
 - Exact mechanics of `scaffold_root()` returning `LOCO_LLM_HOME` — what env vars / fallbacks?
 - Stash policy precise text and failure handling.
-- Whether to also gate `llm update` behind a `--yes` confirmation (or default to non-interactive).
-- Whether `llm update --check` should exit non-zero when behind (CI-friendly) or zero (informational).
+- Whether to also gate `loco update` behind a `--yes` confirmation (or default to non-interactive).
+- Whether `loco update --check` should exit non-zero when behind (CI-friendly) or zero (informational).
 
 ## 18. Out of scope (deliberately)
 
 - Multi-channel updates (`--prerelease`, `--unstable`).
 - PowerShell installer.
 - Compile-to-binary distribution.
-- Automatic post-update verification beyond `llm --version`.
-- Rolling back from a bad tag (manual: `llm update --tag <prev>`).
+- Automatic post-update verification beyond `loco --version`.
+- Rolling back from a bad tag (manual: `loco update --tag <prev>`).
 
 ---
 

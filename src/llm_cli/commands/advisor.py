@@ -1,4 +1,4 @@
-"""`llm advisor` — surface VRAM-aware recommendations."""
+"""`loco advisor` — surface VRAM-aware recommendations."""
 from __future__ import annotations
 
 import json
@@ -52,7 +52,7 @@ def _render_text(
         "  • Estimates based on llama.cpp's typical KV cost; actual VRAM use "
         "varies\n"
         "    with quant and prompt length.\n"
-        "  • Run  llm config setup  to scaffold a config using these values.\n"
+        "  • Run  loco config setup  to scaffold a config using these values.\n"
     )
 
 
@@ -154,7 +154,7 @@ def _interactive_pick() -> tuple[str | None, str | None]:
     if not models:
         console.print(
             f"[red]error:[/red] no models in registry match accepts_formats "
-            f"{list(rt_manifest.accepts_formats)}. Try `llm model pull <hf-url>`."
+            f"{list(rt_manifest.accepts_formats)}. Try `loco model pull <hf-url>`."
         )
         return (None, None)
     model_id = wiz.select("Pick a model", [m.id for m in models])
